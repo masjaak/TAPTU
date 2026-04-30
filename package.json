@@ -1,0 +1,16 @@
+{
+  "name": "taptu-hadiri",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @taptu/web",
+    "dev:web": "npm run dev --workspace @taptu/web",
+    "dev:api": "npm run dev --workspace @taptu/api",
+    "build": "npm run build --workspace @taptu/shared && npm run build --workspace @taptu/api && npm run build --workspace @taptu/web",
+    "typecheck": "npm run typecheck --workspace @taptu/shared && npm run typecheck --workspace @taptu/api && npm run typecheck --workspace @taptu/web"
+  }
+}
