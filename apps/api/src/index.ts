@@ -122,6 +122,9 @@ const attendanceSchema = z.object({
 });
 
 const requestSchema = z.object({
+  category: z.enum(["Izin", "Cuti", "Sakit"]),
+  startDate: z.string().min(10),
+  endDate: z.string().min(10),
   title: z.string().min(3),
   detail: z.string().min(8)
 });
@@ -203,6 +206,9 @@ function listAttendanceHistory(user: AuthUser): AttendanceTimelineItem[] {
 function buildRequestItem(request: (typeof store.requests)[number], actorName?: string): LeaveRequestItem {
   return {
     id: request.id,
+    category: request.category,
+    startDate: request.startDate,
+    endDate: request.endDate,
     title: request.title,
     detail: request.detail,
     status: request.status,
@@ -438,6 +444,9 @@ app.post("/api/requests", async (req, res) => {
   const nextRequest = {
     id: `req-${Date.now()}`,
     userId: user.id,
+    category: parsed.data.category,
+    startDate: parsed.data.startDate,
+    endDate: parsed.data.endDate,
     title: parsed.data.title,
     detail: parsed.data.detail,
     status: "Menunggu" as const,

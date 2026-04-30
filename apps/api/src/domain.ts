@@ -16,6 +16,9 @@ export interface AttendanceRecord {
 export interface RequestRecord {
   id: string;
   userId: string;
+  category: "Izin" | "Cuti" | "Sakit";
+  startDate: string;
+  endDate: string;
   title: string;
   detail: string;
   status: RequestFlowStatus;
@@ -151,6 +154,9 @@ export function createInitialStore(): DemoStore {
       {
         id: "req-001",
         userId: "usr-employee-01",
+        category: "Izin",
+        startDate: "2026-05-02",
+        endDate: "2026-05-02",
         title: "Izin pribadi",
         detail: "Perlu keluar kantor pukul 15.00 untuk urusan keluarga.",
         status: "Menunggu",

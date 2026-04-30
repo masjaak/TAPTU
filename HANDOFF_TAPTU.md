@@ -170,6 +170,30 @@ Batch terbaru sudah menambahkan:
 - request detail panel di tab `Izin`
 - cancel request untuk request `Menunggu`
 - scanner screen yang lebih fullscreen-like dan lebih cocok untuk perangkat operasional
+- request form yang lebih dekat ke kebutuhan nyata:
+  - tipe `Izin / Cuti / Sakit`
+  - tanggal mulai
+  - tanggal selesai
+
+## Catatan deploy Vercel
+
+Error deploy sebelumnya:
+
+- `Cannot find module '@taptu/shared'`
+
+Perbaikan yang sudah diterapkan:
+
+- `packages/shared/package.json` sekarang punya `exports`
+- `apps/api` dan `apps/web` build script sekarang build `@taptu/shared` dulu bila dibuild terpisah
+- root sudah punya `vercel.json` untuk deploy frontend web-only:
+  - build command: `npm run build --workspace @taptu/web`
+  - output directory: `apps/web/dist`
+
+Catatan penting:
+
+- konfigurasi ini memperbaiki build path untuk deploy frontend di Vercel
+- backend Express belum otomatis ikut ter-deploy sebagai server runtime Vercel
+- untuk login dan flow API di production, frontend tetap butuh `VITE_API_BASE_URL` yang mengarah ke backend yang benar
 
 Review terakhir tetap hijau:
 

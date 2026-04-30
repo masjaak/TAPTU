@@ -52,7 +52,10 @@ export async function checkOut(token: string, method: "QR" | "GPS" | "Selfie" | 
   );
 }
 
-export async function createRequest(token: string, payload: { title: string; detail: string }) {
+export async function createRequest(
+  token: string,
+  payload: { category: "Izin" | "Cuti" | "Sakit"; startDate: string; endDate: string; title: string; detail: string }
+) {
   return requestJson<RequestActionResponse>(
     "/requests",
     {

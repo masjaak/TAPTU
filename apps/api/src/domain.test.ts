@@ -31,6 +31,9 @@ describe("request state machine", () => {
       request: {
         id: "req-777",
         userId: "usr-employee-01",
+        category: "Cuti",
+        startDate: "2026-05-05",
+        endDate: "2026-05-06",
         title: "Cuti tahunan",
         detail: "Butuh cuti 2 hari.",
         status: "Menunggu",

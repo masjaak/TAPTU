@@ -43,7 +43,13 @@ export function AppPage() {
   const [scannerMeta, setScannerMeta] = useState<{ expiresInSeconds: number; scansToday: number; locationName: string } | null>(null);
   const [greeting, setGreeting] = useState("");
   const [tab, setTab] = useState<AppTabKey>("home");
-  const [requestForm, setRequestForm] = useState({ title: "", detail: "" });
+  const [requestForm, setRequestForm] = useState({
+    category: "Izin" as "Izin" | "Cuti" | "Sakit",
+    startDate: "",
+    endDate: "",
+    title: "",
+    detail: ""
+  });
   const [requestDetail, setRequestDetail] = useState<LeaveRequestItem | null>(null);
   const [historyFilter, setHistoryFilter] = useState<(typeof attendanceFilters)[number]>("all");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -165,7 +171,7 @@ export function AppPage() {
     try {
       const response = await createRequest(currentSession.token, requestForm);
       setRequests((current) => [response.request, ...current]);
-      setRequestForm({ title: "", detail: "" });
+      setRequestForm({ category: "Izin", startDate: "", endDate: "", title: "", detail: "" });
       setActionMessage("Pengajuan izin berhasil dikirim.");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Pengajuan izin gagal.");
@@ -458,6 +464,38 @@ export function AppPage() {
                 </div>
               ) : (
                 <form className="mt-6 space-y-4" onSubmit={handleCreateRequest}>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-[#31423b]">Tipe</span>
+                      <select
+                        value={requestForm.category}
+                        onChange={(event) => setRequestForm((current) => ({ ...current, category: event.target.value as "Izin" | "Cuti" | "Sakit" }))}
+                        className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                      >
+                        <option value="Izin">Izin</option>
+                        <option value="Cuti">Cuti</option>
+                        <option value="Sakit">Sakit</option>
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-[#31423b]">Mulai</span>
+                      <input
+                        type="date"
+                        value={requestForm.startDate}
+                        onChange={(event) => setRequestForm((current) => ({ ...current, startDate: event.target.value }))}
+                        className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-[#31423b]">Selesai</span>
+                      <input
+                        type="date"
+                        value={requestForm.endDate}
+                        onChange={(event) => setRequestForm((current) => ({ ...current, endDate: event.target.value }))}
+                        className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                      />
+                    </label>
+                  </div>
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-[#31423b]">Judul pengajuan</span>
                     <input
@@ -525,6 +563,20 @@ export function AppPage() {
                   <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Judul</p>
                     <p className="mt-2 text-lg font-semibold text-ink">{requestDetail.title}</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Tipe</p>
+                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.category ?? "-"}</p>
+                    </div>
+                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Mulai</p>
+                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.startDate ?? "-"}</p>
+                    </div>
+                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Selesai</p>
+                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.endDate ?? "-"}</p>
+                    </div>
                   </div>
                   {requestDetail.requester ? (
                     <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">

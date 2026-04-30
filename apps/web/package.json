@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "build": "npm run build --workspace @taptu/shared && tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run typecheck --workspace @taptu/shared && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios"

@@ -41,6 +41,9 @@ export interface AttendanceTimelineItem {
 export interface LeaveRequestItem {
   id?: string;
   requester?: string;
+  category?: "Izin" | "Cuti" | "Sakit";
+  startDate?: string;
+  endDate?: string;
   title: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";
   detail: string;
