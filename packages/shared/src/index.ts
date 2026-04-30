@@ -74,3 +74,19 @@ export interface DashboardPayload {
   requests: LeaveRequestItem[];
   scannerToken?: string;
 }
+
+export interface AdminOverview {
+  totalEmployees: number;
+  checkedInToday: number;
+  onTimeToday: number;
+  lateToday: number;
+  pendingRequests: number;
+}
+
+export interface EmployeeSummary {
+  totalDays: number;
+  onTimeDays: number;
+  lateDays: number;
+  pendingRequests: number;
+  currentAttendanceState: "idle" | "checked_in" | "checked_out";
+}

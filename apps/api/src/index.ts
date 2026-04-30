@@ -5,11 +5,13 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import type {
+  AdminOverview,
   AttendanceTimelineItem,
   AttendanceActionResponse,
   AuthUser,
   DashboardPayload,
   DashboardStat,
+  EmployeeSummary,
   LeaveRequestItem,
   LoginRequest,
   LoginResponse,
@@ -17,7 +19,7 @@ import type {
   ScannerTokenPayload,
   UserRole
 } from "@taptu/shared";
-import { createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
+import { computeAdminOverview, computeEmployeeSummary, createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
 import { getApiConfig } from "./config";
 import { createStorageAdapter } from "./storage";
 
@@ -555,6 +557,34 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
   await storage.save(store);
 
   return res.json(response);
+});
+
+app.get("/api/admin/overview", (req, res) => {
+  const user = requireUser(req, res);
+
+  if (!user) {
+    return;
+  }
+
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const overview: AdminOverview = computeAdminOverview(store, users.filter((u) => u.role === "employee").length);
+
+  return res.json(overview);
+});
+
+app.get("/api/employee/summary", (req, res) => {
+  const user = requireUser(req, res);
+
+  if (!user) {
+    return;
+  }
+
+  const summary: EmployeeSummary = computeEmployeeSummary(store, user.id);
+
+  return res.json(summary);
 });
 
 app.get("/api/scanner/token", async (req, res) => {

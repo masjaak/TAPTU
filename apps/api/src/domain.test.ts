@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken } from "./domain";
+import { computeAdminOverview, computeEmployeeSummary, createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken } from "./domain";
 
 describe("attendance state machine", () => {
   it("moves from idle to checked_in", () => {
@@ -94,5 +94,103 @@ describe("attendance history filter", () => {
 
     expect(filtered).toHaveLength(1);
     expect(filtered[0].status).toBe("Izin");
+  });
+});
+
+describe("admin overview", () => {
+  it("returns zero counts for an empty store", () => {
+    const store = createInitialStore();
+    store.attendance = {};
+    store.attendanceHistory = [];
+    store.requests = [];
+
+    const overview = computeAdminOverview(store, 10);
+
+    expect(overview.checkedInToday).toBe(0);
+    expect(overview.onTimeToday).toBe(0);
+    expect(overview.lateToday).toBe(0);
+    expect(overview.pendingRequests).toBe(0);
+    expect(overview.totalEmployees).toBe(10);
+  });
+
+  it("counts employees who have checked in today", () => {
+    const store = createInitialStore();
+    store.attendance["usr-employee-01"] = {
+      userId: "usr-employee-01",
+      state: "checked_in",
+      checkInAt: "2026-04-30T08:03:00.000Z",
+      checkInMethod: "QR"
+    };
+
+    const overview = computeAdminOverview(store, 5);
+
+    expect(overview.checkedInToday).toBe(1);
+  });
+
+  it("counts pending requests correctly", () => {
+    const store = createInitialStore();
+    const overview = computeAdminOverview(store, 5);
+
+    expect(overview.pendingRequests).toBe(1);
+  });
+
+  it("counts on-time and late entries for today", () => {
+    const store = createInitialStore();
+    store.attendanceHistory = [
+      { id: "a1", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" },
+      { id: "a2", day: "Hari ini", status: "Terlambat", time: "09:15", method: "GPS" },
+      { id: "a3", day: "Kemarin", status: "Tepat waktu", time: "07:58", method: "QR" }
+    ];
+
+    const overview = computeAdminOverview(store, 5);
+
+    expect(overview.onTimeToday).toBe(1);
+    expect(overview.lateToday).toBe(1);
+  });
+});
+
+describe("employee summary", () => {
+  it("returns correct on-time and late counts from history", () => {
+    const store = createInitialStore();
+    store.attendanceHistory = [
+      { id: "a1", day: "Kemarin", status: "Tepat waktu", time: "08:03", method: "QR" },
+      { id: "a2", day: "Senin", status: "Terlambat", time: "09:15", method: "GPS" },
+      { id: "a3", day: "Minggu lalu", status: "Tepat waktu", time: "07:58", method: "QR" }
+    ];
+
+    const summary = computeEmployeeSummary(store, "usr-employee-01");
+
+    expect(summary.onTimeDays).toBe(2);
+    expect(summary.lateDays).toBe(1);
+    expect(summary.totalDays).toBe(3);
+  });
+
+  it("returns correct attendance state for the user", () => {
+    const store = createInitialStore();
+    store.attendance["usr-employee-01"] = {
+      userId: "usr-employee-01",
+      state: "checked_in",
+      checkInAt: "2026-04-30T08:03:00.000Z",
+      checkInMethod: "QR"
+    };
+
+    const summary = computeEmployeeSummary(store, "usr-employee-01");
+
+    expect(summary.currentAttendanceState).toBe("checked_in");
+  });
+
+  it("counts only pending requests belonging to the user", () => {
+    const store = createInitialStore();
+    const summary = computeEmployeeSummary(store, "usr-employee-01");
+
+    expect(summary.pendingRequests).toBe(1);
+  });
+
+  it("returns idle state for unknown user", () => {
+    const store = createInitialStore();
+    const summary = computeEmployeeSummary(store, "usr-unknown-99");
+
+    expect(summary.currentAttendanceState).toBe("idle");
+    expect(summary.pendingRequests).toBe(0);
   });
 });

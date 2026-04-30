@@ -1,7 +1,9 @@
 import type {
+  AdminOverview,
   AttendanceActionResponse,
   AttendanceTimelineItem,
   DashboardPayload,
+  EmployeeSummary,
   LeaveRequestItem,
   LoginRequest,
   LoginResponse,
@@ -97,6 +99,14 @@ export async function cancelRequest(token: string, id: string) {
 
 export async function refreshScannerToken(token: string) {
   return requestJson<ScannerTokenPayload>("/scanner/token", {}, token);
+}
+
+export async function fetchAdminOverview(token: string) {
+  return requestJson<AdminOverview>("/admin/overview", {}, token);
+}
+
+export async function fetchEmployeeSummary(token: string) {
+  return requestJson<EmployeeSummary>("/employee/summary", {}, token);
 }
 
 async function requestJson<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {

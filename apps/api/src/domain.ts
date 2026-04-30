@@ -126,6 +126,31 @@ export function filterAttendanceHistory(items: AttendanceTimelineItem[], filter:
   return items.filter((item) => item.status === "Terlambat" || item.status === "Izin" || item.status === "Belum check-in");
 }
 
+export function computeAdminOverview(store: DemoStore, totalEmployees: number) {
+  const checkedInToday = Object.values(store.attendance).filter(
+    (record) => record.state === "checked_in" || record.state === "checked_out"
+  ).length;
+
+  const todayItems = store.attendanceHistory.filter((item) => item.day === "Hari ini");
+  const onTimeToday = todayItems.filter((item) => item.status === "Tepat waktu").length;
+  const lateToday = todayItems.filter((item) => item.status === "Terlambat").length;
+  const pendingRequests = store.requests.filter((request) => request.status === "Menunggu").length;
+
+  return { totalEmployees, checkedInToday, onTimeToday, lateToday, pendingRequests };
+}
+
+export function computeEmployeeSummary(store: DemoStore, userId: string) {
+  const onTimeDays = store.attendanceHistory.filter((item) => item.status === "Tepat waktu").length;
+  const lateDays = store.attendanceHistory.filter((item) => item.status === "Terlambat").length;
+  const totalDays = onTimeDays + lateDays;
+  const pendingRequests = store.requests.filter(
+    (request) => request.userId === userId && request.status === "Menunggu"
+  ).length;
+  const currentAttendanceState = store.attendance[userId]?.state ?? ("idle" as const);
+
+  return { totalDays, onTimeDays, lateDays, pendingRequests, currentAttendanceState };
+}
+
 export function createInitialStore(): DemoStore {
   return {
     attendance: {

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Bell, Clock3, LogOut, MapPinned, QrCode, ScanFace, ShieldCheck } from "lucide-react";
+import { Bell, Clock3, LogOut, MapPinned, QrCode, ScanFace, ShieldCheck, TrendingUp, Users } from "lucide-react";
 
 import type {
+  AdminOverview,
   AttendanceTimelineItem,
   DashboardPayload,
   DashboardScheduleItem,
   DashboardStat,
+  EmployeeSummary,
   LeaveRequestItem
 } from "@taptu/shared";
 
@@ -19,9 +21,11 @@ import {
   checkIn,
   checkOut,
   createRequest,
+  fetchAdminOverview,
   fetchAttendanceHistoryByFilter,
   fetchRequestDetail,
   fetchAttendanceHistory,
+  fetchEmployeeSummary,
   fetchRequests,
   getDashboard,
   refreshScannerToken
@@ -53,12 +57,15 @@ export function AppPage() {
   });
   const [requestDetail, setRequestDetail] = useState<LeaveRequestItem | null>(null);
   const [historyFilter, setHistoryFilter] = useState<(typeof attendanceFilters)[number]>("all");
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [adminOverview, setAdminOverview] = useState<AdminOverview | null>(null);
+  const [employeeSummary, setEmployeeSummary] = useState<EmployeeSummary | null>(null);
+  const [feedback, setFeedback] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const groupedAttendance = groupAttendanceHistory(attendance);
 
   const tabs = useMemo(() => getTabsForRole(session?.user.role ?? "employee"), [session?.user.role]);
   const scannerRoleActive = session?.user.role === "scanner";
+  const isAdmin = session?.user.role === "admin" || session?.user.role === "superadmin";
 
   useEffect(() => {
     if (!session) {
@@ -104,7 +111,19 @@ export function AppPage() {
         })
         .catch(() => undefined);
     }
-  }, [historyFilter, scannerMeta, scannerRoleActive, session, tab]);
+
+    if (tab === "home" && isAdmin && !adminOverview) {
+      fetchAdminOverview(session.token)
+        .then((data) => setAdminOverview(data))
+        .catch(() => undefined);
+    }
+
+    if (tab === "profile" && !employeeSummary) {
+      fetchEmployeeSummary(session.token)
+        .then((data) => setEmployeeSummary(data))
+        .catch(() => undefined);
+    }
+  }, [historyFilter, scannerMeta, scannerRoleActive, session, tab, isAdmin, adminOverview, employeeSummary]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -130,8 +149,6 @@ export function AppPage() {
   }
 
   const currentSession = session;
-
-  const isAdmin = currentSession.user.role === "admin" || currentSession.user.role === "superadmin";
   const isScanner = currentSession.user.role === "scanner";
 
   function toneForStatus(status: AttendanceTimelineItem["status"] | LeaveRequestItem["status"]) {
@@ -144,9 +161,9 @@ export function AppPage() {
     return "green" as const;
   }
 
-  function setActionMessage(message: string) {
-    setFeedback(message);
-    window.setTimeout(() => setFeedback(null), 2600);
+  function setActionMessage(message: string, tone: "ok" | "err" = "ok") {
+    setFeedback({ message, tone });
+    window.setTimeout(() => setFeedback(null), 2800);
   }
 
   async function handleCheckIn(method: (typeof attendanceMethods)[number]) {
@@ -161,7 +178,7 @@ export function AppPage() {
       );
       setActionMessage("Check-in berhasil tersimpan.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Check-in gagal.");
+      setActionMessage(error instanceof Error ? error.message : "Check-in gagal.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -179,7 +196,7 @@ export function AppPage() {
       );
       setActionMessage("Check-out berhasil tersimpan.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Check-out gagal.");
+      setActionMessage(error instanceof Error ? error.message : "Check-out gagal.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -202,7 +219,7 @@ export function AppPage() {
       setRequestForm({ category: "Izin", startDate: "", endDate: "", title: "", detail: "" });
       setActionMessage("Pengajuan izin berhasil dikirim.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Pengajuan izin gagal.");
+      setActionMessage(error instanceof Error ? error.message : "Pengajuan izin gagal.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -216,7 +233,7 @@ export function AppPage() {
       setRequests((current) => current.map((item) => (item.id === id ? response.request : item)));
       setActionMessage(status === "Disetujui" ? "Pengajuan disetujui." : "Pengajuan ditolak.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Approval gagal.");
+      setActionMessage(error instanceof Error ? error.message : "Approval gagal.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -229,7 +246,7 @@ export function AppPage() {
       const next = await fetchRequests(currentSession.token, isAdmin);
       setRequests(next);
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Daftar pengajuan gagal dimuat.");
+      setActionMessage(error instanceof Error ? error.message : "Daftar pengajuan gagal dimuat.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -242,7 +259,7 @@ export function AppPage() {
       const detail = await fetchRequestDetail(currentSession.token, id);
       setRequestDetail(detail);
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Detail pengajuan gagal dimuat.");
+      setActionMessage(error instanceof Error ? error.message : "Detail pengajuan gagal dimuat.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -259,7 +276,7 @@ export function AppPage() {
       }
       setActionMessage("Pengajuan berhasil dibatalkan.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Pengajuan gagal dibatalkan.");
+      setActionMessage(error instanceof Error ? error.message : "Pengajuan gagal dibatalkan.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -278,7 +295,7 @@ export function AppPage() {
       });
       setActionMessage("Token scanner berhasil diperbarui.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Token scanner gagal diperbarui.");
+      setActionMessage(error instanceof Error ? error.message : "Token scanner gagal diperbarui.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -305,7 +322,17 @@ export function AppPage() {
           </Button>
         </header>
 
-        {feedback ? <div className="rounded-[24px] border border-[#d9e2da] bg-white px-4 py-3 text-sm text-[#41514c] shadow-panel">{feedback}</div> : null}
+        {feedback ? (
+          <div
+            className={`rounded-[24px] border px-4 py-3 text-sm shadow-panel ${
+              feedback.tone === "err"
+                ? "border-[#f0d9d9] bg-[#fdf4f4] text-[#7a3535]"
+                : "border-[#d9e2da] bg-white text-[#2b3e37]"
+            }`}
+          >
+            {feedback.message}
+          </div>
+        ) : null}
 
         <nav className="sticky top-4 z-10 rounded-[28px] border border-[#dbe4da] bg-white/92 p-2 shadow-panel backdrop-blur">
           <div className={`grid gap-2 ${tabs.length >= 5 ? "grid-cols-5" : "grid-cols-4"}`}>
@@ -342,39 +369,94 @@ export function AppPage() {
 
         {tab === "home" ? (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {stats.map((item) => (
-                <article key={item.label} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel sm:p-6">
-                  <p className="text-sm font-semibold text-[#52645d]">{item.label}</p>
-                  <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
-                  <p className="mt-3 text-sm leading-6 text-[#667770]">{item.detail}</p>
-                </article>
-              ))}
-            </section>
+            {isAdmin && adminOverview ? (
+              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: "Total Karyawan", value: String(adminOverview.totalEmployees), detail: "Terdaftar dalam sistem" },
+                  { label: "Hadir Hari Ini", value: String(adminOverview.checkedInToday), detail: `${adminOverview.onTimeToday} tepat waktu · ${adminOverview.lateToday} terlambat` },
+                  { label: "Tingkat Kehadiran", value: adminOverview.totalEmployees > 0 ? `${Math.round((adminOverview.checkedInToday / adminOverview.totalEmployees) * 100)}%` : "0%", detail: "Dari total karyawan aktif" },
+                  { label: "Permintaan Pending", value: String(adminOverview.pendingRequests), detail: "Menunggu approval admin" }
+                ].map((item) => (
+                  <article key={item.label} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel sm:p-6">
+                    <p className="text-sm font-semibold text-[#52645d]">{item.label}</p>
+                    <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
+                    <p className="mt-3 text-sm leading-6 text-[#667770]">{item.detail}</p>
+                  </article>
+                ))}
+              </section>
+            ) : !isAdmin ? (
+              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {stats.map((item) => (
+                  <article key={item.label} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel sm:p-6">
+                    <p className="text-sm font-semibold text-[#52645d]">{item.label}</p>
+                    <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
+                    <p className="mt-3 text-sm leading-6 text-[#667770]">{item.detail}</p>
+                  </article>
+                ))}
+              </section>
+            ) : null}
 
             <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Fokus hari ini</p>
-                    <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Absensi, izin, dan scanner berjalan dari satu fondasi yang sama.</h2>
-                  </div>
-                  <Bell className="h-6 w-6 text-moss" />
-                </div>
-                <div className="mt-7 grid gap-4 md:grid-cols-3">
-                  {[
-                    [QrCode, "Check-in cepat", "Tombol hadir dan pulang sekarang punya state yang jelas."],
-                    [MapPinned, "Izin lebih rapi", "Employee kirim pengajuan, admin review dari panel yang sama."],
-                    [ScanFace, "Scanner aktif", "Token QR bisa di-refresh dari mode scanner kapan saja."]
-                  ].map(([Icon, title, detail]) => (
-                    <div key={title as string} className="rounded-[24px] border border-[#e4ebe4] bg-[#fbfcf8] p-5">
-                      <Icon className="h-10 w-10 rounded-2xl bg-white p-2.5 text-moss shadow-sm" />
-                      <h3 className="mt-5 text-lg font-semibold text-ink">{title as string}</h3>
-                      <p className="mt-3 text-sm leading-6 text-[#62736d]">{detail as string}</p>
+              {isAdmin && adminOverview ? (
+                <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Ringkasan kehadiran</p>
+                      <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Aktivitas hari ini langsung dari store yang aktif.</h2>
                     </div>
-                  ))}
+                    <Users className="h-6 w-6 text-moss" />
+                  </div>
+                  <div className="mt-6">
+                    <div className="mb-3 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-ink">Check-in rate</span>
+                      <span className="text-[#5d6e67]">
+                        {adminOverview.checkedInToday} / {adminOverview.totalEmployees} karyawan
+                      </span>
+                    </div>
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-[#eef2ee]">
+                      <div
+                        className="h-full rounded-full bg-[#2d5246] transition-all"
+                        style={{ width: adminOverview.totalEmployees > 0 ? `${Math.round((adminOverview.checkedInToday / adminOverview.totalEmployees) * 100)}%` : "0%" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    {[
+                      { label: "Tepat waktu", value: adminOverview.onTimeToday, color: "text-[#2d5246]" },
+                      { label: "Terlambat", value: adminOverview.lateToday, color: "text-[#8a5c2e]" },
+                      { label: "Belum hadir", value: Math.max(0, adminOverview.totalEmployees - adminOverview.checkedInToday), color: "text-[#5c5c6a]" }
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-[22px] border border-[#e4ebe4] bg-[#fbfcf8] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">{item.label}</p>
+                        <p className={`font-display mt-2 text-2xl font-semibold tracking-[-0.04em] ${item.color}`}>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Fokus hari ini</p>
+                      <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Absensi, izin, dan scanner berjalan dari satu fondasi yang sama.</h2>
+                    </div>
+                    <Bell className="h-6 w-6 text-moss" />
+                  </div>
+                  <div className="mt-7 grid gap-4 md:grid-cols-3">
+                    {[
+                      [QrCode, "Check-in cepat", "Tombol hadir dan pulang sekarang punya state yang jelas."],
+                      [MapPinned, "Izin lebih rapi", "Employee kirim pengajuan, admin review dari panel yang sama."],
+                      [ScanFace, "Scanner aktif", "Token QR bisa di-refresh dari mode scanner kapan saja."]
+                    ].map(([Icon, title, detail]) => (
+                      <div key={title as string} className="rounded-[24px] border border-[#e4ebe4] bg-[#fbfcf8] p-5">
+                        <Icon className="h-10 w-10 rounded-2xl bg-white p-2.5 text-moss shadow-sm" />
+                        <h3 className="mt-5 text-lg font-semibold text-ink">{title as string}</h3>
+                        <p className="mt-3 text-sm leading-6 text-[#62736d]">{detail as string}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-[30px] border border-[#dae5db] bg-[#12261f] p-5 text-white shadow-panel sm:p-6">
                 <div className="flex items-center gap-3">
@@ -705,28 +787,62 @@ export function AppPage() {
               <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">{currentSession.user.fullName}</h2>
               <div className="mt-6 space-y-4 text-sm text-[#61726c]">
                 <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="font-semibold text-ink">Email</p>
-                  <p className="mt-2">{currentSession.user.email}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Email</p>
+                  <p className="mt-2 font-medium text-ink">{currentSession.user.email}</p>
                 </div>
                 <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="font-semibold text-ink">Organisasi</p>
-                  <p className="mt-2">{currentSession.user.organizationName}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Organisasi</p>
+                  <p className="mt-2 font-medium text-ink">{currentSession.user.organizationName}</p>
+                </div>
+                <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Role</p>
+                  <p className="mt-2 font-medium capitalize text-ink">{currentSession.user.role}</p>
                 </div>
               </div>
             </div>
             <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Prioritas berikutnya</p>
-              <div className="mt-5 space-y-3">
-                {[
-                  "Integrasi push notification FCM",
-                  "Sinkron offline queue untuk check-in",
-                  "Foto selfie dan bukti lokasi produksi"
-                ].map((item) => (
-                  <div key={item} className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] px-4 py-4 text-sm text-[#5f706a]">
-                    {item}
-                  </div>
-                ))}
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Ringkasan kehadiran</p>
+                <TrendingUp className="h-5 w-5 text-moss" />
               </div>
+              {employeeSummary ? (
+                <>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    {[
+                      { label: "Total Hadir", value: String(employeeSummary.totalDays), color: "text-ink" },
+                      { label: "Tepat Waktu", value: String(employeeSummary.onTimeDays), color: "text-[#2d5246]" },
+                      { label: "Terlambat", value: String(employeeSummary.lateDays), color: "text-[#8a5c2e]" }
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">{item.label}</p>
+                        <p className={`font-display mt-2 text-2xl font-semibold tracking-[-0.04em] ${item.color}`}>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">Izin pending</p>
+                      <p className="font-display mt-2 text-2xl font-semibold tracking-[-0.04em] text-ink">{employeeSummary.pendingRequests}</p>
+                    </div>
+                    <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">Status hari ini</p>
+                      <p className="mt-2 text-sm font-semibold capitalize text-ink">
+                        {employeeSummary.currentAttendanceState === "idle"
+                          ? "Belum check-in"
+                          : employeeSummary.currentAttendanceState === "checked_in"
+                            ? "Sudah check-in"
+                            : "Sudah check-out"}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  {["Tingkat kehadiran", "Izin yang disetujui", "Riwayat check-in bulan ini"].map((item) => (
+                    <div key={item} className="h-14 animate-pulse rounded-[22px] bg-[#f2f4f2]" />
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         ) : null}
