@@ -27,6 +27,7 @@ import {
   refreshScannerToken
 } from "../lib/api";
 import { getTabsForRole, transitionTab, type AppTabKey } from "../lib/appShellState";
+import { formatAttendanceGroupLabel, groupAttendanceHistory, nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow";
 import { clearSession, readSession } from "../lib/session";
 
 const attendanceMethods = ["QR", "GPS", "Selfie"] as const;
@@ -54,6 +55,7 @@ export function AppPage() {
   const [historyFilter, setHistoryFilter] = useState<(typeof attendanceFilters)[number]>("all");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const groupedAttendance = groupAttendanceHistory(attendance);
 
   const tabs = useMemo(() => getTabsForRole(session?.user.role ?? "employee"), [session?.user.role]);
   const scannerRoleActive = session?.user.role === "scanner";
@@ -103,6 +105,25 @@ export function AppPage() {
         .catch(() => undefined);
     }
   }, [historyFilter, scannerMeta, scannerRoleActive, session, tab]);
+
+  useEffect(() => {
+    if (tab !== "scanner" || !scannerMeta) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setScannerMeta((current) =>
+        current
+          ? {
+              ...current,
+              expiresInSeconds: nextScannerCountdown(current.expiresInSeconds)
+            }
+          : current
+      );
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [scannerMeta, tab]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -166,6 +187,13 @@ export function AppPage() {
 
   async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const validationError = validateRequestForm(requestForm);
+
+    if (validationError) {
+      setActionMessage(validationError);
+      return;
+    }
+
     setBusyAction("create-request");
 
     try {
@@ -428,21 +456,30 @@ export function AppPage() {
                   </button>
                 ))}
               </div>
-              <div className="mt-6 space-y-3">
-                {attendance.map((item) => (
-                  <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#e6ece5] bg-[#fbfcfa] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-ink">{item.day}</p>
-                        <p className="mt-1 text-sm text-[#667770]">{item.time}</p>
-                      </div>
-                      <StatusPill tone={toneForStatus(item.status)}>{item.status}</StatusPill>
+              <div className="mt-6 space-y-4">
+                {groupedAttendance.map((group) => (
+                  <div key={group.day}>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#6a7b75]">
+                      {formatAttendanceGroupLabel(group.day, group.items.length)}
+                    </p>
+                    <div className="space-y-3">
+                      {group.items.map((item) => (
+                        <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#e6ece5] bg-[#fbfcfa] p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-ink">{item.time}</p>
+                              <p className="mt-1 text-sm text-[#667770]">{item.day}</p>
+                            </div>
+                            <StatusPill tone={toneForStatus(item.status)}>{item.status}</StatusPill>
+                          </div>
+                          <div className="mt-4 flex items-center justify-between text-sm text-[#576863]">
+                            <span>Metode {item.method}</span>
+                            <span>Sinkron</span>
+                          </div>
+                        </article>
+                      ))}
                     </div>
-                    <div className="mt-4 flex items-center justify-between text-sm text-[#576863]">
-                      <span>Metode {item.method}</span>
-                      <span>Sinkron</span>
-                    </div>
-                  </article>
+                  </div>
                 ))}
               </div>
             </div>

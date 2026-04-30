@@ -26,7 +26,27 @@ export function groupAttendanceHistory(items: AttendanceTimelineItem[]) {
   }, []);
 }
 
+export function formatAttendanceGroupLabel(day: string, count: number) {
+  return `${day} · ${count} catatan`;
+}
+
+export function nextScannerCountdown(secondsLeft: number) {
+  if (secondsLeft <= 1) {
+    return 30;
+  }
+
+  return secondsLeft - 1;
+}
+
 export function validateRequestForm(form: RequestFormState) {
+  if (!form.startDate || !form.endDate) {
+    return "Tanggal pengajuan harus lengkap.";
+  }
+
+  if (!form.title.trim() || !form.detail.trim()) {
+    return "Judul dan detail pengajuan wajib diisi.";
+  }
+
   if (!form.startDate || !form.endDate) {
     return "Tanggal pengajuan harus lengkap.";
   }
@@ -37,6 +57,10 @@ export function validateRequestForm(form: RequestFormState) {
 
   if (form.title.trim().length < 3) {
     return "Judul pengajuan terlalu pendek.";
+  }
+
+  if (form.category === "Sakit" && form.detail.trim().length < 12) {
+    return "Pengajuan sakit butuh detail yang lebih jelas.";
   }
 
   if (form.detail.trim().length < 8) {

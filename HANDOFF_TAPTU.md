@@ -177,6 +177,10 @@ Batch terbaru sudah menambahkan:
 - helper mobile workflow yang sudah punya test:
   - grouping attendance history
   - validasi request form
+- scanner countdown helper
+- config-aware storage adapter stub:
+  - `local-demo`
+  - `production-adapter`
 
 ## Catatan deploy Vercel
 
@@ -202,7 +206,7 @@ Catatan penting:
 Review terakhir tetap hijau:
 
 - API tests pass `20/20`
-- Web tests pass `7/7`
+- Web tests pass `10/10`
 - `npm run typecheck` pass
 - `npm run build` pass
 

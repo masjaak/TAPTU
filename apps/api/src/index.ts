@@ -19,7 +19,7 @@ import type {
 } from "@taptu/shared";
 import { createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
 import { getApiConfig } from "./config";
-import { ensureStoreFile, saveStore } from "./store";
+import { createStorageAdapter } from "./storage";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -56,8 +56,9 @@ const users: Array<AuthUser & { password: string }> = [
 ];
 
 const storePath = join(process.cwd(), "apps", "api", "data", "demo-store.json");
-let store = await ensureStoreFile(storePath);
 const apiConfig = getApiConfig();
+const storage = createStorageAdapter(apiConfig.storageMode, storePath);
+let store = await storage.load();
 
 const roleStats: Record<UserRole, DashboardStat[]> = {
   superadmin: [],
@@ -350,7 +351,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
   store.attendance[user.id] = next;
   const historyItem = buildAttendanceItem(user.id);
   store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
-  await saveStore(storePath, store);
+  await storage.save(store);
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
@@ -387,7 +388,7 @@ app.post("/api/attendance/checkout", async (req, res) => {
   store.attendance[user.id] = next;
   const historyItem = buildAttendanceItem(user.id);
   store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
-  await saveStore(storePath, store);
+  await storage.save(store);
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
@@ -462,7 +463,7 @@ app.post("/api/requests", async (req, res) => {
     type: "CREATE",
     request: nextRequest
   });
-  await saveStore(storePath, store);
+  await storage.save(store);
 
   const response: RequestActionResponse = {
     request: buildRequestItem(nextRequest)
@@ -499,7 +500,7 @@ app.delete("/api/requests/:id", async (req, res) => {
   }
 
   store.requests = next;
-  await saveStore(storePath, store);
+  await storage.save(store);
 
   return res.json({ id: req.params.id, removed: true });
 });
@@ -551,7 +552,7 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
     request: buildRequestItem(updated, users.find((entry) => entry.id === updated.userId)?.fullName)
   };
 
-  await saveStore(storePath, store);
+  await storage.save(store);
 
   return res.json(response);
 });
@@ -568,7 +569,7 @@ app.get("/api/scanner/token", async (req, res) => {
   }
 
   store.scanner = refreshScannerToken(store.scanner);
-  await saveStore(storePath, store);
+  await storage.save(store);
 
   const payload: ScannerTokenPayload = {
     token: store.scanner.token,
