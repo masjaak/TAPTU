@@ -7,6 +7,12 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@taptu/shared": [
+        "packages/shared/dist/index.d.ts",
+        "packages/shared/src/index.ts"
+      ]
+    }
   }
 }

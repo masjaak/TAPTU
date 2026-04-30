@@ -18,6 +18,7 @@ import type {
   UserRole
 } from "@taptu/shared";
 import { createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
+import { getApiConfig } from "./config";
 import { ensureStoreFile, saveStore } from "./store";
 
 const app = express();
@@ -56,6 +57,7 @@ const users: Array<AuthUser & { password: string }> = [
 
 const storePath = join(process.cwd(), "apps", "api", "data", "demo-store.json");
 let store = await ensureStoreFile(storePath);
+const apiConfig = getApiConfig();
 
 const roleStats: Record<UserRole, DashboardStat[]> = {
   superadmin: [],
@@ -127,6 +129,8 @@ const requestSchema = z.object({
   endDate: z.string().min(10),
   title: z.string().min(3),
   detail: z.string().min(8)
+}).refine((value) => value.endDate >= value.startDate, {
+  message: "Tanggal selesai tidak boleh lebih awal dari tanggal mulai."
 });
 
 const approvalSchema = z.object({
@@ -220,6 +224,7 @@ app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
     service: "hadiri-api",
+    storageMode: apiConfig.storageMode,
     timestamp: new Date().toISOString()
   });
 });

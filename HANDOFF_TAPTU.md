@@ -174,6 +174,9 @@ Batch terbaru sudah menambahkan:
   - tipe `Izin / Cuti / Sakit`
   - tanggal mulai
   - tanggal selesai
+- helper mobile workflow yang sudah punya test:
+  - grouping attendance history
+  - validasi request form
 
 ## Catatan deploy Vercel
 
@@ -185,6 +188,7 @@ Perbaikan yang sudah diterapkan:
 
 - `packages/shared/package.json` sekarang punya `exports`
 - `apps/api` dan `apps/web` build script sekarang build `@taptu/shared` dulu bila dibuild terpisah
+- `tsconfig.base.json` sekarang punya path alias untuk `@taptu/shared`
 - root sudah punya `vercel.json` untuk deploy frontend web-only:
   - build command: `npm run build --workspace @taptu/web`
   - output directory: `apps/web/dist`
@@ -197,8 +201,8 @@ Catatan penting:
 
 Review terakhir tetap hijau:
 
-- API tests pass `18/18`
-- Web tests pass `5/5`
+- API tests pass `20/20`
+- Web tests pass `7/7`
 - `npm run typecheck` pass
 - `npm run build` pass
 
