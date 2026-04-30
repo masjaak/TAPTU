@@ -159,6 +159,25 @@ Status penting:
 3. Tambahkan request detail dan cancel untuk request pending milik employee
 4. Mulai siapkan storage dan DB layer yang lebih dekat ke produksi
 
+## Update terbaru setelah handoff awal
+
+Batch terbaru sudah menambahkan:
+
+- filter attendance history:
+  - `all`
+  - `present`
+  - `issue`
+- request detail panel di tab `Izin`
+- cancel request untuk request `Menunggu`
+- scanner screen yang lebih fullscreen-like dan lebih cocok untuk perangkat operasional
+
+Review terakhir tetap hijau:
+
+- API tests pass `18/18`
+- Web tests pass `5/5`
+- `npm run typecheck` pass
+- `npm run build` pass
+
 ## Menjalankan project
 
 ```bash

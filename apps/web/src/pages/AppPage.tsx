@@ -15,9 +15,12 @@ import { Shell } from "../components/Shell";
 import { StatusPill } from "../components/StatusPill";
 import {
   approveRequest,
+  cancelRequest,
   checkIn,
   checkOut,
   createRequest,
+  fetchAttendanceHistoryByFilter,
+  fetchRequestDetail,
   fetchAttendanceHistory,
   fetchRequests,
   getDashboard,
@@ -27,6 +30,7 @@ import { getTabsForRole, transitionTab, type AppTabKey } from "../lib/appShellSt
 import { clearSession, readSession } from "../lib/session";
 
 const attendanceMethods = ["QR", "GPS", "Selfie"] as const;
+const attendanceFilters = ["all", "present", "issue"] as const;
 
 export function AppPage() {
   const session = readSession();
@@ -40,6 +44,8 @@ export function AppPage() {
   const [greeting, setGreeting] = useState("");
   const [tab, setTab] = useState<AppTabKey>("home");
   const [requestForm, setRequestForm] = useState({ title: "", detail: "" });
+  const [requestDetail, setRequestDetail] = useState<LeaveRequestItem | null>(null);
+  const [historyFilter, setHistoryFilter] = useState<(typeof attendanceFilters)[number]>("all");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
@@ -73,7 +79,7 @@ export function AppPage() {
     }
 
     if (tab === "attendance") {
-      fetchAttendanceHistory(session.token)
+      fetchAttendanceHistoryByFilter(session.token, historyFilter)
         .then((items) => setAttendance(items))
         .catch(() => undefined);
     }
@@ -90,7 +96,7 @@ export function AppPage() {
         })
         .catch(() => undefined);
     }
-  }, [scannerMeta, scannerRoleActive, session, tab]);
+  }, [historyFilter, scannerMeta, scannerRoleActive, session, tab]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -190,6 +196,36 @@ export function AppPage() {
       setRequests(next);
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Daftar pengajuan gagal dimuat.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function openRequestDetail(id: string) {
+    setBusyAction(`detail-${id}`);
+
+    try {
+      const detail = await fetchRequestDetail(currentSession.token, id);
+      setRequestDetail(detail);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Detail pengajuan gagal dimuat.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleCancelRequest(id: string) {
+    setBusyAction(`cancel-${id}`);
+
+    try {
+      await cancelRequest(currentSession.token, id);
+      setRequests((current) => current.filter((item) => item.id !== id));
+      if (requestDetail?.id === id) {
+        setRequestDetail(null);
+      }
+      setActionMessage("Pengajuan berhasil dibatalkan.");
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Pengajuan gagal dibatalkan.");
     } finally {
       setBusyAction(null);
     }
@@ -372,6 +408,20 @@ export function AppPage() {
                 </div>
                 <ShieldCheck className="h-6 w-6 text-moss" />
               </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {attendanceFilters.map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setHistoryFilter(filter)}
+                    className={`rounded-2xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] ${
+                      historyFilter === filter ? "bg-ink text-white" : "border border-[#dfe6de] bg-[#fbfcfa] text-[#5d6d66]"
+                    }`}
+                  >
+                    {filter === "all" ? "Semua" : filter === "present" ? "Tepat waktu" : "Perlu perhatian"}
+                  </button>
+                ))}
+              </div>
               <div className="mt-6 space-y-3">
                 {attendance.map((item) => (
                   <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#e6ece5] bg-[#fbfcfa] p-4">
@@ -394,7 +444,7 @@ export function AppPage() {
         ) : null}
 
         {tab === "requests" ? (
-          <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+          <section className="grid gap-5 xl:grid-cols-[0.82fr_1fr_0.78fr]">
             <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Pengajuan dan approval</p>
               <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">
@@ -443,6 +493,18 @@ export function AppPage() {
                     </div>
                     <StatusPill tone={toneForStatus(item.status)}>{item.status}</StatusPill>
                   </div>
+                  {item.id ? (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Button variant="secondary" disabled={busyAction === `detail-${item.id}`} onClick={() => openRequestDetail(item.id!)}>
+                        {busyAction === `detail-${item.id}` ? "Memuat..." : "Lihat detail"}
+                      </Button>
+                      {!isAdmin && item.status === "Menunggu" ? (
+                        <Button variant="secondary" disabled={busyAction === `cancel-${item.id}`} onClick={() => handleCancelRequest(item.id!)}>
+                          {busyAction === `cancel-${item.id}` ? "Membatalkan..." : "Batalkan"}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {isAdmin && item.status === "Menunggu" && item.id ? (
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       <Button disabled={busyAction === `Disetujui-${item.id}`} onClick={() => handleApproval(item.id!, "Disetujui")}>
@@ -456,18 +518,59 @@ export function AppPage() {
                 </article>
               ))}
             </div>
+            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Detail pengajuan</p>
+              {requestDetail ? (
+                <div className="mt-5 space-y-4">
+                  <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Judul</p>
+                    <p className="mt-2 text-lg font-semibold text-ink">{requestDetail.title}</p>
+                  </div>
+                  {requestDetail.requester ? (
+                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Pengaju</p>
+                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.requester}</p>
+                    </div>
+                  ) : null}
+                  <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Status</p>
+                    <div className="mt-3">
+                      <StatusPill tone={toneForStatus(requestDetail.status)}>{requestDetail.status}</StatusPill>
+                    </div>
+                  </div>
+                  <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Catatan</p>
+                    <p className="mt-3 text-sm leading-7 text-[#5f706a]">{requestDetail.detail}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-[24px] border border-dashed border-[#d8e0d8] bg-[#fbfcfa] px-4 py-6 text-sm leading-7 text-[#60716b]">
+                  Pilih salah satu pengajuan untuk melihat detailnya di panel ini.
+                </div>
+              )}
+            </div>
           </section>
         ) : null}
 
         {tab === "scanner" ? (
-          <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="rounded-[30px] border border-[#dae5db] bg-[#10211c] p-5 text-white shadow-panel sm:p-6">
+          <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-[34px] border border-[#0f2b22] bg-[#10211c] p-5 text-white shadow-panel sm:p-8">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Mode scanner</p>
-              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em]">QR refresh dan scan log dalam satu layar.</h2>
-              <div className="mt-6 rounded-[26px] border border-white/10 bg-white/6 p-5">
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em]">Tampilan scanner dibuat lebih fokus, lebih besar, dan lebih siap dipakai di lapangan.</h2>
+              <div className="mt-6 rounded-[30px] border border-white/10 bg-[#173229] p-6">
                 <p className="text-sm text-[#a4cbbc]">Token aktif</p>
-                <p className="font-display mt-3 text-4xl font-semibold tracking-[0.12em]">{scannerToken ?? "HDR-31A-7XZ"}</p>
-                <p className="mt-3 text-sm text-[#bad1c8]">Auto refresh siap dipakai untuk scanner PWA fullscreen.</p>
+                <p className="font-display mt-4 text-5xl font-semibold tracking-[0.14em] sm:text-6xl">{scannerToken ?? "HDR-31A-7XZ"}</p>
+                <div className="mt-6 rounded-[24px] border border-dashed border-[#2a4c41] bg-[#10261f] px-4 py-10 text-center">
+                  <p className="text-xs uppercase tracking-[0.24em] text-[#8fbcae]">Area QR fullscreen</p>
+                  <div className="mx-auto mt-5 flex h-56 w-full max-w-[320px] items-center justify-center rounded-[28px] border border-white/10 bg-[#0d1d18]">
+                    <div className="grid grid-cols-4 gap-2">
+                      {Array.from({ length: 16 }).map((_, index) => (
+                        <div key={index} className={`h-8 w-8 rounded-[8px] ${index % 3 === 0 || index % 5 === 0 ? "bg-white" : "bg-[#2d4b41]"}`} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm text-[#bad1c8]">Auto refresh siap dipakai untuk scanner PWA fullscreen di iPad atau tablet front desk.</p>
                 <Button className="mt-5 w-full" disabled={busyAction === "refresh-scanner"} onClick={handleRefreshScannerToken}>
                   {busyAction === "refresh-scanner" ? "Memperbarui..." : "Refresh token scanner"}
                 </Button>

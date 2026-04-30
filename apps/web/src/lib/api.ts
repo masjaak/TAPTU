@@ -37,6 +37,10 @@ export async function fetchAttendanceHistory(token: string) {
   return requestJson<AttendanceTimelineItem[]>("/attendance/history", {}, token);
 }
 
+export async function fetchAttendanceHistoryByFilter(token: string, filter: "all" | "present" | "issue") {
+  return requestJson<AttendanceTimelineItem[]>(`/attendance/history?filter=${filter}`, {}, token);
+}
+
 export async function checkOut(token: string, method: "QR" | "GPS" | "Selfie" | "Manual") {
   return requestJson<AttendanceActionResponse>(
     "/attendance/checkout",
@@ -72,6 +76,20 @@ export async function approveRequest(token: string, id: string, status: "Disetuj
 
 export async function fetchRequests(token: string, admin = false) {
   return requestJson<LeaveRequestItem[]>(admin ? "/admin/requests" : "/requests", {}, token);
+}
+
+export async function fetchRequestDetail(token: string, id: string) {
+  return requestJson<LeaveRequestItem>(`/requests/${id}`, {}, token);
+}
+
+export async function cancelRequest(token: string, id: string) {
+  return requestJson<{ id: string; removed: boolean }>(
+    `/requests/${id}`,
+    {
+      method: "DELETE"
+    },
+    token
+  );
 }
 
 export async function refreshScannerToken(token: string) {

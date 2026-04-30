@@ -17,7 +17,7 @@ import type {
   ScannerTokenPayload,
   UserRole
 } from "@taptu/shared";
-import { createInitialStore, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
+import { createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
 import { ensureStoreFile, saveStore } from "./store";
 
 const app = express();
@@ -129,6 +129,8 @@ const requestSchema = z.object({
 const approvalSchema = z.object({
   status: z.enum(["Disetujui", "Ditolak"])
 });
+
+const historyFilterSchema = z.enum(["all", "present", "issue"]).catch("all");
 
 function signUser(user: AuthUser): string {
   return jwt.sign(user, jwtSecret, { expiresIn: "8h" });
@@ -301,11 +303,13 @@ app.get("/api/attendance/history", (req, res) => {
     return;
   }
 
+  const filter = historyFilterSchema.parse(req.query.filter);
+
   if (user.role === "admin" || user.role === "superadmin") {
-    return res.json(store.attendanceHistory);
+    return res.json(filterAttendanceHistory(store.attendanceHistory, filter));
   }
 
-  return res.json(listAttendanceHistory(user));
+  return res.json(filterAttendanceHistory(listAttendanceHistory(user), filter));
 });
 
 app.post("/api/attendance/checkin", async (req, res) => {
@@ -398,6 +402,26 @@ app.get("/api/requests", (req, res) => {
   return res.json(store.requests.filter((item) => item.userId === user.id).map((item) => buildRequestItem(item)));
 });
 
+app.get("/api/requests/:id", (req, res) => {
+  const user = requireUser(req, res);
+
+  if (!user) {
+    return;
+  }
+
+  const request = store.requests.find((item) => item.id === req.params.id);
+
+  if (!request) {
+    return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+  }
+
+  if (user.role === "employee" && request.userId !== user.id) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  return res.json(buildRequestItem(request, users.find((entry) => entry.id === request.userId)?.fullName));
+});
+
 app.post("/api/requests", async (req, res) => {
   const user = requireUser(req, res);
 
@@ -431,6 +455,39 @@ app.post("/api/requests", async (req, res) => {
   };
 
   return res.status(201).json(response);
+});
+
+app.delete("/api/requests/:id", async (req, res) => {
+  const user = requireUser(req, res);
+
+  if (!user) {
+    return;
+  }
+
+  const existing = store.requests.find((item) => item.id === req.params.id);
+
+  if (!existing) {
+    return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+  }
+
+  if (user.role === "employee" && existing.userId !== user.id) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const next = reduceRequests(store.requests, {
+    type: "CANCEL",
+    id: req.params.id,
+    actorRole: user.role
+  });
+
+  if (next.length === store.requests.length) {
+    return res.status(409).json({ message: "Pengajuan hanya bisa dibatalkan saat masih menunggu." });
+  }
+
+  store.requests = next;
+  await saveStore(storePath, store);
+
+  return res.json({ id: req.params.id, removed: true });
 });
 
 app.get("/api/admin/requests", (req, res) => {

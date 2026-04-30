@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialStore, reduceAttendance, reduceRequests, refreshScannerToken } from "./domain";
+import { createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken } from "./domain";
 
 describe("attendance state machine", () => {
   it("moves from idle to checked_in", () => {
@@ -63,6 +63,17 @@ describe("request state machine", () => {
 
     expect(next[0].status).toBe("Menunggu");
   });
+
+  it("allows pending request cancellation", () => {
+    const initial = createInitialStore().requests;
+    const next = reduceRequests(initial, {
+      type: "CANCEL",
+      id: "req-001",
+      actorRole: "employee"
+    });
+
+    expect(next).toHaveLength(0);
+  });
 });
 
 describe("scanner token", () => {
@@ -71,5 +82,14 @@ describe("scanner token", () => {
 
     expect(next.token).not.toBe("HDR-31A-7XZ");
     expect(next.expiresInSeconds).toBe(30);
+  });
+});
+
+describe("attendance history filter", () => {
+  it("returns issue items only", () => {
+    const filtered = filterAttendanceHistory(createInitialStore().attendanceHistory, "issue");
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].status).toBe("Izin");
   });
 });

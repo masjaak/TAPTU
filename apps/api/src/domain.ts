@@ -43,7 +43,8 @@ export type AttendanceEvent =
 export type RequestEvent =
   | { type: "CREATE"; request: RequestRecord }
   | { type: "APPROVE"; id: string; actorRole: UserRole }
-  | { type: "REJECT"; id: string; actorRole: UserRole };
+  | { type: "REJECT"; id: string; actorRole: UserRole }
+  | { type: "CANCEL"; id: string; actorRole: UserRole };
 
 export function reduceAttendance(record: AttendanceRecord, event: AttendanceEvent): AttendanceRecord {
   if (event.type === "CHECK_IN") {
@@ -76,6 +77,14 @@ export function reduceRequests(requests: RequestRecord[], event: RequestEvent): 
     return [event.request, ...requests];
   }
 
+  if (event.type === "CANCEL") {
+    if (event.actorRole !== "employee" && event.actorRole !== "admin" && event.actorRole !== "superadmin") {
+      return requests;
+    }
+
+    return requests.filter((request) => !(request.id === event.id && request.status === "Menunggu"));
+  }
+
   if (event.actorRole !== "admin" && event.actorRole !== "superadmin") {
     return requests;
   }
@@ -100,6 +109,18 @@ export function refreshScannerToken(previous: ScannerRecord): ScannerRecord {
     token: nextToken,
     expiresInSeconds: 30
   };
+}
+
+export function filterAttendanceHistory(items: AttendanceTimelineItem[], filter: "all" | "present" | "issue") {
+  if (filter === "all") {
+    return items;
+  }
+
+  if (filter === "present") {
+    return items.filter((item) => item.status === "Tepat waktu");
+  }
+
+  return items.filter((item) => item.status === "Terlambat" || item.status === "Izin" || item.status === "Belum check-in");
 }
 
 export function createInitialStore(): DemoStore {
