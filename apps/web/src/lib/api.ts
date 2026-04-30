@@ -1,34 +1,92 @@
-import type { LoginRequest, LoginResponse } from "@taptu/shared";
+import type {
+  AttendanceActionResponse,
+  DashboardPayload,
+  LeaveRequestItem,
+  LoginRequest,
+  LoginResponse,
+  RequestActionResponse,
+  ScannerTokenPayload
+} from "@taptu/shared";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001/api";
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
-  const response = await fetch(`${apiBaseUrl}/auth/login`, {
+  return requestJson<LoginResponse>("/auth/login", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
     body: JSON.stringify(payload)
   });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({ message: "Login gagal." }));
-    throw new Error(data.message ?? "Login gagal.");
-  }
-
-  return response.json();
 }
 
-export async function getDashboard(token: string) {
-  const response = await fetch(`${apiBaseUrl}/dashboard`, {
+export async function getDashboard(token: string): Promise<DashboardPayload> {
+  return requestJson<DashboardPayload>("/dashboard", {}, token);
+}
+
+export async function checkIn(token: string, method: "QR" | "GPS" | "Selfie" | "Manual") {
+  return requestJson<AttendanceActionResponse>(
+    "/attendance/checkin",
+    {
+      method: "POST",
+      body: JSON.stringify({ method })
+    },
+    token
+  );
+}
+
+export async function checkOut(token: string, method: "QR" | "GPS" | "Selfie" | "Manual") {
+  return requestJson<AttendanceActionResponse>(
+    "/attendance/checkout",
+    {
+      method: "POST",
+      body: JSON.stringify({ method })
+    },
+    token
+  );
+}
+
+export async function createRequest(token: string, payload: { title: string; detail: string }) {
+  return requestJson<RequestActionResponse>(
+    "/requests",
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    token
+  );
+}
+
+export async function approveRequest(token: string, id: string, status: "Disetujui" | "Ditolak") {
+  return requestJson<RequestActionResponse>(
+    `/admin/requests/${id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status })
+    },
+    token
+  );
+}
+
+export async function fetchRequests(token: string, admin = false) {
+  return requestJson<LeaveRequestItem[]>(admin ? "/admin/requests" : "/requests", {}, token);
+}
+
+export async function refreshScannerToken(token: string) {
+  return requestJson<ScannerTokenPayload>("/scanner/token", {}, token);
+}
+
+async function requestJson<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
     headers: {
-      Authorization: `Bearer ${token}`
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init.headers ?? {})
     }
   });
 
   if (!response.ok) {
-    throw new Error("Gagal memuat dashboard.");
+    const data = await response.json().catch(() => ({ message: "Permintaan gagal." }));
+    throw new Error(data.message ?? "Permintaan gagal.");
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }

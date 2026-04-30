@@ -31,6 +31,7 @@ export interface DashboardScheduleItem {
 }
 
 export interface AttendanceTimelineItem {
+  id?: string;
   day: string;
   status: "Tepat waktu" | "Terlambat" | "Izin" | "Belum check-in";
   time: string;
@@ -38,9 +39,27 @@ export interface AttendanceTimelineItem {
 }
 
 export interface LeaveRequestItem {
+  id?: string;
+  requester?: string;
   title: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";
   detail: string;
+}
+
+export interface AttendanceActionResponse {
+  record: AttendanceTimelineItem;
+  attendanceState: "idle" | "checked_in" | "checked_out";
+}
+
+export interface RequestActionResponse {
+  request: LeaveRequestItem;
+}
+
+export interface ScannerTokenPayload {
+  token: string;
+  expiresInSeconds: number;
+  scansToday: number;
+  locationName: string;
 }
 
 export interface DashboardPayload {
@@ -48,6 +67,7 @@ export interface DashboardPayload {
   stats: DashboardStat[];
   schedule: DashboardScheduleItem[];
   attendance: AttendanceTimelineItem[];
+  attendanceState?: "idle" | "checked_in" | "checked_out";
   requests: LeaveRequestItem[];
   scannerToken?: string;
 }
