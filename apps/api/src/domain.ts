@@ -1,4 +1,4 @@
-import type { UserRole } from "@taptu/shared";
+import type { AttendanceTimelineItem, UserRole } from "@taptu/shared";
 
 export type AttendanceMode = "QR" | "GPS" | "Selfie" | "Manual";
 export type AttendanceFlowState = "idle" | "checked_in" | "checked_out";
@@ -31,6 +31,7 @@ export interface ScannerRecord {
 
 export interface DemoStore {
   attendance: Record<string, AttendanceRecord>;
+  attendanceHistory: AttendanceTimelineItem[];
   requests: RequestRecord[];
   scanner: ScannerRecord;
 }
@@ -109,6 +110,22 @@ export function createInitialStore(): DemoStore {
         state: "idle"
       }
     },
+    attendanceHistory: [
+      {
+        id: "att-001",
+        day: "Kemarin",
+        status: "Tepat waktu",
+        time: "07:55",
+        method: "Selfie"
+      },
+      {
+        id: "att-002",
+        day: "Senin",
+        status: "Izin",
+        time: "08:00",
+        method: "Manual"
+      }
+    ],
     requests: [
       {
         id: "req-001",

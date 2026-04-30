@@ -1,5 +1,6 @@
 import type {
   AttendanceActionResponse,
+  AttendanceTimelineItem,
   DashboardPayload,
   LeaveRequestItem,
   LoginRequest,
@@ -30,6 +31,10 @@ export async function checkIn(token: string, method: "QR" | "GPS" | "Selfie" | "
     },
     token
   );
+}
+
+export async function fetchAttendanceHistory(token: string) {
+  return requestJson<AttendanceTimelineItem[]>("/attendance/history", {}, token);
 }
 
 export async function checkOut(token: string, method: "QR" | "GPS" | "Selfie" | "Manual") {

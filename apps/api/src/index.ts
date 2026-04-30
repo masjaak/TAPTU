@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import jwt from "jsonwebtoken";
+import { join } from "node:path";
 import { z } from "zod";
 
 import type {
@@ -17,6 +18,7 @@ import type {
   UserRole
 } from "@taptu/shared";
 import { createInitialStore, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
+import { ensureStoreFile, saveStore } from "./store";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -51,6 +53,9 @@ const users: Array<AuthUser & { password: string }> = [
     role: "scanner"
   }
 ];
+
+const storePath = join(process.cwd(), "apps", "api", "data", "demo-store.json");
+let store = await ensureStoreFile(storePath);
 
 const roleStats: Record<UserRole, DashboardStat[]> = {
   superadmin: [],
@@ -106,8 +111,6 @@ const requestFeed: Record<UserRole, LeaveRequestItem[]> = {
     { title: "Permintaan reset scanner", status: "Menunggu", detail: "Tunggu admin memperbarui PIN perangkat." }
   ]
 };
-
-const store = createInitialStore();
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -188,6 +191,13 @@ function buildAttendanceItem(userId: string): AttendanceTimelineItem {
   };
 }
 
+function listAttendanceHistory(user: AuthUser): AttendanceTimelineItem[] {
+  const todayItem = buildAttendanceItem(user.id);
+  const rest = store.attendanceHistory.filter((item) => item.day !== "Hari ini");
+
+  return [todayItem, ...rest];
+}
+
 function buildRequestItem(request: (typeof store.requests)[number], actorName?: string): LeaveRequestItem {
   return {
     id: request.id,
@@ -259,7 +269,7 @@ app.get("/api/dashboard", (req, res) => {
     ],
     attendance:
       user.role === "employee"
-        ? [buildAttendanceItem(user.id), ...attendanceFeed.employee.filter((item) => item.day !== "Hari ini")]
+        ? listAttendanceHistory(user)
         : attendanceFeed[user.role] ?? attendanceFeed.employee,
     attendanceState: store.attendance[user.id]?.state ?? "idle",
     requests:
@@ -284,7 +294,21 @@ app.get("/api/attendance/today", (req, res) => {
   return res.json(buildAttendanceItem(user.id));
 });
 
-app.post("/api/attendance/checkin", (req, res) => {
+app.get("/api/attendance/history", (req, res) => {
+  const user = requireUser(req, res);
+
+  if (!user) {
+    return;
+  }
+
+  if (user.role === "admin" || user.role === "superadmin") {
+    return res.json(store.attendanceHistory);
+  }
+
+  return res.json(listAttendanceHistory(user));
+});
+
+app.post("/api/attendance/checkin", async (req, res) => {
   const user = requireUser(req, res);
 
   if (!user) {
@@ -309,16 +333,19 @@ app.post("/api/attendance/checkin", (req, res) => {
   }
 
   store.attendance[user.id] = next;
+  const historyItem = buildAttendanceItem(user.id);
+  store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
+  await saveStore(storePath, store);
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
-    record: buildAttendanceItem(user.id)
+    record: historyItem
   };
 
   return res.json(response);
 });
 
-app.post("/api/attendance/checkout", (req, res) => {
+app.post("/api/attendance/checkout", async (req, res) => {
   const user = requireUser(req, res);
 
   if (!user) {
@@ -343,10 +370,13 @@ app.post("/api/attendance/checkout", (req, res) => {
   }
 
   store.attendance[user.id] = next;
+  const historyItem = buildAttendanceItem(user.id);
+  store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
+  await saveStore(storePath, store);
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
-    record: buildAttendanceItem(user.id)
+    record: historyItem
   };
 
   return res.json(response);
@@ -368,7 +398,7 @@ app.get("/api/requests", (req, res) => {
   return res.json(store.requests.filter((item) => item.userId === user.id).map((item) => buildRequestItem(item)));
 });
 
-app.post("/api/requests", (req, res) => {
+app.post("/api/requests", async (req, res) => {
   const user = requireUser(req, res);
 
   if (!user) {
@@ -394,6 +424,7 @@ app.post("/api/requests", (req, res) => {
     type: "CREATE",
     request: nextRequest
   });
+  await saveStore(storePath, store);
 
   const response: RequestActionResponse = {
     request: buildRequestItem(nextRequest)
@@ -416,7 +447,7 @@ app.get("/api/admin/requests", (req, res) => {
   return res.json(store.requests.map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName)));
 });
 
-app.patch("/api/admin/requests/:id", (req, res) => {
+app.patch("/api/admin/requests/:id", async (req, res) => {
   const user = requireUser(req, res);
 
   if (!user) {
@@ -449,10 +480,12 @@ app.patch("/api/admin/requests/:id", (req, res) => {
     request: buildRequestItem(updated, users.find((entry) => entry.id === updated.userId)?.fullName)
   };
 
+  await saveStore(storePath, store);
+
   return res.json(response);
 });
 
-app.get("/api/scanner/token", (req, res) => {
+app.get("/api/scanner/token", async (req, res) => {
   const user = requireUser(req, res);
 
   if (!user) {
@@ -464,6 +497,7 @@ app.get("/api/scanner/token", (req, res) => {
   }
 
   store.scanner = refreshScannerToken(store.scanner);
+  await saveStore(storePath, store);
 
   const payload: ScannerTokenPayload = {
     token: store.scanner.token,

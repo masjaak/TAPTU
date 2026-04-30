@@ -18,6 +18,7 @@ import {
   checkIn,
   checkOut,
   createRequest,
+  fetchAttendanceHistory,
   fetchRequests,
   getDashboard,
   refreshScannerToken
@@ -43,6 +44,7 @@ export function AppPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const tabs = useMemo(() => getTabsForRole(session?.user.role ?? "employee"), [session?.user.role]);
+  const scannerRoleActive = session?.user.role === "scanner";
 
   useEffect(() => {
     if (!session) {
@@ -64,6 +66,31 @@ export function AppPage() {
         location.assign("/login");
       });
   }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    if (tab === "attendance") {
+      fetchAttendanceHistory(session.token)
+        .then((items) => setAttendance(items))
+        .catch(() => undefined);
+    }
+
+    if (tab === "scanner" && scannerRoleActive && !scannerMeta) {
+      refreshScannerToken(session.token)
+        .then((response) => {
+          setScannerToken(response.token);
+          setScannerMeta({
+            expiresInSeconds: response.expiresInSeconds,
+            scansToday: response.scansToday,
+            locationName: response.locationName
+          });
+        })
+        .catch(() => undefined);
+    }
+  }, [scannerMeta, scannerRoleActive, session, tab]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
