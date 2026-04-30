@@ -14,5 +14,10 @@
     "build:web": "npm run build --workspace @taptu/shared && npm run build --workspace @taptu/web",
     "build:all": "npm run build --workspace @taptu/shared && npm run build --workspace @taptu/api && npm run build --workspace @taptu/web",
     "typecheck": "npm run typecheck --workspace @taptu/shared && npm run typecheck --workspace @taptu/api && npm run typecheck --workspace @taptu/web"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.2",
+    "vite": "^7.1.3",
+    "vite-plugin-pwa": "^1.0.3"
   }
 }
