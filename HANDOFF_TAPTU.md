@@ -69,8 +69,8 @@ Sebelum menutup batch baru:
 
 Terakhir diverifikasi hijau:
 
-- API tests pass `14/14`
-- Web tests pass `5/5`
+- API tests pass `32/32`
+- Web tests pass `10/10`
 - `npm run typecheck` pass
 - `npm run build` pass
 
@@ -154,10 +154,29 @@ Status penting:
 
 ## Next pass yang paling masuk akal
 
-1. Jadikan tab `Scanner` benar-benar fullscreen operational screen
-2. Tambahkan filter attendance history
-3. Tambahkan request detail dan cancel untuk request pending milik employee
-4. Mulai siapkan storage dan DB layer yang lebih dekat ke produksi
+1. ~~Jadikan tab `Scanner` benar-benar fullscreen operational screen~~ selesai
+2. ~~Tambahkan filter attendance history~~ selesai
+3. ~~Tambahkan request detail dan cancel untuk request pending milik employee~~ selesai
+4. ~~Admin overview + employee summary dari real store data~~ selesai
+5. Admin karyawan list - tabel karyawan yang hadir/belum hadir hari ini (dari `/api/admin/overview`)
+6. Attendance reset harian - reset state `attendance` store ke `idle` setiap hari baru
+7. Notifikasi in-app - badge di tab Izin saat ada request pending untuk admin
+8. Mulai storage DB layer produksi (SQLite atau Postgres adapter)
+
+## Update batch terbaru (2026-04-30)
+
+Batch ini menambahkan:
+
+- shared types: `AdminOverview` + `EmployeeSummary`
+- domain: `computeAdminOverview` + `computeEmployeeSummary` (8 test baru, TDD Red-Green)
+- api: `GET /api/admin/overview` - real stats dari store (checkedInToday, onTimeToday, lateToday, pendingRequests)
+- api: `GET /api/employee/summary` - ringkasan kehadiran per user dari store
+- web: admin home tab sekarang menampilkan 4 stat live + progress bar check-in rate + breakdown on-time/terlambat/belum hadir
+- web: profile tab employee sekarang menampilkan total hadir, tepat waktu, terlambat, izin pending, status hari ini — semua dari store
+- web: feedback toast sekarang punya dua tone: ok (hijau) dan err (merah)
+- visual: tidak ada gradient, tidak ada em-dash
+
+Commit: `2def225`
 
 ## Update terbaru setelah handoff awal
 
