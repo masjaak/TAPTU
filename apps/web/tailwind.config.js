@@ -4,17 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#10211c",
-        moss: "#1f8f6c",
-        mist: "#edf2ea",
-        sand: "#f7f6f1",
-        cloud: "#fefefe"
+        ink: "#15231f",
+        moss: "#2c6b5a",
+        mist: "#ebefe9",
+        sand: "#f3f1eb",
+        cloud: "#fcfcf9",
+        steel: "#5e6b67"
       },
       fontFamily: {
-        sans: ["Poppins", "ui-sans-serif", "system-ui"]
+        sans: ["Instrument Sans", "ui-sans-serif", "system-ui"],
+        display: ["Poppins", "Instrument Sans", "ui-sans-serif", "system-ui"]
       },
       boxShadow: {
-        panel: "0 18px 60px rgba(15, 32, 27, 0.08)"
+        panel: "0 16px 40px rgba(18, 32, 28, 0.06)"
       }
     }
   },

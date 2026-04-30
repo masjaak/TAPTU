@@ -3,14 +3,12 @@ import { Navigate } from "react-router-dom";
 import {
   Bell,
   Clock3,
-  Home,
   LogOut,
   MapPinned,
   QrCode,
   ScanFace,
   ShieldCheck,
   TimerReset,
-  UserRound
 } from "lucide-react";
 
 import type { AttendanceTimelineItem, DashboardPayload, DashboardStat, LeaveRequestItem } from "@taptu/shared";
@@ -20,8 +18,7 @@ import { Shell } from "../components/Shell";
 import { StatusPill } from "../components/StatusPill";
 import { clearSession, readSession } from "../lib/session";
 import { getDashboard } from "../lib/api";
-
-type TabKey = "home" | "attendance" | "requests" | "scanner" | "profile";
+import { getTabsForRole, transitionTab, type AppTabKey } from "../lib/appShellState";
 
 export function AppPage() {
   const session = readSession();
@@ -31,21 +28,9 @@ export function AppPage() {
   const [requests, setRequests] = useState<LeaveRequestItem[]>([]);
   const [scannerToken, setScannerToken] = useState<string | undefined>();
   const [greeting, setGreeting] = useState("");
-  const [tab, setTab] = useState<TabKey>("home");
+  const [tab, setTab] = useState<AppTabKey>("home");
 
-  const tabs = useMemo(() => {
-    const base = [
-      { key: "home" as const, label: "Beranda", icon: Home },
-      { key: "attendance" as const, label: "Absensi", icon: QrCode },
-      { key: "requests" as const, label: "Izin", icon: TimerReset }
-    ];
-
-    if (session?.user.role === "scanner") {
-      return [...base, { key: "scanner" as const, label: "Scanner", icon: ScanFace }, { key: "profile" as const, label: "Profil", icon: UserRound }];
-    }
-
-    return [...base, { key: "profile" as const, label: "Profil", icon: UserRound }];
-  }, [session?.user.role]);
+  const tabs = useMemo(() => getTabsForRole(session?.user.role ?? "employee"), [session?.user.role]);
 
   useEffect(() => {
     if (!session) {
@@ -86,8 +71,8 @@ export function AppPage() {
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
         <header className="flex flex-col gap-5 rounded-[30px] border border-[#dbe5dc] bg-white p-5 shadow-panel md:flex-row md:items-center md:justify-between md:p-6">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-moss">{session.user.role} workspace</p>
-            <h1 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-3xl">{greeting || `Halo, ${session.user.fullName}`}</h1>
+            <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-moss">{session.user.role} workspace</p>
+            <h1 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-3xl">{greeting || `Halo, ${session.user.fullName}`}</h1>
             <p className="mt-2 text-base text-[#63746d]">
               {session.user.organizationName} · Responsive PWA untuk website dan mobile wrapper.
             </p>
@@ -110,7 +95,22 @@ export function AppPage() {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setTab(item.key)}
+                onClick={() =>
+                  setTab((current) =>
+                    transitionTab(session.user.role, current, {
+                      type:
+                        item.key === "home"
+                          ? "OPEN_HOME"
+                          : item.key === "attendance"
+                            ? "OPEN_ATTENDANCE"
+                            : item.key === "requests"
+                              ? "OPEN_REQUESTS"
+                              : item.key === "scanner"
+                                ? "OPEN_SCANNER"
+                                : "OPEN_PROFILE"
+                    })
+                  )
+                }
                 className={`flex flex-col items-center justify-center rounded-[22px] px-3 py-3 text-center text-xs font-semibold transition ${
                   tab === item.key ? "bg-ink text-white" : "text-[#5c6d67] hover:bg-[#f3f6f1]"
                 }`}
@@ -128,7 +128,7 @@ export function AppPage() {
               {stats.map((item) => (
                 <article key={item.label} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel sm:p-6">
                   <p className="text-sm font-semibold text-[#52645d]">{item.label}</p>
-                  <p className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
+                  <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
                   <p className="mt-3 text-sm leading-6 text-[#667770]">{item.detail}</p>
                 </article>
               ))}
@@ -139,7 +139,7 @@ export function AppPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Fokus hari ini</p>
-                    <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Flow absensi yang siap diteruskan ke produk penuh.</h2>
+                    <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Flow absensi yang siap diteruskan ke produk penuh.</h2>
                   </div>
                   <Bell className="h-6 w-6 text-moss" />
                 </div>
@@ -163,7 +163,7 @@ export function AppPage() {
                   <Clock3 className="h-6 w-6 text-[#97d7be]" />
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Rencana implementasi</p>
-                    <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl">Baseline sprint pertama</h2>
+                    <h2 className="font-display mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl">Baseline sprint pertama</h2>
                   </div>
                 </div>
                 <div className="mt-7 space-y-4">
@@ -187,7 +187,7 @@ export function AppPage() {
           <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-[30px] border border-[#dae5db] bg-[#10211c] p-5 text-white shadow-panel sm:p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Absensi hari ini</p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Masuk kerja tanpa langkah yang bikin lambat.</h2>
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em]">Masuk kerja tanpa langkah yang bikin lambat.</h2>
               <p className="mt-4 text-sm leading-7 text-[#b9cfc5]">
                 Tampilan ini disusun mobile-first supaya check-in, GPS, dan selfie bisa dipakai nyaman di layar kecil.
               </p>
@@ -213,7 +213,7 @@ export function AppPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Riwayat singkat</p>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">Jejak kehadiran terbaru</h2>
+                  <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">Jejak kehadiran terbaru</h2>
                 </div>
                 <ShieldCheck className="h-6 w-6 text-moss" />
               </div>
@@ -242,7 +242,7 @@ export function AppPage() {
           <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
             <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Pengajuan dan approval</p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">Panel izin yang lebih mudah dibaca di mobile.</h2>
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">Panel izin yang lebih mudah dibaca di mobile.</h2>
               <p className="mt-4 text-sm leading-7 text-[#64756e]">
                 Flow ini disiapkan agar employee dan admin bisa melihat status approval tanpa kehilangan konteks.
               </p>
@@ -271,10 +271,10 @@ export function AppPage() {
           <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-[30px] border border-[#dae5db] bg-[#10211c] p-5 text-white shadow-panel sm:p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Mode scanner</p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">QR refresh dan scan log dalam satu layar.</h2>
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em]">QR refresh dan scan log dalam satu layar.</h2>
               <div className="mt-6 rounded-[26px] border border-white/10 bg-white/6 p-5">
                 <p className="text-sm text-[#a4cbbc]">Token aktif</p>
-                <p className="mt-3 text-4xl font-semibold tracking-[0.12em]">{scannerToken ?? "HDR-31A-7XZ"}</p>
+                <p className="font-display mt-3 text-4xl font-semibold tracking-[0.12em]">{scannerToken ?? "HDR-31A-7XZ"}</p>
                 <p className="mt-3 text-sm text-[#bad1c8]">Auto refresh tiap 30 detik. Siap dipakai untuk fullscreen scanner PWA.</p>
               </div>
             </div>
@@ -301,7 +301,7 @@ export function AppPage() {
           <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
             <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Profil akun</p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">{session.user.fullName}</h2>
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">{session.user.fullName}</h2>
               <div className="mt-6 space-y-4 text-sm text-[#61726c]">
                 <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
                   <p className="font-semibold text-ink">Email</p>

@@ -33,8 +33,8 @@ export function LoginPage() {
     <Shell>
       <div className="mx-auto grid min-h-screen max-w-7xl gap-10 px-6 py-10 lg:grid-cols-[0.95fr_1.05fr] lg:px-10 lg:py-14">
         <div className="rounded-[36px] bg-ink p-8 text-white lg:p-10">
-          <p className="text-xs uppercase tracking-[0.28em] text-[#8ed3b7]">Login web dan mobile</p>
-          <h1 className="mt-6 text-4xl font-semibold tracking-[-0.04em]">Masuk ke Hadiri tanpa membuang langkah penting.</h1>
+          <p className="font-display text-xs uppercase tracking-[0.28em] text-[#8ed3b7]">Login web dan mobile</p>
+          <h1 className="font-display mt-6 text-4xl font-semibold tracking-[-0.04em]">Masuk ke Hadiri tanpa membuang langkah penting.</h1>
           <p className="mt-6 max-w-lg text-base leading-8 text-[#bdd3ca]">
             Halaman ini jadi fondasi untuk login website dan wrapper iPhone. Role admin, employee, dan scanner sudah disiapkan
             sebagai baseline supaya kamu bisa lanjut ke flow produksi.
@@ -53,7 +53,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="w-full rounded-[36px] border border-[#dde6dd] bg-white p-7 shadow-panel md:p-10">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-moss">Masuk</p>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-ink">Akses workspace Hadiri</h2>
+              <h2 className="font-display mt-4 text-3xl font-semibold tracking-[-0.03em] text-ink">Akses workspace Hadiri</h2>
               <p className="mt-3 text-base leading-7 text-[#61726c]">
                 Gunakan akun demo dulu. Setelah backend produksi siap, flow ini tinggal diarahkan ke database dan OTP.
               </p>

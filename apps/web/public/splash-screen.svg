@@ -1,8 +1,7 @@
 <svg width="1284" height="2778" viewBox="0 0 1284 2778" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1284" height="2778" fill="#F7F6F1"/>
-  <circle cx="642" cy="536" r="472" fill="url(#paint0_radial_1_8)" fill-opacity="0.24"/>
-  <rect x="292" y="806" width="700" height="700" rx="168" fill="#0E1F1B"/>
-  <rect x="388" y="902" width="508" height="508" rx="132" fill="url(#paint1_linear_1_8)"/>
+  <rect width="1284" height="2778" fill="#F3F1EB"/>
+  <rect x="292" y="806" width="700" height="700" rx="168" fill="#15231F"/>
+  <rect x="388" y="902" width="508" height="508" rx="132" fill="#2C6B5A"/>
   <path d="M550 1004C550 984.118 566.118 968 586 968H698C717.882 968 734 984.118 734 1004V1036H550V1004Z" fill="#ECF5EF"/>
   <path d="M522 1088C522 1068.12 538.118 1052 558 1052H726C745.882 1052 762 1068.12 762 1088V1246C762 1294.6 722.601 1334 674 1334H610C561.399 1334 522 1294.6 522 1246V1088Z" fill="#FDFEFC"/>
   <rect x="572" y="1148" width="140" height="24" rx="12" fill="#1F8F6C"/>
@@ -12,15 +11,5 @@
   <path d="M617 1323.5L634 1340.5L671 1303.5" stroke="#1F8F6C" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="642" y="1654" text-anchor="middle" fill="#10211C" font-family="Poppins, Arial, sans-serif" font-size="120" font-weight="700">Hadiri</text>
   <text x="642" y="1752" text-anchor="middle" fill="#5B6B65" font-family="Poppins, Arial, sans-serif" font-size="52" font-weight="500">Absensi yang lebih rapi untuk tim modern</text>
-  <text x="642" y="1888" text-anchor="middle" fill="#1F8F6C" font-family="Poppins, Arial, sans-serif" font-size="38" font-weight="600" letter-spacing="8">BY TAPTU</text>
-  <defs>
-    <radialGradient id="paint0_radial_1_8" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(642 536) rotate(90) scale(472)">
-      <stop stop-color="#7FE4BF"/>
-      <stop offset="1" stop-color="#7FE4BF" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="paint1_linear_1_8" x1="642" y1="902" x2="642" y2="1410" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#2AAA82"/>
-      <stop offset="1" stop-color="#15795A"/>
-    </linearGradient>
-  </defs>
+  <text x="642" y="1888" text-anchor="middle" fill="#2C6B5A" font-family="Poppins, Arial, sans-serif" font-size="38" font-weight="600" letter-spacing="8">BY TAPTU</text>
 </svg>
