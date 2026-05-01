@@ -44,4 +44,11 @@ describe("landing page", () => {
     renderAt("/");
     expect(screen.queryByText(/hadiri/i)).toBeNull();
   });
+
+  it("includes completion sections for rollout confidence", () => {
+    renderAt("/");
+    expect(screen.getByRole("heading", { name: /yang sudah disiapkan untuk rollout/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /pertanyaan sebelum mulai/i })).toBeTruthy();
+    expect(screen.getByRole("contentinfo")).toBeTruthy();
+  });
 });
