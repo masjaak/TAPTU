@@ -1,12 +1,12 @@
 import {
   ArrowRight,
-  BadgeCheck,
-  CheckCircle2,
+  Bell,
+  CalendarCheck,
   Clock3,
   Fingerprint,
   MapPin,
+  QrCode,
   RadioTower,
-  ScanLine,
   ShieldCheck,
   Smartphone,
   UsersRound
@@ -17,123 +17,89 @@ import { Link } from "react-router-dom";
 
 import { Shell } from "../components/Shell";
 
-const proofMetrics = [
-  { value: "30s", label: "QR token refresh", detail: "Mengurangi risiko titip scan di titik kerja." },
-  { value: "3 peran", label: "Admin, tim, scanner", detail: "Setiap orang melihat hal yang perlu dikerjakan saja." },
-  { value: "1 alur", label: "Web dan PWA", detail: "Login, scan, izin, dan audit tetap satu bahasa visual." }
-];
+const revealViewport = { once: true, margin: "-80px" } as const;
 
-const trustPoints = [
+const fadeUp = {
+  hidden: { opacity: 0, y: 26 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.65 } }
+};
+
+const stagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.08 } }
+};
+
+const deskItems = [
   {
-    icon: ShieldCheck,
-    title: "Validasi sebelum data masuk laporan",
-    description: "QR, lokasi, selfie, dan waktu dibuat sebagai checkpoint, bukan sekadar tombol hadir."
+    icon: QrCode,
+    title: "QR refresh otomatis",
+    copy: "Token scanner berubah berkala supaya check-in tetap cepat tanpa membuka celah titip scan."
   },
   {
-    icon: Clock3,
-    title: "Manager melihat pengecualian lebih cepat",
-    description: "Keterlambatan, izin, dan scan bermasalah naik ke permukaan tanpa membuka banyak tab."
+    icon: MapPin,
+    title: "Lokasi punya guard",
+    copy: "Check-in di luar radius tidak langsung masuk laporan final. Admin melihatnya sebagai antrian review."
   },
   {
-    icon: BadgeCheck,
-    title: "Audit trail siap dibaca ulang",
-    description: "Riwayat perubahan dibuat jelas agar keputusan operasional tidak bergantung pada chat."
+    icon: Fingerprint,
+    title: "Bukti hadir berlapis",
+    copy: "QR, waktu, lokasi, dan selfie bisa dipakai sebagai konteks sebelum data masuk payroll."
   }
 ];
 
-const workflowStates = [
-  {
-    state: "01",
-    title: "Tim check-in",
-    copy: "Karyawan membuka PWA, scan QR, lalu sistem mencatat waktu, perangkat, dan konteks lokasi."
-  },
-  {
-    state: "02",
-    title: "Sistem memvalidasi",
-    copy: "Status bergerak dari draft -> validasi lokasi -> masuk log admin. Transisi yang tidak valid ditahan."
-  },
-  {
-    state: "03",
-    title: "Admin mengambil keputusan",
-    copy: "Izin, terlambat, dan anomali scan tampil sebagai antrian kerja yang bisa diprioritaskan."
-  }
+const workflowSteps = [
+  ["01", "Scan", "Tim check-in dari PWA atau gate scanner."],
+  ["02", "Validasi", "Sistem membaca lokasi, waktu, perangkat, dan status shift."],
+  ["03", "Review", "Anomali masuk queue admin, bukan laporan final."],
+  ["04", "Laporan", "Data yang lolos guard siap dipakai HR dan payroll."]
 ];
 
 const roleCards = [
   {
     icon: UsersRound,
     title: "Admin HR",
-    description: "Pantau kehadiran harian, lihat pengecualian, dan tindak lanjuti approval dari satu meja kerja."
+    copy: "Dashboard ringan untuk melihat siapa hadir, siapa terlambat, dan apa yang perlu keputusan."
   },
   {
     icon: Smartphone,
-    title: "Karyawan lapangan",
-    description: "Check-in tetap cepat di mobile tanpa merasa seperti mengisi form internal yang berat."
+    title: "Karyawan mobile",
+    copy: "Check-in dibuat secepat membuka app, tanpa formulir internal yang berat."
   },
   {
-    icon: ScanLine,
+    icon: RadioTower,
     title: "Scanner gate",
-    description: "Mode scanner fokus pada scan dan refresh token, bukan navigasi dashboard yang tidak perlu."
+    copy: "Mode scanner fokus pada scan, refresh token, dan status lokasi kerja."
   }
 ];
 
-const dashboardRows = [
-  ["08.03", "Nadia check-in dari Kantor Pusat", "Valid"],
-  ["08.15", "Gate Timur refresh QR token", "Sync"],
-  ["09.20", "2 izin sakit menunggu manager", "Review"],
-  ["10.05", "Scan luar radius ditahan sistem", "Blocked"]
-];
-
-const rolloutItems = [
-  {
-    title: "Demo role sudah lengkap",
-    description: "Admin, karyawan, dan scanner punya pintu masuk sendiri supaya evaluasi tidak berhenti di satu tampilan."
-  },
-  {
-    title: "PWA siap jadi kebiasaan tim",
-    description: "Flow mobile dibuat cepat untuk check-in harian dan tetap cukup jelas saat dipasang seperti aplikasi."
-  },
-  {
-    title: "Fondasi audit sudah terlihat",
-    description: "Status, validasi, dan pengecualian disusun sebagai riwayat kerja yang bisa dibaca ulang oleh HR."
-  },
-  {
-    title: "Siap disambungkan ke produksi",
-    description: "Struktur login, dashboard, dan API demo sudah rapi untuk diarahkan ke database, OTP, dan payroll."
-  }
+const trustSignals = [
+  { value: "30s", label: "QR token refresh" },
+  { value: "3 mode", label: "Admin, mobile, scanner" },
+  { value: "1 queue", label: "Review pengecualian" },
+  { value: "24/7", label: "Siap untuk shift" }
 ];
 
 const faqs = [
   {
     question: "Apakah Taptu hanya untuk tim lapangan?",
-    answer: "Tidak. Taptu cocok untuk tim hybrid yang punya kantor, titik kerja, gate scanner, dan karyawan mobile dalam satu operasi."
+    answer: "Tidak. Taptu cocok untuk tim hybrid yang punya kantor, gate scanner, lokasi lapangan, dan karyawan mobile."
   },
   {
-    question: "Apakah demo ini sudah bisa dicoba tanpa setup?",
-    answer: "Bisa. Gunakan akun demo di halaman login untuk melihat alur admin, karyawan, dan scanner."
+    question: "Apa yang bisa dicoba di demo?",
+    answer: "Kamu bisa masuk sebagai admin, karyawan, atau scanner untuk melihat alur utama dari sisi yang berbeda."
   },
   {
     question: "Apa yang perlu disiapkan sebelum produksi?",
-    answer: "Database produksi, aturan lokasi, kebijakan approval, metode OTP, dan integrasi payroll jika dibutuhkan."
+    answer: "Aturan lokasi, struktur shift, kebijakan approval, database produksi, OTP, dan integrasi payroll jika dibutuhkan."
   }
 ];
-
-const revealViewport = { once: true, margin: "-80px" };
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.7 } }
-};
-const staggerGroup = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.08 } }
-};
 
 function PrimaryLink({ children, to }: { children: ReactNode; to: string }) {
   return (
     <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
       <Link
         to={to}
-        className="inline-flex items-center justify-center rounded-full bg-[#0f211c] px-6 py-4 text-sm font-bold text-white shadow-[0_18px_40px_rgba(15,33,28,0.22)] transition duration-200 hover:bg-[#1b332c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0f211c]"
+        className="inline-flex items-center justify-center rounded-2xl bg-[#1769ff] px-6 py-4 text-sm font-bold text-white shadow-[0_18px_42px_rgba(23,105,255,0.28)] transition hover:bg-[#0d5be8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1769ff]"
       >
         {children}
       </Link>
@@ -145,7 +111,7 @@ function SectionLink({ children, href }: { children: ReactNode; href: string }) 
   return (
     <motion.a
       href={href}
-      className="inline-flex items-center justify-center rounded-full border border-[#c8d2c8] bg-[#fffdf7] px-6 py-4 text-sm font-bold text-[#13231e] transition duration-200 hover:-translate-y-0.5 hover:border-[#93a994] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0f211c]"
+      className="inline-flex items-center justify-center rounded-2xl border border-[#d8dde7] bg-white px-6 py-4 text-sm font-bold text-[#111827] shadow-[0_12px_32px_rgba(20,24,31,0.06)] transition hover:border-[#b9c2d3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1769ff]"
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.98 }}
     >
@@ -154,356 +120,324 @@ function SectionLink({ children, href }: { children: ReactNode; href: string }) 
   );
 }
 
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">{children}</p>;
+}
+
 export function LandingPage() {
   return (
     <Shell>
       <MotionConfig reducedMotion="user">
-      <div className="min-h-screen overflow-hidden bg-[#f5f0e6] text-[#13231e]">
-        <header className="relative z-20 border-b border-[#ded6c7]/80 bg-[#f5f0e6]/90 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 lg:px-10">
-            <a href="#top" className="group flex items-center gap-3" aria-label="Taptu home">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#13231e] text-sm font-black text-[#f7d36b] shadow-[0_12px_30px_rgba(19,35,30,0.2)]">
-                T
-              </span>
-              <span>
-                <span className="block text-lg font-black tracking-[-0.04em]">Taptu</span>
-                <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-[#617067]">Attendance OS</span>
-              </span>
-            </a>
-
-            <nav className="hidden items-center gap-2 md:flex" aria-label="Primary navigation">
-              <a className="rounded-full px-4 py-2 text-sm font-semibold text-[#4e6057] hover:bg-white/70" href="#proof">
-                Bukti
-              </a>
-              <a className="rounded-full px-4 py-2 text-sm font-semibold text-[#4e6057] hover:bg-white/70" href="#workflow">
-                Alur
-              </a>
-              <a className="rounded-full px-4 py-2 text-sm font-semibold text-[#4e6057] hover:bg-white/70" href="#roles">
-                Peran
-              </a>
-              <a className="rounded-full px-4 py-2 text-sm font-semibold text-[#4e6057] hover:bg-white/70" href="#faq">
-                FAQ
-              </a>
-              <Link
-                className="ml-2 rounded-full bg-[#13231e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#203830] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#13231e]"
-                to="/login"
-              >
-                Coba demo Taptu
-              </Link>
-            </nav>
-          </div>
-        </header>
-
-        <main id="top">
-          <motion.section className="relative" initial="hidden" animate="visible" variants={staggerGroup}>
-            <motion.div
-              className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(247,211,107,0.35),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(44,107,90,0.22),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.62),transparent_42%)]"
-              initial={{ opacity: 0.65, scale: 1.04 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1.2 }}
-            />
-            <div className="absolute left-1/2 top-0 h-full w-px bg-[#d6cebf]" />
-            <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-14 md:px-8 lg:grid-cols-[0.92fr_1.08fr] lg:px-10 lg:py-20">
-              <motion.div className="max-w-3xl" variants={fadeUp}>
-                <p className="inline-flex items-center rounded-full border border-[#d7cdbd] bg-[#fffaf0] px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#77633a]">
-                  Absensi operasional untuk tim hybrid
-                </p>
-                <h1 className="mt-6 max-w-4xl text-[44px] font-black leading-[0.98] tracking-[-0.055em] text-[#10201b] md:text-6xl lg:text-[72px]">
-                  Absensi rapi tanpa chat berantakan.
-                </h1>
-                <p className="mt-6 max-w-2xl text-base leading-8 text-[#4d5e56] md:text-lg">
-                  Taptu membantu tim lapangan, kantor, HR, dan gate scanner bergerak dalam satu alur kehadiran yang mudah
-                  diaudit. Cepat untuk karyawan, jelas untuk admin, aman untuk keputusan operasional.
-                </p>
-
-                <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                  <PrimaryLink to="/login">
-                    Coba demo Taptu
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </PrimaryLink>
-                  <SectionLink href="#workflow">Lihat cara kerja</SectionLink>
+        <div className="min-h-screen bg-[#d9d9d9] px-4 py-6 text-[#101217] sm:px-6 lg:px-8">
+          <motion.main initial="hidden" animate="visible" variants={stagger}>
+            <section className="mx-auto max-w-7xl overflow-hidden rounded-[34px] border border-white/70 bg-[#f9fafc] shadow-[0_34px_90px_rgba(20,24,31,0.18)]">
+              <header className="relative z-20 flex items-center justify-between border-b border-[#edf0f5] px-5 py-4 md:px-8">
+                <a href="#top" className="flex items-center gap-3" aria-label="Taptu home">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#111827] text-sm font-black text-white">
+                    T
+                  </span>
+                  <span className="text-sm font-black tracking-[-0.02em]">Taptu</span>
+                </a>
+                <nav className="hidden items-center gap-8 text-xs font-semibold text-[#596172] md:flex" aria-label="Primary navigation">
+                  <a href="#desk" className="transition hover:text-[#111827]">
+                    Platform
+                  </a>
+                  <a href="#workflow" className="transition hover:text-[#111827]">
+                    Workflow
+                  </a>
+                  <a href="#roles" className="transition hover:text-[#111827]">
+                    Roles
+                  </a>
+                  <a href="#faq" className="transition hover:text-[#111827]">
+                    FAQ
+                  </a>
+                </nav>
+                <div className="flex items-center gap-3">
+                  <Link className="hidden text-xs font-semibold text-[#596172] transition hover:text-[#111827] sm:inline" to="/login">
+                    Sign in
+                  </Link>
+                  <Link
+                    className="rounded-xl border border-[#d8dde7] bg-white px-4 py-2.5 text-xs font-bold text-[#111827] shadow-[0_10px_24px_rgba(20,24,31,0.06)]"
+                    to="/login"
+                  >
+                    Coba demo
+                  </Link>
                 </div>
+              </header>
 
-                <motion.div className="mt-9 grid gap-3 sm:grid-cols-3" variants={staggerGroup}>
-                  {proofMetrics.map((metric) => (
-                    <motion.div key={metric.label} className="rounded-[26px] border border-[#ded6c7] bg-[#fffaf0]/80 p-5 backdrop-blur" variants={fadeUp}>
-                      <p className="text-2xl font-black tracking-[-0.05em] text-[#13231e]">{metric.value}</p>
-                      <p className="mt-2 text-sm font-bold text-[#34463e]">{metric.label}</p>
-                      <p className="mt-2 text-sm leading-6 text-[#69766f]">{metric.detail}</p>
-                    </motion.div>
-                  ))}
+              <div id="top" className="relative min-h-[680px] overflow-hidden px-5 py-14 md:px-8 lg:min-h-[720px]">
+                <div className="absolute inset-0 bg-[radial-gradient(#d9dee8_1px,transparent_1px)] [background-size:18px_18px]" />
+                <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#f9fafc] to-transparent" />
+
+                <motion.div
+                  className="absolute left-6 top-16 hidden w-56 rotate-[-6deg] rounded-[22px] border border-[#ece3a8] bg-[#fff177] p-5 shadow-[0_24px_60px_rgba(20,24,31,0.16)] lg:block"
+                  variants={fadeUp}
+                >
+                  <p className="text-sm font-black leading-6 text-[#37321a]">Catatan shift</p>
+                  <p className="mt-2 text-sm leading-6 text-[#5f5623]">Review scan luar radius sebelum tutup payroll.</p>
                 </motion.div>
-              </motion.div>
 
-              <motion.div className="relative lg:pt-6" variants={fadeUp}>
-                <div className="absolute -right-10 top-8 hidden h-36 w-36 rounded-full bg-[#f7d36b] lg:block" />
-                <div className="relative rounded-[34px] border border-[#11231d] bg-[#11231d] p-3 shadow-[0_30px_80px_rgba(17,35,29,0.22)]">
-                  <div className="rounded-[26px] border border-white/10 bg-[#172b24] p-5 text-white md:p-7">
-                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-6">
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.24em] text-[#f7d36b]">Live operations board</p>
-                        <h2 className="mt-3 max-w-md text-2xl font-black leading-tight tracking-[-0.035em] md:text-3xl">
-                          Dibangun untuk keputusan operasional, bukan sekadar daftar hadir.
-                        </h2>
-                      </div>
-                      <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-[#d9eee5]">
-                        91% on-time
-                      </div>
-                    </div>
-
-                    <div className="mt-6 grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
-                      <div className="rounded-[24px] bg-[#f8f1e4] p-5 text-[#13231e]">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-black uppercase tracking-[0.16em] text-[#5c6a63]">Hari ini</p>
-                          <RadioTower className="h-5 w-5 text-[#2c6b5a]" />
-                        </div>
-                        <div className="mt-6 space-y-4">
-                          {dashboardRows.map(([time, title, status]) => (
-                            <div key={title} className="grid grid-cols-[56px_1fr_auto] items-center gap-3 rounded-2xl bg-white px-3 py-3">
-                              <span className="text-xs font-black text-[#829087]">{time}</span>
-                              <span className="text-sm font-semibold leading-5 text-[#273a33]">{title}</span>
-                              <span className="rounded-full bg-[#edf3ed] px-2.5 py-1 text-[11px] font-black text-[#2c6b5a]">
-                                {status}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4">
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.08] p-5">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-black uppercase tracking-[0.16em] text-[#a8c7ba]">Validasi</p>
-                            <Fingerprint className="h-5 w-5 text-[#f7d36b]" />
-                          </div>
-                          <div className="mt-6 grid grid-cols-3 gap-2">
-                            {["QR", "GPS", "Selfie"].map((item) => (
-                              <div key={item} className="rounded-2xl bg-white/10 px-3 py-4 text-center text-sm font-black">
-                                {item}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="rounded-[24px] bg-[#f7d36b] p-5 text-[#13231e]">
-                          <MapPin className="h-6 w-6" />
-                          <p className="mt-4 text-sm font-black uppercase tracking-[0.16em]">Geo rule aktif</p>
-                          <p className="mt-2 text-3xl font-black tracking-[-0.05em]">12 lokasi</p>
-                          <p className="mt-2 text-sm leading-6 text-[#594a24]">Check-in di luar radius masuk review, bukan laporan final.</p>
-                        </div>
-                      </div>
+                <motion.div
+                  className="absolute right-10 top-20 hidden w-56 rotate-[7deg] rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.14)] lg:block"
+                  variants={fadeUp}
+                >
+                  <div className="flex items-center gap-3">
+                    <Bell className="h-9 w-9 rounded-2xl bg-[#f1f5ff] p-2 text-[#1769ff]" />
+                    <div>
+                      <p className="text-sm font-black">Reminder</p>
+                      <p className="text-xs text-[#7a8495]">Approval izin</p>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            </div>
-          </motion.section>
+                  <div className="mt-4 rounded-2xl bg-[#f6f8fb] p-3 text-xs font-bold text-[#596172]">14 request menunggu</div>
+                </motion.div>
 
-          <motion.section
-            id="proof"
-            className="border-y border-[#ded6c7] bg-[#fffaf0]"
-            initial="hidden"
-            whileInView="visible"
-            viewport={revealViewport}
-            variants={staggerGroup}
-          >
-            <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 md:px-8 lg:grid-cols-[0.78fr_1.22fr] lg:px-10 lg:py-20">
-              <motion.div variants={fadeUp}>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#77633a]">Trust first</p>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-[#10201b] md:text-[44px]">
-                  Data absensi harus bisa dipercaya sebelum dipakai untuk payroll.
-                </h2>
-              </motion.div>
-              <div className="grid gap-4 md:grid-cols-3">
-                {trustPoints.map((point) => (
-                  <motion.article
-                    key={point.title}
-                    className="rounded-[28px] border border-[#e1d8c9] bg-white p-6 shadow-[0_18px_45px_rgba(54,45,28,0.06)]"
-                    variants={fadeUp}
-                  >
-                    <point.icon className="h-11 w-11 rounded-2xl bg-[#edf3ed] p-2.5 text-[#2c6b5a]" />
-                    <h3 className="mt-5 text-xl font-black leading-tight tracking-[-0.03em] text-[#13231e]">{point.title}</h3>
-                    <p className="mt-3 text-base leading-7 text-[#607068]">{point.description}</p>
-                  </motion.article>
-                ))}
+                <motion.div
+                  className="absolute bottom-10 left-8 hidden w-64 rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.12)] md:block"
+                  variants={fadeUp}
+                >
+                  <p className="text-sm font-black">Validasi hari ini</p>
+                  <div className="mt-4 space-y-3">
+                    {["QR Gate Timur", "GPS Kantor Pusat"].map((item, index) => (
+                      <div key={item}>
+                        <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#596172]">
+                          <span>{item}</span>
+                          <span>{index === 0 ? "82%" : "64%"}</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-[#ecf0f6]">
+                          <div className={index === 0 ? "h-full w-[82%] rounded-full bg-[#1769ff]" : "h-full w-[64%] rounded-full bg-[#ff7a45]"} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  className="absolute bottom-12 right-8 hidden w-64 rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.12)] md:block"
+                  variants={fadeUp}
+                >
+                  <p className="text-sm font-black">Integrasi operasional</p>
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    {[CalendarCheck, ShieldCheck, Clock3].map((Icon, index) => (
+                      <div key={index} className="grid h-14 place-items-center rounded-2xl bg-[#f6f8fb]">
+                        <Icon className="h-6 w-6 text-[#1769ff]" />
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+
+                <motion.div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center pt-20 text-center md:pt-24" variants={fadeUp}>
+                  <div className="grid h-16 w-16 place-items-center rounded-[22px] border border-[#e2e7f0] bg-white shadow-[0_22px_50px_rgba(20,24,31,0.12)]">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <span className="h-3.5 w-3.5 rounded-full bg-[#1769ff]" />
+                      <span className="h-3.5 w-3.5 rounded-full bg-[#111827]" />
+                      <span className="h-3.5 w-3.5 rounded-full bg-[#7dd3fc]" />
+                      <span className="h-3.5 w-3.5 rounded-full bg-[#a3a3a3]" />
+                    </div>
+                  </div>
+                  <h1 className="mt-9 max-w-4xl text-[46px] font-black leading-[1.02] tracking-[-0.065em] text-[#0f1115] md:text-7xl lg:text-[82px]">
+                    Kelola absensi tim
+                    <span className="block text-[#9aa1ad]">dalam satu alur kerja</span>
+                  </h1>
+                  <p className="mt-6 max-w-xl text-base leading-7 text-[#596172] md:text-lg">
+                    Taptu menyatukan check-in mobile, scanner gate, validasi lokasi, approval izin, dan laporan admin dalam
+                    satu workspace yang terasa ringan.
+                  </p>
+                  <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                    <PrimaryLink to="/login">
+                      Coba demo Taptu
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </PrimaryLink>
+                    <SectionLink href="#workflow">Lihat alur validasi</SectionLink>
+                  </div>
+                </motion.div>
               </div>
-            </div>
-          </motion.section>
+            </section>
 
-          <motion.section
-            id="workflow"
-            className="mx-auto max-w-7xl px-5 py-16 md:px-8 lg:px-10 lg:py-20"
-            initial="hidden"
-            whileInView="visible"
-            viewport={revealViewport}
-            variants={staggerGroup}
-          >
-            <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr]">
-              <motion.div variants={fadeUp}>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#77633a]">State-machine flow</p>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-[#10201b] md:text-[44px]">
-                  Alur yang jelas sebelum tim masuk laporan final.
+            <motion.section
+              id="desk"
+              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+                <motion.div variants={fadeUp}>
+                  <SectionLabel>Platform</SectionLabel>
+                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Attendance desk yang siap dipakai.
+                  </h2>
+                  <p className="mt-5 max-w-lg text-base leading-8 text-[#596172]">
+                    Desain baru mengikuti pola hero yang bersih: banyak ruang kosong, satu pesan utama, dan UI attendance yang
+                    langsung menjelaskan fungsi produk.
+                  </p>
+                </motion.div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {deskItems.map((item) => (
+                    <motion.article
+                      key={item.title}
+                      className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-6"
+                      variants={fadeUp}
+                      whileHover={{ y: -5 }}
+                    >
+                      <item.icon className="h-11 w-11 rounded-2xl bg-white p-2.5 text-[#1769ff] shadow-[0_14px_30px_rgba(20,24,31,0.08)]" />
+                      <h3 className="mt-6 text-xl font-black tracking-[-0.03em]">{item.title}</h3>
+                      <p className="mt-3 text-sm leading-7 text-[#596172]">{item.copy}</p>
+                    </motion.article>
+                  ))}
+                </div>
+              </div>
+            </motion.section>
+
+            <motion.section
+              id="workflow"
+              className="mx-auto mt-8 max-w-7xl overflow-hidden rounded-[32px] bg-[#101217] px-5 py-14 text-white shadow-[0_24px_70px_rgba(20,24,31,0.18)] md:px-8 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+                <motion.div variants={fadeUp}>
+                  <SectionLabel>Workflow</SectionLabel>
+                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Dari scan sampai laporan.
+                  </h2>
+                  <p className="mt-5 max-w-lg text-base leading-8 text-[#b7bfca]">
+                    Setiap check-in punya status. Alur ini membuat data yang masuk payroll lebih bersih dan lebih mudah
+                    dipertanggungjawabkan.
+                  </p>
+                </motion.div>
+                <div className="grid gap-4">
+                  {workflowSteps.map(([number, title, copy]) => (
+                    <motion.article
+                      key={title}
+                      className="grid gap-5 rounded-[26px] border border-white/10 bg-white/[0.07] p-5 md:grid-cols-[72px_1fr]"
+                      variants={fadeUp}
+                    >
+                      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#1769ff] text-lg font-black">{number}</div>
+                      <div>
+                        <h3 className="text-2xl font-black tracking-[-0.04em]">{title}</h3>
+                        <p className="mt-2 text-base leading-7 text-[#b7bfca]">{copy}</p>
+                      </div>
+                    </motion.article>
+                  ))}
+                </div>
+              </div>
+            </motion.section>
+
+            <motion.section
+              id="roles"
+              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <motion.div className="mx-auto max-w-3xl text-center" variants={fadeUp}>
+                <SectionLabel>Dibuat untuk tiga mode kerja</SectionLabel>
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                  Dibuat untuk tiga mode kerja.
                 </h2>
-                <p className="mt-5 max-w-xl text-base leading-8 text-[#56665f] md:text-lg">
-                  Taptu memperlakukan check-in seperti transisi status. Ada kondisi awal, validasi, guard, dan hasil akhir
-                  yang bisa ditelusuri.
+                <p className="mt-5 text-base leading-8 text-[#596172]">
+                  Setiap peran melihat interface yang sesuai konteks, bukan dashboard yang dipaksakan sama untuk semua orang.
                 </p>
               </motion.div>
-
-              <div className="grid gap-4">
-                {workflowStates.map((step) => (
-                  <motion.article
-                    key={step.state}
-                    className="grid gap-5 rounded-[30px] border border-[#ded6c7] bg-[#fffaf0] p-5 md:grid-cols-[76px_1fr] md:p-6"
-                    variants={fadeUp}
-                    whileHover={{ y: -4 }}
-                  >
-                    <div className="grid h-[72px] w-[72px] place-items-center rounded-[22px] bg-[#13231e] text-xl font-black text-[#f7d36b]">
-                      {step.state}
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black tracking-[-0.035em] text-[#13231e] md:text-2xl">{step.title}</h3>
-                      <p className="mt-3 text-base leading-7 text-[#5f6f67]">{step.copy}</p>
-                    </div>
-                  </motion.article>
-                ))}
-              </div>
-            </div>
-          </motion.section>
-
-          <motion.section
-            id="roles"
-            className="bg-[#13231e] text-white"
-            initial="hidden"
-            whileInView="visible"
-            viewport={revealViewport}
-            variants={staggerGroup}
-          >
-            <div className="mx-auto max-w-7xl px-5 py-16 md:px-8 lg:px-10 lg:py-20">
-              <motion.div className="max-w-3xl" variants={fadeUp}>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#f7d36b]">Role clarity</p>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-[44px]">
-                  Siap dipakai oleh tiga peran tanpa membuat semuanya terasa sama.
-                </h2>
-              </motion.div>
-
-              <div className="mt-9 grid gap-4 lg:grid-cols-3">
+              <div className="mt-10 grid gap-4 lg:grid-cols-3">
                 {roleCards.map((role) => (
                   <motion.article
                     key={role.title}
-                    className="rounded-[30px] border border-white/10 bg-white/[0.08] p-7"
+                    className="rounded-[28px] border border-[#edf0f5] bg-[#f9fafc] p-7"
                     variants={fadeUp}
-                    whileHover={{ y: -5, backgroundColor: "rgba(255,255,255,0.11)" }}
+                    whileHover={{ y: -5 }}
                   >
-                    <role.icon className="h-12 w-12 rounded-2xl bg-white/10 p-2.5 text-[#f7d36b]" />
-                    <h3 className="mt-6 text-2xl font-black tracking-[-0.04em]">{role.title}</h3>
-                    <p className="mt-3 text-base leading-8 text-[#c4d4cd]">{role.description}</p>
+                    <role.icon className="h-12 w-12 rounded-2xl bg-white p-2.5 text-[#1769ff] shadow-[0_14px_30px_rgba(20,24,31,0.08)]" />
+                    <h3 className="mt-7 text-2xl font-black tracking-[-0.04em]">{role.title}</h3>
+                    <p className="mt-3 text-base leading-8 text-[#596172]">{role.copy}</p>
                   </motion.article>
                 ))}
               </div>
-            </div>
-          </motion.section>
+            </motion.section>
 
-          <motion.section
-            className="mx-auto max-w-7xl px-5 py-16 md:px-8 lg:px-10 lg:py-20"
-            initial="hidden"
-            whileInView="visible"
-            viewport={revealViewport}
-            variants={staggerGroup}
-          >
-            <div className="grid gap-10 lg:grid-cols-[0.86fr_1.14fr] lg:items-start">
-              <motion.div variants={fadeUp}>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#77633a]">Rollout readiness</p>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-[#10201b] md:text-[44px]">
-                  Yang sudah disiapkan untuk rollout.
-                </h2>
-                <p className="mt-5 max-w-xl text-base leading-8 text-[#56665f] md:text-lg">
-                  Landing page tidak boleh berhenti di visual. Bagian ini menjawab apa yang siap diuji, apa yang sudah
-                  punya struktur, dan apa yang perlu dilanjutkan sebelum produksi.
-                </p>
-              </motion.div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {rolloutItems.map((item) => (
-                  <motion.article
-                    key={item.title}
-                    className="rounded-[28px] border border-[#ded6c7] bg-[#fffaf0] p-6 shadow-[0_18px_45px_rgba(54,45,28,0.05)]"
-                    variants={fadeUp}
-                    whileHover={{ y: -4 }}
-                  >
-                    <CheckCircle2 className="h-9 w-9 rounded-2xl bg-[#edf3ed] p-2 text-[#2c6b5a]" />
-                    <h3 className="mt-5 text-xl font-black leading-tight tracking-[-0.03em] text-[#13231e]">{item.title}</h3>
-                    <p className="mt-3 text-base leading-7 text-[#607068]">{item.description}</p>
-                  </motion.article>
-                ))}
-              </div>
-            </div>
-          </motion.section>
-
-          <motion.section
-            id="faq"
-            className="border-y border-[#ded6c7] bg-[#fffaf0]"
-            initial="hidden"
-            whileInView="visible"
-            viewport={revealViewport}
-            variants={staggerGroup}
-          >
-            <div className="mx-auto grid max-w-7xl gap-8 px-5 py-16 md:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:px-10 lg:py-20">
-              <motion.div variants={fadeUp}>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#77633a]">FAQ</p>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-[#10201b] md:text-[44px]">
-                  Pertanyaan sebelum mulai.
-                </h2>
-              </motion.div>
-              <div className="space-y-4">
-                {faqs.map((faq) => (
-                  <motion.article key={faq.question} className="rounded-[26px] border border-[#e1d8c9] bg-white p-6" variants={fadeUp}>
-                    <h3 className="text-lg font-black tracking-[-0.02em] text-[#13231e]">{faq.question}</h3>
-                    <p className="mt-3 text-base leading-7 text-[#607068]">{faq.answer}</p>
-                  </motion.article>
-                ))}
-              </div>
-            </div>
-          </motion.section>
-
-          <motion.section
-            className="relative px-5 py-16 md:px-8 lg:px-10 lg:py-20"
-            initial="hidden"
-            whileInView="visible"
-            viewport={revealViewport}
-            variants={fadeUp}
-          >
-            <div className="mx-auto max-w-7xl overflow-hidden rounded-[34px] border border-[#d8cdbc] bg-[#fffaf0]">
-              <div className="grid gap-8 p-7 md:p-10 lg:grid-cols-[1.1fr_0.9fr] lg:p-12">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#77633a]">Mulai dari demo</p>
-                  <h2 className="mt-4 max-w-3xl text-3xl font-black leading-tight tracking-[-0.045em] text-[#10201b] md:text-[44px]">
-                    Lihat apakah alur Taptu cocok untuk ritme tim kamu.
+            <motion.section
+              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-[#f9fafc] px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+                <motion.div variants={fadeUp}>
+                  <SectionLabel>Trust signals</SectionLabel>
+                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Sinyal yang membuat admin percaya.
                   </h2>
-                  <p className="mt-5 max-w-2xl text-base leading-8 text-[#5a6a62] md:text-lg">
-                    Masuk ke demo, cek dashboard, coba mode mobile, lalu nilai apakah struktur ini cukup jelas untuk
-                    dipakai sebagai fondasi produksi.
-                  </p>
-                </div>
-                <div className="flex flex-col justify-end gap-4 rounded-[30px] bg-[#13231e] p-6 text-white">
-                  <CheckCircle2 className="h-10 w-10 text-[#f7d36b]" />
-                  <p className="text-xl font-black tracking-[-0.04em]">Tidak perlu setup untuk melihat flow utama.</p>
-                  <PrimaryLink to="/login">
-                    Coba demo Taptu
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </PrimaryLink>
+                </motion.div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {trustSignals.map((signal) => (
+                    <motion.div key={signal.label} className="rounded-[26px] bg-white p-6 text-center" variants={fadeUp}>
+                      <p className="text-4xl font-black tracking-[-0.06em] text-[#1769ff]">{signal.value}</p>
+                      <p className="mt-3 text-sm font-bold text-[#596172]">{signal.label}</p>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
-            </div>
-          </motion.section>
-        </main>
+            </motion.section>
 
-        <footer className="border-t border-[#ded6c7] px-5 py-8 md:px-8 lg:px-10">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-[#607068] md:flex-row md:items-center md:justify-between">
-            <p className="font-bold text-[#13231e]">Taptu Attendance OS</p>
-            <p>Demo attendance platform untuk web, PWA, dan scanner workflow.</p>
-          </div>
-        </footer>
-      </div>
+            <motion.section
+              id="faq"
+              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr]">
+                <motion.div variants={fadeUp}>
+                  <SectionLabel>FAQ</SectionLabel>
+                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Pertanyaan sebelum mulai.
+                  </h2>
+                </motion.div>
+                <div className="space-y-4">
+                  {faqs.map((faq) => (
+                    <motion.article key={faq.question} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-6" variants={fadeUp}>
+                      <h3 className="text-lg font-black tracking-[-0.02em]">{faq.question}</h3>
+                      <p className="mt-3 text-base leading-7 text-[#596172]">{faq.answer}</p>
+                    </motion.article>
+                  ))}
+                </div>
+              </div>
+            </motion.section>
+
+            <motion.section
+              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-12 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={fadeUp}
+            >
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">Mulai dari demo</p>
+                  <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Coba alur Taptu sebelum masuk produksi.
+                  </h2>
+                </div>
+                <PrimaryLink to="/login">
+                  Coba demo Taptu
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </PrimaryLink>
+              </div>
+            </motion.section>
+          </motion.main>
+
+          <footer className="mx-auto flex max-w-7xl flex-col gap-4 px-2 py-8 text-sm text-[#596172] md:flex-row md:items-center md:justify-between">
+            <p className="font-black text-[#101217]">Taptu Attendance OS</p>
+            <p>Web, PWA, scanner, dan admin workflow untuk absensi tim.</p>
+          </footer>
+        </div>
       </MotionConfig>
     </Shell>
   );

@@ -22,22 +22,22 @@ describe("landing page", () => {
     cleanup();
   });
 
-  it("positions Taptu as the attendance command center", () => {
+  it("positions Taptu inside a focused attendance hero", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /absensi rapi tanpa chat berantakan/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /kelola absensi tim/i })).toBeTruthy();
   });
 
   it("shows conversion paths for demo and workflow review", () => {
     renderAt("/");
     expect(screen.getAllByRole("link", { name: /coba demo taptu/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /lihat cara kerja/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /lihat alur validasi/i })).toBeTruthy();
   });
 
   it("explains the landing page trust sequence", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /dibangun untuk keputusan operasional/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /alur yang jelas sebelum tim masuk/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /siap dipakai oleh tiga peran/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /attendance desk yang siap dipakai/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /dari scan sampai laporan/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /dibuat untuk tiga mode kerja/i })).toBeTruthy();
   });
 
   it("does not show the old product name", () => {
@@ -47,7 +47,7 @@ describe("landing page", () => {
 
   it("includes completion sections for rollout confidence", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /yang sudah disiapkan untuk rollout/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /sinyal yang membuat admin percaya/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /pertanyaan sebelum mulai/i })).toBeTruthy();
     expect(screen.getByRole("contentinfo")).toBeTruthy();
   });
