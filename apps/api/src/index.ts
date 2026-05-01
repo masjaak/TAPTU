@@ -34,24 +34,24 @@ const users: Array<AuthUser & { password: string }> = [
   {
     id: "usr-admin-01",
     fullName: "Nadia Putri",
-    email: "admin@hadiri.app",
-    password: "Hadiri123!",
+    email: "admin@taptu.app",
+    password: "Taptu123!",
     organizationName: "TAPTU HQ",
     role: "admin"
   },
   {
     id: "usr-employee-01",
     fullName: "Fikri Maulana",
-    email: "employee@hadiri.app",
-    password: "Hadiri123!",
+    email: "employee@taptu.app",
+    password: "Taptu123!",
     organizationName: "TAPTU HQ",
     role: "employee"
   },
   {
     id: "usr-scanner-01",
     fullName: "Front Gate Scanner",
-    email: "scanner@hadiri.app",
-    password: "Hadiri123!",
+    email: "scanner@taptu.app",
+    password: "Taptu123!",
     organizationName: "TAPTU HQ",
     role: "scanner"
   }
@@ -226,7 +226,7 @@ function buildRequestItem(request: (typeof store.requests)[number], actorName?: 
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    service: "hadiri-api",
+    service: "taptu-api",
     storageMode: apiConfig.storageMode,
     timestamp: new Date().toISOString()
   });
@@ -612,5 +612,5 @@ app.get("/api/scanner/token", async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Hadiri API listening on http://localhost:${port}`);
+  console.log(`Taptu API listening on http://localhost:${port}`);
 });

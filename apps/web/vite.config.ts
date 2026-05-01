@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "app-icon.svg", "splash-screen.svg"],
       manifest: {
-        name: "Hadiri by TAPTU",
-        short_name: "Hadiri",
+        name: "Taptu Attendance OS",
+        short_name: "Taptu",
         theme_color: "#0e1f1b",
         background_color: "#f7f8f4",
         display: "standalone",

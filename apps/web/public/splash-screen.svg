@@ -9,7 +9,7 @@
   <rect x="572" y="1248" width="120" height="24" rx="12" fill="#D6E8DE"/>
   <circle cx="642" cy="1322" r="50" fill="#E6F6EF"/>
   <path d="M617 1323.5L634 1340.5L671 1303.5" stroke="#1F8F6C" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="642" y="1654" text-anchor="middle" fill="#10211C" font-family="Poppins, Arial, sans-serif" font-size="120" font-weight="700">Hadiri</text>
+  <text x="642" y="1654" text-anchor="middle" fill="#10211C" font-family="Poppins, Arial, sans-serif" font-size="120" font-weight="700">Taptu</text>
   <text x="642" y="1752" text-anchor="middle" fill="#5B6B65" font-family="Poppins, Arial, sans-serif" font-size="52" font-weight="500">Absensi yang lebih rapi untuk tim modern</text>
-  <text x="642" y="1888" text-anchor="middle" fill="#2C6B5A" font-family="Poppins, Arial, sans-serif" font-size="38" font-weight="600" letter-spacing="8">BY TAPTU</text>
+  <text x="642" y="1888" text-anchor="middle" fill="#2C6B5A" font-family="Poppins, Arial, sans-serif" font-size="38" font-weight="600" letter-spacing="8">ATTENDANCE OS</text>
 </svg>

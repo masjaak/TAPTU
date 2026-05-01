@@ -1,6 +1,6 @@
 import type { LoginResponse } from "@taptu/shared";
 
-const key = "hadiri-session";
+const key = "taptu-session";
 
 export function saveSession(session: LoginResponse) {
   localStorage.setItem(key, JSON.stringify(session));

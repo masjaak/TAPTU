@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { router as appRouter } from "../pages/router";
 
@@ -18,13 +18,30 @@ function renderAt(path: string) {
 }
 
 describe("landing page", () => {
-  it("shows the main Hadiri heading", () => {
-    renderAt("/");
-    expect(screen.getByRole("heading", { name: /satu sistem absensi/i })).toBeTruthy();
+  afterEach(() => {
+    cleanup();
   });
 
-  it("shows the login call to action", () => {
+  it("positions Taptu as the attendance command center", () => {
     renderAt("/");
-    expect(screen.getAllByRole("button", { name: /masuk ke aplikasi/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: /absensi rapi tanpa chat berantakan/i })).toBeTruthy();
+  });
+
+  it("shows conversion paths for demo and workflow review", () => {
+    renderAt("/");
+    expect(screen.getAllByRole("link", { name: /coba demo taptu/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /lihat cara kerja/i })).toBeTruthy();
+  });
+
+  it("explains the landing page trust sequence", () => {
+    renderAt("/");
+    expect(screen.getByRole("heading", { name: /dibangun untuk keputusan operasional/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /alur yang jelas sebelum tim masuk/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /siap dipakai oleh tiga peran/i })).toBeTruthy();
+  });
+
+  it("does not show the old product name", () => {
+    renderAt("/");
+    expect(screen.queryByText(/hadiri/i)).toBeNull();
   });
 });
