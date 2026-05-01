@@ -597,9 +597,114 @@ Review terakhir tetap hijau:
 
 ```bash
 npm install
-npm run dev:api
-npm run dev:web
+npm run dev        # menjalankan API + web sekaligus
+```
+
+Atau terpisah:
+
+```bash
+npm run dev:api    # Terminal 1 — API di localhost:3001
+npm run dev:web    # Terminal 2 — Web di localhost:5173
 ```
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:3001`
+
+## Update: fix login demo + 404 on refresh + remove demo panel (2026-05-01)
+
+### Task 1 — Fix login demo (client-side demo mode)
+
+Root cause sebelumnya: login demo hanya bisa berjalan saat API aktif. Kalau API mati, semua demo account gagal.
+
+Fix: implementasi client-side demo mode di `apps/web/src/lib/demo.ts`.
+
+- `tryDemoLogin(email, password)` — intercept login sebelum hit API. Jika cocok dengan kredensial demo, langsung return `LoginResponse` lokal dengan token `demo:<role>`
+- `isDemoToken(token)` — deteksi token demo
+- Semua fungsi API (`getDashboard`, `fetchAttendanceHistoryByFilter`, `fetchAdminOverview`, `fetchEmployeeSummary`, `fetchRequests`, `refreshScannerToken`, `checkIn`, `checkOut`, `createRequest`, `approveRequest`, `cancelRequest`, `fetchRequestDetail`) sekarang intercept token demo dan return data mock langsung tanpa hit server
+- Demo data konsisten dengan data yang ada di API (STATS, ATTENDANCE, REQUESTS, SCHEDULE)
+- Demo login tidak memerlukan API berjalan sama sekali
+
+Akun demo (semua bisa login tanpa API running):
+
+| Role | Email | Password |
+|------|-------|----------|
+| superadmin | superadmin@taptu.app | Taptu123! |
+| admin | admin@taptu.app | Taptu123! |
+| karyawan | employee@taptu.app | Taptu123! |
+| scanner | scanner@taptu.app | Taptu123! |
+
+### Task 2 — Fix 404 on refresh
+
+Root cause: `vercel.json` tidak punya rewrites rule. SPA di Vercel/production selalu 404 saat halaman di-refresh karena server tidak tahu route `/login`, `/register`, `/app`.
+
+Fix: tambahkan ke `vercel.json`:
+```json
+"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+```
+
+Sekarang semua route SPA (/, /login, /register, /app) fallback ke `index.html` dan React Router yang menangani routing.
+
+### Task 3 — Remove demo panel "klik untuk pakai"
+
+Panel interaktif `data-testid="demo-accounts-panel"` dihapus dari LoginPage.
+
+Gantinya: info panel statis di kolom kiri menampilkan 4 akun demo + password dalam format teks yang clean. User mengetik sendiri — tidak ada magic fill lagi.
+
+Juga:
+- State pre-fill default (`admin@taptu.app / Taptu123!`) dihapus — form sekarang kosong saat load
+- `fillDemo()` function dan `demoAccounts` array dihapus
+- `DemoRole` type dihapus
+
+### Task 1 lanjutan — Multi-role registration
+
+RegisterPage sekarang punya role dropdown:
+- Superadmin (default)
+- Admin HR
+- Karyawan
+
+Badge di pojok kiri atas berubah warna sesuai role yang dipilih:
+- superadmin: amber `bg-[#fff3dc] text-[#92600a]`
+- admin: blue `bg-[#f1f5ff] text-[#1769ff]`
+- employee: green `bg-[#f0fdf4] text-[#16a34a]`
+
+`data-testid` badge sekarang dinamis: `role-badge-${role}` (default `role-badge-superadmin`).
+
+API endpoint `POST /api/auth/register` sekarang menerima field `role` (opsional, default `"superadmin"`). Zod schema memvalidasi `["superadmin", "admin", "employee"]`.
+
+`RegisterRequest` di `packages/shared/src/index.ts` sekarang:
+```ts
+export interface RegisterRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  organizationName: string;
+  role?: UserRole;
+}
+```
+
+### `dev` script sekarang jalankan keduanya sekaligus
+
+Root `package.json`:
+```json
+"dev": "npm run dev:all",
+"dev:all": "npm run dev:api & npm run dev:web",
+```
+
+User cukup `npm run dev` — API dan web jalan bersamaan.
+
+### Agent rule review
+
+TDD dilakukan:
+- 7 test merah ditulis sebelum kode produksi:
+  - 3 test demo login bypass (superadmin, admin, employee)
+  - 2 test demo dashboard bypass (admin, employee)
+  - 1 test role dropdown register page
+  - 1 test "does not show demo accounts panel" di login page
+- Semua 43 web tests hijau pasca implementasi
+- Typecheck full clean (shared + api + web)
+
+### Kondisi build setelah batch ini
+
+- Web tests: 43/43 hijau
+- `npm run typecheck` pass (shared + api + web)
+- Build clean

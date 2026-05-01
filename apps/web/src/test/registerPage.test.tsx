@@ -16,7 +16,7 @@ function renderAt(path: string) {
 describe("register page", () => {
   afterEach(cleanup);
 
-  it("shows superadmin role badge", () => {
+  it("shows role badge defaulting to superadmin", () => {
     renderAt("/register");
     expect(screen.getByTestId("role-badge-superadmin")).toBeTruthy();
   });
@@ -28,6 +28,15 @@ describe("register page", () => {
     expect(screen.getByLabelText(/^email$/i)).toBeTruthy();
     expect(screen.getByLabelText(/^password$/i)).toBeTruthy();
     expect(screen.getByLabelText(/konfirmasi password/i)).toBeTruthy();
+  });
+
+  it("has role selection dropdown with superadmin, admin, employee options", () => {
+    renderAt("/register");
+    const select = screen.getByLabelText(/peran akun/i);
+    expect(select).toBeTruthy();
+    expect(screen.getByRole("option", { name: /superadmin/i })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /admin hr/i })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /karyawan/i })).toBeTruthy();
   });
 
   it("has a submit button", () => {

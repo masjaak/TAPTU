@@ -4,22 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { login } from "../lib/api";
 import { saveSession } from "../lib/session";
 
-type DemoRole = "superadmin" | "admin" | "employee" | "scanner";
-
-const demoAccounts: { role: DemoRole; label: string; email: string; password: string }[] = [
-  { role: "superadmin", label: "Super Admin", email: "superadmin@taptu.app", password: "Taptu123!" },
-  { role: "admin", label: "Admin HR", email: "admin@taptu.app", password: "Taptu123!" },
-  { role: "employee", label: "Karyawan", email: "employee@taptu.app", password: "Taptu123!" },
-  { role: "scanner", label: "Scanner Gate", email: "scanner@taptu.app", password: "Taptu123!" }
-];
-
-const roleBadge: Record<DemoRole, string> = {
-  superadmin: "bg-[#fff3dc] text-[#92600a]",
-  admin: "bg-[#f1f5ff] text-[#1769ff]",
-  employee: "bg-[#f0fdf4] text-[#16a34a]",
-  scanner: "bg-[#fff7f0] text-[#c2410c]"
-};
-
 const inputClass =
   "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10";
 
@@ -28,8 +12,8 @@ const labelClass = "mb-2 block text-sm font-bold text-[#111827]";
 export function LoginPage() {
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("admin@taptu.app");
-  const [password, setPassword] = useState("Taptu123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,12 +31,6 @@ export function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function fillDemo(acc: (typeof demoAccounts)[number]) {
-    setEmail(acc.email);
-    setPassword(acc.password);
-    setError(null);
   }
 
   return (
@@ -78,28 +56,16 @@ export function LoginPage() {
             </p>
           </div>
 
-          {/* Demo accounts — clickable to fill form */}
-          <div data-testid="demo-accounts-panel" className="mt-10 rounded-[24px] border border-white/10 bg-white/[0.05] p-6">
+          <div className="mt-10 rounded-[24px] border border-white/10 bg-white/[0.05] p-6">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-white/40">
-              Akun demo — klik untuk pakai
+              Akun demo tersedia
             </p>
-            <div className="mt-5 space-y-3">
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => fillDemo(acc)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left transition hover:bg-white/[0.09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ${roleBadge[acc.role]}`}>
-                      {acc.label}
-                    </span>
-                    <span className="text-sm text-white/60">{acc.email}</span>
-                  </div>
-                  <span className="text-xs text-white/30">Pakai</span>
-                </button>
-              ))}
+            <div className="mt-5 space-y-3 text-sm text-white/60">
+              <p><span className="font-bold text-white/80">Superadmin</span> — superadmin@taptu.app</p>
+              <p><span className="font-bold text-white/80">Admin HR</span> — admin@taptu.app</p>
+              <p><span className="font-bold text-white/80">Karyawan</span> — employee@taptu.app</p>
+              <p><span className="font-bold text-white/80">Scanner</span> — scanner@taptu.app</p>
+              <p className="pt-2 text-white/30">Password semua akun: <span className="font-mono text-white/50">Taptu123!</span></p>
             </div>
           </div>
 
@@ -116,7 +82,7 @@ export function LoginPage() {
               Akses workspace Taptu.
             </h2>
             <p className="mt-5 text-base leading-8 text-[#596172]">
-              Pilih akun demo di sebelah atau masuk dengan email terdaftar.
+              Masuk dengan email dan password akun Taptu Anda.
             </p>
 
             <div className="mt-8 space-y-5">
@@ -130,6 +96,7 @@ export function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="akun@organisasi.com"
                   className={inputClass}
                 />
               </div>
@@ -144,6 +111,7 @@ export function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password Anda"
                   className={inputClass}
                 />
               </div>

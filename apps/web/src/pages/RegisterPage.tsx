@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import type { UserRole } from "@taptu/shared";
 import { register } from "../lib/api";
 import { saveSession } from "../lib/session";
 
@@ -9,9 +10,16 @@ const inputClass =
 
 const labelClass = "mb-2 block text-sm font-bold text-[#111827]";
 
+const ROLE_OPTIONS: { value: UserRole; label: string; badge: string }[] = [
+  { value: "superadmin", label: "Superadmin", badge: "bg-[#fff3dc] text-[#92600a]" },
+  { value: "admin", label: "Admin HR", badge: "bg-[#f1f5ff] text-[#1769ff]" },
+  { value: "employee", label: "Karyawan", badge: "bg-[#f0fdf4] text-[#16a34a]" }
+];
+
 export function RegisterPage() {
   const navigate = useNavigate();
 
+  const [role, setRole] = useState<UserRole>("superadmin");
   const [organizationName, setOrganizationName] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -19,6 +27,8 @@ export function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const selectedRole = ROLE_OPTIONS.find((r) => r.value === role) ?? ROLE_OPTIONS[0];
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,7 +47,7 @@ export function RegisterPage() {
     setLoading(true);
 
     try {
-      const session = await register({ fullName, email, password, organizationName });
+      const session = await register({ fullName, email, password, organizationName, role });
       saveSession(session);
       navigate("/app");
     } catch (err) {
@@ -59,20 +69,38 @@ export function RegisterPage() {
 
         <div className="mt-8 rounded-[32px] bg-white p-8 shadow-[0_24px_70px_rgba(20,24,31,0.10)] lg:p-10">
           <span
-            data-testid="role-badge-superadmin"
-            className="inline-flex items-center rounded-full bg-[#fff3dc] px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#92600a]"
+            data-testid={`role-badge-${role}`}
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${selectedRole.badge}`}
           >
-            Superadmin
+            {selectedRole.label}
           </span>
 
           <h1 className="mt-5 text-3xl font-black leading-snug tracking-[-0.03em] text-[#111827]">
-            Buat akun superadmin.
+            Buat akun baru.
           </h1>
           <p className="mt-5 text-base leading-8 text-[#596172]">
-            Superadmin punya akses penuh ke seluruh organisasi, karyawan, dan konfigurasi sistem Taptu.
+            Pilih peran yang sesuai. Superadmin punya akses penuh; admin mengelola tim; karyawan mengakses absensi dan izin.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+            <div>
+              <label htmlFor="role" className={labelClass}>
+                Peran akun
+              </label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as UserRole)}
+                className={inputClass}
+              >
+                {ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label htmlFor="organizationName" className={labelClass}>
                 Nama organisasi
@@ -113,7 +141,7 @@ export function RegisterPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="superadmin@organisasi.com"
+                placeholder="akun@organisasi.com"
                 className={inputClass}
               />
             </div>

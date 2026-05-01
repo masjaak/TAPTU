@@ -27,9 +27,9 @@ describe("login page", () => {
     expect(screen.getByLabelText(/^password$/i)).toBeTruthy();
   });
 
-  it("shows demo account credentials panel", () => {
+  it("does not show demo accounts panel", () => {
     renderAt("/login");
-    expect(screen.getByTestId("demo-accounts-panel")).toBeTruthy();
+    expect(screen.queryByTestId("demo-accounts-panel")).toBeNull();
   });
 
   it("has link to register superadmin account", () => {

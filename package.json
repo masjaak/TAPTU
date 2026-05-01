@@ -7,7 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @taptu/web",
+    "dev": "npm run dev:all",
+    "dev:all": "npm run dev:api & npm run dev:web",
     "dev:web": "npm run dev --workspace @taptu/web",
     "dev:api": "npm run dev --workspace @taptu/api",
     "build": "npm run build --workspace @taptu/shared && npm run build --workspace @taptu/web",

@@ -135,8 +135,9 @@ const registerSchema = z.object({
   fullName: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  organizationName: z.string().min(2)
-} satisfies Record<keyof RegisterRequest, z.ZodTypeAny>);
+  organizationName: z.string().min(2),
+  role: z.enum(["superadmin", "admin", "employee"]).default("superadmin")
+});
 
 const attendanceSchema = z.object({
   method: z.enum(["QR", "GPS", "Selfie", "Manual"])
@@ -281,19 +282,19 @@ app.post("/api/auth/register", (req, res) => {
     return res.status(400).json({ message: "Data registrasi tidak valid." });
   }
 
-  const { fullName, email, password, organizationName } = parsed.data;
+  const { fullName, email, password, organizationName, role } = parsed.data;
 
   if (users.some((u) => u.email === email)) {
     return res.status(409).json({ message: "Email sudah digunakan." });
   }
 
   const newUser: AuthUser & { password: string } = {
-    id: `usr-superadmin-${Date.now()}`,
+    id: `usr-${role}-${Date.now()}`,
     fullName,
     email,
     password,
     organizationName,
-    role: "superadmin"
+    role
   };
 
   users.push(newUser);

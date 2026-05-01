@@ -18,6 +18,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   organizationName: string;
+  role?: UserRole;
 }
 
 export interface LoginResponse {
