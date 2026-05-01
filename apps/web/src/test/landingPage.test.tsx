@@ -71,6 +71,12 @@ describe("landing page", () => {
     expect(screen.getByLabelText(/integrasi operasional icons/i).getAttribute("data-motion-style")).toBe("staggered-icons");
   });
 
+  it("landing stage uses the tight floating-card layout variant", () => {
+    renderAt("/");
+    const stage = screen.getByTestId("landing-stage");
+    expect(stage.getAttribute("data-variant")).toBe("card-tight");
+  });
+
   it("trust signals section has a supporting description paragraph", () => {
     renderAt("/");
     expect(screen.getByTestId("trust-signals-copy")).toBeTruthy();

@@ -267,6 +267,66 @@ File utama batch ini:
 - `apps/web/src/test/landingPage.test.tsx`
 - `apps/web/src/test/setup.ts`
 
+## Update UI/UX review + landing page polish (2026-05-01)
+
+Batch ini menerapkan review 7 prinsip UI/UX dan memperbaiki layout floating-card landing page.
+
+### Perubahan trust signal section
+
+- Layout lama: dua kolom `[0.8fr_1.2fr]` — heading kecil vs empat stat card (lopsided)
+- Layout baru: centered header + full-width 4-col stat grid di bawah (konsisten dengan pola Roles section)
+- Tambah paragraf deskripsi di bawah h2 (`data-testid="trust-signals-copy"`)
+- Stat cards sekarang punya `border border-[#edf0f5]` + `shadow` — kontras terhadap background `#f9fafc`
+- Divider tipis (`h-px w-8`) antara nilai dan label untuk menjembatani ukuran font
+- Tracking stat value diperbaiki: `-0.06em` → `-0.03em`
+- Setiap card punya `aria-label` untuk screen reader: `"30s — QR token refresh"` dst
+- `whileHover={{ y: -4 }}` ditambahkan pada setiap stat card
+
+### Perubahan CTA section
+
+- `PrimaryLink` (blue button) di dalam section `bg-[#1769ff]` = kontras 1:1, button tidak terlihat
+- Diganti dengan komponen baru `CTAWhiteLink`: `bg-white text-[#1769ff]`, `data-testid="cta-demo-action"`
+- Section CTA kini punya visible action yang kontras terhadap latar biru
+
+### Perubahan Desk section copy
+
+- Copy lama: meta-commentary tentang proses desain ("Desain baru mengikuti pola hero…")
+- Copy baru: deskripsi produk yang nyata tentang fungsi attendance desk
+
+### Perubahan floating-card layout gap (Option A)
+
+Masalah: outer background `#d9d9d9` terlalu gelap dan kontras, gap `mt-8` (32px) terlalu besar sehingga section terasa terputus-putus, bukan modul yang stacked.
+
+- Outer background: `#d9d9d9` → `#e9eaec` (lebih terang, kurang obstruktif)
+- Outer padding: `py-6` → `py-4` (lebih rapat secara vertikal)
+- Semua 6 section gaps: `mt-8` → `mt-4 sm:mt-6` (16px mobile, 24px sm+)
+- Outer div kini punya `data-testid="landing-stage"` dan `data-variant="card-tight"`
+
+### Hero text fix (batch ini juga)
+
+- Icon di atas hero: grid 2×2 dot → Taptu logomark (`bg-[#111827]` dengan "T")
+- Headline uppercase: `tracking` diperlonggar dari `-0.065em` → `-0.03em`, `leading` dari `1.02` → `1.08`
+- Gap ikon ke headline: `mt-9` → `mt-12`
+- Gap headline ke paragraf: `mt-6` → `mt-8`
+- Roles section SectionLabel: duplikat teks h2 → diganti `"Roles"`
+
+### Agent rule review
+
+- TDD dilakukan: satu test RED per perubahan structural, lalu production code GREEN
+- Tests baru yang ditambahkan:
+  - `trust signals section has a supporting description paragraph`
+  - `trust signals cards are individually labeled for screen readers`
+  - `CTA section uses a visually distinct action link`
+  - `landing stage uses the tight floating-card layout variant`
+- Semua 19 tests hijau pasca implementasi
+- Typecheck dan build clean
+
+### Kondisi build setelah batch ini
+
+- Web tests pass `19/19`
+- `npm run typecheck --workspace @taptu/web` pass
+- `npm run build:web` pass
+
 ## Catatan deploy Vercel
 
 Error deploy sebelumnya:

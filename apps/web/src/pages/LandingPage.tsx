@@ -161,7 +161,11 @@ export function LandingPage() {
   return (
     <Shell>
       <MotionConfig reducedMotion="user">
-        <div className="min-h-screen bg-[#d9d9d9] px-4 py-6 text-[#101217] sm:px-6 lg:px-8">
+        <div
+          className="min-h-screen bg-[#e9eaec] px-4 py-4 text-[#101217] sm:px-6 lg:px-8"
+          data-testid="landing-stage"
+          data-variant="card-tight"
+        >
           <motion.main initial="hidden" animate="visible" variants={stagger}>
             <section className="mx-auto max-w-7xl overflow-hidden rounded-[34px] border border-white/70 bg-[#f9fafc] shadow-[0_34px_90px_rgba(20,24,31,0.18)]">
               <header className="relative z-20 flex items-center justify-between border-b border-[#edf0f5] px-5 py-4 md:px-8">
@@ -329,7 +333,7 @@ export function LandingPage() {
 
             <motion.section
               id="desk"
-              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -365,7 +369,7 @@ export function LandingPage() {
 
             <motion.section
               id="workflow"
-              className="mx-auto mt-8 max-w-7xl overflow-hidden rounded-[32px] bg-[#101217] px-5 py-14 text-white shadow-[0_24px_70px_rgba(20,24,31,0.18)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl overflow-hidden rounded-[32px] bg-[#101217] px-5 py-14 text-white shadow-[0_24px_70px_rgba(20,24,31,0.18)] md:px-8 lg:px-12 lg:py-20"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -402,7 +406,7 @@ export function LandingPage() {
 
             <motion.section
               id="roles"
-              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -434,7 +438,7 @@ export function LandingPage() {
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-[#f9fafc] px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-[#f9fafc] px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -468,7 +472,7 @@ export function LandingPage() {
 
             <motion.section
               id="faq"
-              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -493,7 +497,7 @@ export function LandingPage() {
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-8 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-12 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-12 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
