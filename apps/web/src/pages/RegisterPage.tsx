@@ -65,14 +65,14 @@ export function RegisterPage() {
             Superadmin
           </span>
 
-          <h1 className="mt-5 text-3xl font-black tracking-[-0.045em] text-[#111827]">
+          <h1 className="mt-5 text-3xl font-black leading-snug tracking-[-0.03em] text-[#111827]">
             Buat akun superadmin.
           </h1>
-          <p className="mt-4 text-base leading-7 text-[#596172]">
+          <p className="mt-5 text-base leading-8 text-[#596172]">
             Superadmin punya akses penuh ke seluruh organisasi, karyawan, dan konfigurasi sistem Taptu.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit} className="mt-10 space-y-6">
             <div>
               <label htmlFor="organizationName" className={labelClass}>
                 Nama organisasi

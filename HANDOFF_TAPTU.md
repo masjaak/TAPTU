@@ -327,6 +327,84 @@ Masalah: outer background `#d9d9d9` terlalu gelap dan kontras, gap `mt-8` (32px)
 - `npm run typecheck --workspace @taptu/web` pass
 - `npm run build:web` pass
 
+## Fix: login demo account + auth page text spacing (2026-05-01)
+
+### Root causes ditemukan
+
+1. **API tidak berjalan** — web memanggil `http://localhost:3001/api` secara langsung tanpa proxy. Ketika API offline, `fetch()` melempar `TypeError: Failed to fetch` — user melihat error generik, bukan petunjuk yang membantu.
+2. **Tidak ada Vite proxy** — cross-origin request dari port 5173 ke 3001 rawan CORS di beberapa konfigurasi browser/network.
+3. **Error message tidak deskriptif** — catch block hanya meneruskan error mentah dari fetch.
+4. **Text spacing terlalu rapat** — heading di LoginPage dan RegisterPage memakai `tracking-[-0.045em]` dan `leading-tight`, tidak konsisten dengan ritme landing page.
+
+### Fix 1 — Vite proxy
+
+`apps/web/vite.config.ts` sekarang punya:
+```ts
+proxy: {
+  "/api": {
+    target: "http://localhost:3001",
+    changeOrigin: true
+  }
+}
+```
+
+Web app memanggil `/api/...` secara relatif → Vite meneruskan ke port 3001 tanpa cross-origin. Tidak ada CORS issue di local dev.
+
+### Fix 2 — API base URL
+
+`apps/web/src/lib/api.ts`:
+```ts
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+```
+
+- Local dev: gunakan `/api` relatif → lewat Vite proxy
+- Production: set `VITE_API_BASE_URL` ke URL backend production
+
+### Fix 3 — Descriptive error message
+
+`requestJson` sekarang wrap `fetch()` dalam try/catch:
+```ts
+try {
+  response = await fetch(...);
+} catch {
+  throw new Error("Tidak dapat terhubung ke server. Jalankan npm run dev:api terlebih dahulu.");
+}
+```
+
+User sekarang mendapat pesan yang jelas ketika API tidak berjalan, bukan raw "Failed to fetch".
+
+### Fix 4 — Text spacing LoginPage + RegisterPage
+
+| Element | Sebelum | Sesudah |
+|---------|---------|---------|
+| h1/h2 tracking | `tracking-[-0.045em]` | `tracking-[-0.03em]` |
+| h1/h2 leading | `leading-tight` (1.25) | `leading-snug` (1.375) |
+| Section label → h1/h2 gap | `mt-4` | `mt-5` |
+| h1/h2 → paragraph gap | `mt-4` / `mt-5` | `mt-5` / `mt-6` |
+| Dark panel top margin | `mt-14` | `mt-12` |
+| Register form top margin | `mt-8` | `mt-10` |
+| Register form field spacing | `space-y-5` | `space-y-6` |
+
+### Cara menjalankan
+
+```bash
+# Terminal 1
+npm run dev:api
+
+# Terminal 2
+npm run dev:web
+```
+
+Web: `http://localhost:5173` → `/api` di-proxy ke `http://localhost:3001`
+
+### Agent rule review
+
+- TDD: 2 test merah ditulis sebelum kode produksi:
+  - `throws a descriptive error when the server is unreachable` → RED sebelum fix, GREEN setelah
+  - `throws the API error message when the server responds with an error` → sudah GREEN (existing behavior dipertahankan)
+- 36 tests hijau pasca implementasi
+- Typecheck web + api clean, build clean
+
 ## Update auth revamp + superadmin register (2026-05-01)
 
 ### DB recommendation: Supabase

@@ -68,12 +68,12 @@ export function LoginPage() {
             <span className="text-sm font-black tracking-[-0.02em]">Taptu</span>
           </a>
 
-          <div className="mt-14">
+          <div className="mt-12">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">Platform</p>
-            <h1 className="mt-4 text-4xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+            <h1 className="mt-5 text-4xl font-black leading-snug tracking-[-0.03em] md:text-5xl">
               Satu login untuk semua peran.
             </h1>
-            <p className="mt-5 max-w-md text-base leading-8 text-[#8b9199]">
+            <p className="mt-6 max-w-md text-base leading-8 text-[#8b9199]">
               Admin, karyawan, dan scanner punya akses yang sesuai peran masing-masing. Tidak ada data yang bocor ke peran yang salah.
             </p>
           </div>
@@ -112,10 +112,10 @@ export function LoginPage() {
         <div className="flex items-center justify-center rounded-[32px] bg-white p-8 shadow-[0_24px_70px_rgba(20,24,31,0.10)] lg:p-12">
           <form onSubmit={handleSubmit} className="w-full max-w-sm">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">Masuk</p>
-            <h2 className="mt-4 text-3xl font-black tracking-[-0.045em] text-[#111827]">
+            <h2 className="mt-5 text-3xl font-black leading-snug tracking-[-0.03em] text-[#111827]">
               Akses workspace Taptu.
             </h2>
-            <p className="mt-4 text-base leading-7 text-[#596172]">
+            <p className="mt-5 text-base leading-8 text-[#596172]">
               Pilih akun demo di sebelah atau masuk dengan email terdaftar.
             </p>
 

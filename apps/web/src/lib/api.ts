@@ -12,7 +12,7 @@ import type {
   ScannerTokenPayload
 } from "@taptu/shared";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001/api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   return requestJson<LoginResponse>("/auth/login", {
@@ -118,14 +118,20 @@ export async function fetchEmployeeSummary(token: string) {
 }
 
 async function requestJson<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {})
-    }
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {})
+      }
+    });
+  } catch {
+    throw new Error("Tidak dapat terhubung ke server. Jalankan npm run dev:api terlebih dahulu.");
+  }
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({ message: "Permintaan gagal." }));
