@@ -107,14 +107,10 @@ const faqs = [
   }
 ];
 
-const floatLoop = {
-  y: [0, -8, 0],
-  transition: { duration: 5, repeat: Infinity, repeatType: "mirror" as const }
-};
-
 const pulseLoop = {
-  scale: [1, 1.08, 1],
-  transition: { duration: 2.8, repeat: Infinity, repeatType: "mirror" as const }
+  rotate: [0, -13, 11, -8, 5, 0],
+  scale: [1, 1.08, 1.04, 1.06, 1],
+  transition: { duration: 2.4, repeat: Infinity, repeatDelay: 1.6 }
 };
 
 function PrimaryLink({ children, to }: { children: ReactNode; to: string }) {
@@ -194,21 +190,35 @@ export function LandingPage() {
                 <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#f9fafc] to-transparent" />
 
                 <motion.div
-                  className="absolute left-6 top-16 hidden w-56 rotate-[-6deg] rounded-[22px] border border-[#ece3a8] bg-[#fff177] p-5 shadow-[0_24px_60px_rgba(20,24,31,0.16)] lg:block"
-                  variants={fadeUp}
-                  animate={floatLoop}
+                  aria-label="Catatan shift sticky note"
+                  className="absolute left-6 top-16 hidden w-56 rounded-[22px] border border-[#ece3a8] bg-[#fff177] p-5 shadow-[0_24px_60px_rgba(20,24,31,0.16)] lg:block"
+                  data-motion-style="sticky-note"
+                  initial={{ opacity: 0, y: 30, rotate: -11 }}
+                  animate={{ opacity: 1, y: [0, -7, 0, 5, 0], rotate: [-6, -8, -5, -7, -6] }}
+                  transition={{
+                    opacity: { duration: 0.55 },
+                    y: { duration: 5.8, repeat: Infinity, repeatType: "mirror" },
+                    rotate: { duration: 5.8, repeat: Infinity, repeatType: "mirror" }
+                  }}
+                  whileHover={{ rotate: -3, scale: 1.03, y: -10 }}
                 >
                   <p className="text-sm font-black leading-6 text-[#37321a]">Catatan shift</p>
                   <p className="mt-2 text-sm leading-6 text-[#5f5623]">Review scan luar radius sebelum tutup payroll.</p>
                 </motion.div>
 
                 <motion.div
-                  className="absolute right-10 top-20 hidden w-56 rotate-[7deg] rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.14)] lg:block"
-                  variants={fadeUp}
-                  animate={{ y: [0, 7, 0], transition: { duration: 5.5, repeat: Infinity, repeatType: "mirror" } }}
+                  className="absolute right-10 top-20 hidden w-56 rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.14)] lg:block"
+                  initial={{ opacity: 0, y: 28, rotate: 10 }}
+                  animate={{ opacity: 1, y: [0, 7, 0], rotate: [7, 9, 6, 7] }}
+                  transition={{
+                    opacity: { duration: 0.55, delay: 0.1 },
+                    y: { duration: 5.5, repeat: Infinity, repeatType: "mirror" },
+                    rotate: { duration: 5.5, repeat: Infinity, repeatType: "mirror" }
+                  }}
+                  whileHover={{ rotate: 4, scale: 1.03, y: -6 }}
                 >
                   <div className="flex items-center gap-3">
-                    <motion.div animate={pulseLoop}>
+                    <motion.div aria-label="Reminder bell notification" data-motion-style="bell-ring" animate={pulseLoop}>
                       <Bell className="h-9 w-9 rounded-2xl bg-[#f1f5ff] p-2 text-[#1769ff]" />
                     </motion.div>
                     <div>
@@ -253,9 +263,16 @@ export function LandingPage() {
                 </motion.div>
 
                 <motion.div
+                  aria-label="Integrasi operasional icons"
                   className="absolute bottom-12 right-8 hidden w-64 rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.12)] md:block"
-                  variants={fadeUp}
-                  animate={{ y: [0, -6, 0], transition: { duration: 6, repeat: Infinity, repeatType: "mirror" } }}
+                  data-motion-style="staggered-icons"
+                  initial={{ opacity: 0, y: 28 }}
+                  animate={{ opacity: 1, y: [0, -6, 0] }}
+                  transition={{
+                    opacity: { duration: 0.55, delay: 0.16 },
+                    y: { duration: 6, repeat: Infinity, repeatType: "mirror" }
+                  }}
+                  whileHover={{ scale: 1.02, y: -10 }}
                 >
                   <p className="text-sm font-black">Integrasi operasional</p>
                   <div className="mt-4 grid grid-cols-3 gap-3">
@@ -263,8 +280,9 @@ export function LandingPage() {
                       <motion.div
                         key={index}
                         className="grid h-14 place-items-center rounded-2xl bg-[#f6f8fb]"
-                        animate={{ y: [0, -4, 0] }}
-                        transition={{ duration: 2.4, delay: index * 0.18, repeat: Infinity, repeatType: "mirror" }}
+                        animate={{ y: [0, -5, 0], rotate: [0, index % 2 === 0 ? -5 : 5, 0], scale: [1, 1.06, 1] }}
+                        transition={{ duration: 2.5, delay: index * 0.22, repeat: Infinity, repeatType: "mirror" }}
+                        whileHover={{ y: -8, scale: 1.1 }}
                       >
                         <Icon className="h-6 w-6 text-[#1769ff]" />
                       </motion.div>

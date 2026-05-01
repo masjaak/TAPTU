@@ -62,4 +62,12 @@ describe("landing page", () => {
     expect(gpsBar.getAttribute("data-motion-state")).toBe("visible");
     expect(gpsBar.getAttribute("data-motion-target")).toBe("64");
   });
+
+  it("marks floating hero cards with intentional motion styles", () => {
+    renderAt("/");
+
+    expect(screen.getByLabelText(/catatan shift sticky note/i).getAttribute("data-motion-style")).toBe("sticky-note");
+    expect(screen.getByLabelText(/reminder bell notification/i).getAttribute("data-motion-style")).toBe("bell-ring");
+    expect(screen.getByLabelText(/integrasi operasional icons/i).getAttribute("data-motion-style")).toBe("staggered-icons");
+  });
 });
