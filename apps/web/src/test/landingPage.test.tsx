@@ -71,6 +71,14 @@ describe("landing page", () => {
     expect(screen.getByLabelText(/integrasi operasional icons/i).getAttribute("data-motion-style")).toBe("staggered-icons");
   });
 
+  it("hero headline is structured as exactly two explicit lines", () => {
+    renderAt("/");
+    const h1 = screen.getByRole("heading", { name: /kelola absensi tim/i });
+    expect(h1.getAttribute("data-lines")).toBe("2");
+    const lines = h1.querySelectorAll("span[data-line]");
+    expect(lines).toHaveLength(2);
+  });
+
   it("landing stage uses the tight floating-card layout variant", () => {
     renderAt("/");
     const stage = screen.getByTestId("landing-stage");
@@ -93,5 +101,20 @@ describe("landing page", () => {
   it("CTA section uses a visually distinct action link, not the primary blue-on-blue pattern", () => {
     renderAt("/");
     expect(screen.getByTestId("cta-demo-action")).toBeTruthy();
+  });
+
+  it("CTA section has supporting sub-copy to reduce hesitation", () => {
+    renderAt("/");
+    expect(screen.getByTestId("cta-sub-copy")).toBeTruthy();
+  });
+
+  it("footer has nav links matching the primary navigation", () => {
+    renderAt("/");
+    expect(screen.getByRole("navigation", { name: /footer navigation/i })).toBeTruthy();
+  });
+
+  it("footer shows copyright year", () => {
+    renderAt("/");
+    expect(screen.getByText(/© 2026 Taptu/i)).toBeTruthy();
   });
 });

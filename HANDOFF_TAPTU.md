@@ -327,6 +327,64 @@ Masalah: outer background `#d9d9d9` terlalu gelap dan kontras, gap `mt-8` (32px)
 - `npm run typecheck --workspace @taptu/web` pass
 - `npm run build:web` pass
 
+## Update CTA + footer redesign (2026-05-01)
+
+### CTA section
+
+- Padding: `py-12` → `py-16 lg:py-24` — memberi ruang napas sebagai conversion moment terakhir
+- Sub-copy ditambahkan di bawah h2 (`data-testid="cta-sub-copy"`):
+  - "Masuk sebagai admin, karyawan, atau scanner. Tidak perlu install, tidak perlu setup."
+- `max-w-3xl` dihapus dari h2 — diganti `max-w-2xl` pada parent div agar heading tidak terpotong di lg
+- Mobile layout: `flex-col items-start` — button tidak lagi stretch full-width
+- Button dibungkus `<div class="shrink-0">` agar tidak menyusut di lg flex-row
+
+### Footer
+
+- Padding: `px-2` → `px-5 md:px-8` — konsisten dengan semua elemen lain
+- Separator: `border-t border-[#c8cacd]` dengan `pt-8` sebagai visual grounding antara CTA dan footer
+- Struktur tiga kolom:
+  - Kiri: Taptu logomark (hitam) + nama + "Attendance OS" tagline
+  - Tengah: `nav aria-label="Footer navigation"` dengan link Platform, Workflow, Roles, FAQ
+  - Kanan: copyright `© 2026 Taptu. All rights reserved.`
+- `pb-10` untuk bottom padding — halaman tidak berakhir terlalu terpotong
+
+### Agent rule review
+
+- TDD: 3 test merah ditulis sebelum kode produksi:
+  - `CTA section has supporting sub-copy to reduce hesitation`
+  - `footer has nav links matching the primary navigation`
+  - `footer shows copyright year`
+- 23 tests hijau pasca implementasi
+- Typecheck dan build clean
+
+### Kondisi build setelah batch ini
+
+- Web tests pass `23/23`
+- `npm run typecheck --workspace @taptu/web` pass
+- `npm run build:web` pass
+
+## Update hero text 2-line fix (2026-05-01)
+
+### Masalah
+
+Di lg breakpoint, hero headline "KELOLA ABSENSI TIM" sendiri butuh ~990px untuk render satu baris, sedangkan container `max-w-4xl` hanya 896px. Akibatnya phrase pertama wrap ke 2 baris, lalu "DALAM SATU ALUR KERJA" tambah 1 baris lagi — total 3 baris.
+
+### Fix
+
+- `motion.div` container: `max-w-4xl` → `max-w-5xl` (896px → 1024px)
+- `h1` max-w: `max-w-4xl` → `max-w-5xl`
+- Font size dikalibrasi:
+  - `md:text-7xl` (72px) → `md:text-5xl` (48px) — aman untuk 704px container di md breakpoint
+  - `lg:text-[82px]` → `lg:text-[72px]` — "DALAM SATU ALUR KERJA" pada 72px ≈ 831px, muat di 984px container
+- Kedua phrase dibuat explicit `block` span dengan `data-line="1"` dan `data-line="2"` — menjamin break selalu terjadi di antara dua phrase, tidak di tengah
+- `h1` kini punya `data-lines="2"` sebagai dokumentasi intent
+
+### Agent rule review
+
+- TDD dilakukan: test `data-lines="2"` dan `span[data-line]` length ditulis merah dulu
+- 20 tests hijau pasca implementasi
+- Typecheck dan build clean
+
 ## Catatan deploy Vercel
 
 Error deploy sebelumnya:

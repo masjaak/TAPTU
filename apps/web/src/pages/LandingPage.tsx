@@ -308,13 +308,16 @@ export function LandingPage() {
                   </div>
                 </motion.div>
 
-                <motion.div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center pt-20 text-center md:pt-24" variants={fadeUp}>
+                <motion.div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center pt-20 text-center md:pt-24" variants={fadeUp}>
                   <div className="grid h-16 w-16 place-items-center rounded-[22px] bg-[#111827] shadow-[0_22px_50px_rgba(20,24,31,0.22)]">
                     <span className="text-2xl font-black tracking-[-0.02em] text-white">T</span>
                   </div>
-                  <h1 className="mt-12 max-w-4xl text-[46px] font-black uppercase leading-[1.08] tracking-[-0.03em] text-[#0f1115] md:text-7xl lg:text-[82px]">
-                    Kelola absensi tim
-                    <span className="block text-[#9aa1ad]">dalam satu alur kerja</span>
+                  <h1
+                    className="mt-12 max-w-5xl text-[46px] font-black uppercase leading-[1.08] tracking-[-0.03em] text-[#0f1115] md:text-5xl lg:text-[72px]"
+                    data-lines="2"
+                  >
+                    <span className="block" data-line="1">Kelola absensi tim</span>
+                    <span className="block text-[#9aa1ad]" data-line="2">dalam satu alur kerja</span>
                   </h1>
                   <p className="mt-8 max-w-xl text-base leading-7 text-[#596172] md:text-lg">
                     Taptu menyatukan check-in mobile, scanner gate, validasi lokasi, approval izin, dan laporan admin dalam
@@ -497,30 +500,53 @@ export function LandingPage() {
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-12 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12"
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-16 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
               variants={fadeUp}
             >
-              <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-                <div>
+              <div className="flex flex-col items-start gap-10 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Mulai dari demo</p>
-                  <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                  <h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
                     Coba alur Taptu sebelum masuk produksi.
                   </h2>
+                  <p data-testid="cta-sub-copy" className="mt-4 text-base leading-7 text-white/70">
+                    Masuk sebagai admin, karyawan, atau scanner. Tidak perlu install, tidak perlu setup.
+                  </p>
                 </div>
-                <CTAWhiteLink to="/login">
-                  Coba demo Taptu
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </CTAWhiteLink>
+                <div className="shrink-0">
+                  <CTAWhiteLink to="/login">
+                    Coba demo Taptu
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </CTAWhiteLink>
+                </div>
               </div>
             </motion.section>
           </motion.main>
 
-          <footer className="mx-auto flex max-w-7xl flex-col gap-4 px-2 py-8 text-sm text-[#596172] md:flex-row md:items-center md:justify-between">
-            <p className="font-black text-[#101217]">Taptu Attendance OS</p>
-            <p>Web, PWA, scanner, dan admin workflow untuk absensi tim.</p>
+          <footer className="mx-auto max-w-7xl px-5 pb-10 pt-6 md:px-8">
+            <div className="border-t border-[#c8cacd] pt-8">
+              <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+                <a href="#top" className="flex items-center gap-3" aria-label="Taptu home">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#111827] text-sm font-black text-white">
+                    T
+                  </span>
+                  <div>
+                    <p className="text-sm font-black text-[#101217]">Taptu</p>
+                    <p className="text-xs text-[#7a8495]">Attendance OS</p>
+                  </div>
+                </a>
+                <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold text-[#596172]">
+                  <a href="#desk" className="transition hover:text-[#111827]">Platform</a>
+                  <a href="#workflow" className="transition hover:text-[#111827]">Workflow</a>
+                  <a href="#roles" className="transition hover:text-[#111827]">Roles</a>
+                  <a href="#faq" className="transition hover:text-[#111827]">FAQ</a>
+                </nav>
+                <p className="text-xs text-[#7a8495]">© 2026 Taptu. All rights reserved.</p>
+              </div>
+            </div>
           </footer>
         </div>
       </MotionConfig>
