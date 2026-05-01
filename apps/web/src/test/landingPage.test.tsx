@@ -51,4 +51,15 @@ describe("landing page", () => {
     expect(screen.getByRole("heading", { name: /pertanyaan sebelum mulai/i })).toBeTruthy();
     expect(screen.getByRole("contentinfo")).toBeTruthy();
   });
+
+  it("documents animated validation bar states", () => {
+    renderAt("/");
+    const qrBar = screen.getByLabelText(/qr gate timur validation progress/i);
+    const gpsBar = screen.getByLabelText(/gps kantor pusat validation progress/i);
+
+    expect(qrBar.getAttribute("data-motion-state")).toBe("visible");
+    expect(qrBar.getAttribute("data-motion-target")).toBe("82");
+    expect(gpsBar.getAttribute("data-motion-state")).toBe("visible");
+    expect(gpsBar.getAttribute("data-motion-target")).toBe("64");
+  });
 });

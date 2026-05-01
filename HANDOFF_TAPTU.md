@@ -19,10 +19,11 @@
 
 ## Status saat ini
 
-Hadiri sudah punya baseline full-stack lokal:
+Taptu sudah punya baseline full-stack lokal:
 
 - `apps/web`
-  - landing page responsif
+  - landing page responsif dengan visual direction ChronoTask-inspired
+  - Motion animation pada hero, floating cards, CTA, section reveal, dan validation progress bars
   - login page
   - mobile-first app shell
   - tab `Beranda`, `Absensi`, `Izin`, `Scanner`, `Profil`
@@ -43,9 +44,9 @@ Hadiri sudah punya baseline full-stack lokal:
 
 ## Akun demo
 
-- Admin: `admin@hadiri.app / Hadiri123!`
-- Employee: `employee@hadiri.app / Hadiri123!`
-- Scanner: `scanner@hadiri.app / Hadiri123!`
+- Admin: `admin@taptu.app / Taptu123!`
+- Employee: `employee@taptu.app / Taptu123!`
+- Scanner: `scanner@taptu.app / Taptu123!`
 
 ## Commit lokal penting
 
@@ -62,17 +63,18 @@ Sebelum menutup batch baru:
 3. `npm run typecheck`
 4. `npm run build`
 5. scan cepat untuk larangan visual/copy:
-   - tidak pakai gradient
+   - tidak pakai nama lama `Hadiri` di surface web/API aktif
    - tidak pakai em dash
+   - motion harus menghormati `MotionConfig reducedMotion="user"`
 
 ## Kondisi build terakhir
 
 Terakhir diverifikasi hijau:
 
-- API tests pass `32/32`
-- Web tests pass `10/10`
-- `npm run typecheck` pass
-- `npm run build` pass
+- API tests pass `44/44`
+- Web tests pass `14/14`
+- `npm run typecheck --workspace @taptu/web` pass
+- `npm run build:web` pass
 
 ## Struktur state penting
 
@@ -201,6 +203,55 @@ Batch terbaru sudah menambahkan:
   - `local-demo`
   - `production-adapter`
 
+## Update landing page dan Motion (2026-05-01)
+
+Batch terbaru mengubah landing page menjadi visual direction yang terinspirasi dari Dribbble ChronoTask, tanpa copy/pixel clone:
+
+- hero berada di canvas putih besar dengan outer background abu-abu
+- headline centered: `Kelola absensi tim dalam satu alur kerja`
+- floating cards:
+  - catatan shift
+  - reminder approval izin
+  - validasi hari ini
+  - integrasi operasional
+- CTA utama biru: `Coba demo Taptu`
+- section lanjutan:
+  - `Attendance desk yang siap dipakai`
+  - `Dari scan sampai laporan`
+  - `Dibuat untuk tiga mode kerja`
+  - `Sinyal yang membuat admin percaya`
+  - FAQ
+
+Motion implementation:
+
+- import dari `motion/react`
+- wrapper `MotionConfig reducedMotion="user"`
+- `fadeUp` + `stagger` variants untuk hero dan section reveal
+- floating hero cards memakai loop motion ringan
+- reminder icon memakai pulse motion ringan
+- validation bars sekarang data-driven dan animated:
+  - `QR Gate Timur` target `82`
+  - `GPS Kantor Pusat` target `64`
+- validation progress bars punya accessible label dan `role="progressbar"`
+- test regression menandai motion state progress bar:
+  - `data-motion-state="visible"`
+  - `data-motion-target`
+
+Agent rule review:
+
+- TDD dilakukan: test landing motion state dibuat merah dulu, lalu production code dibuat hijau
+- state-machine thinking diterapkan pada UI motion state:
+  - initial progress `0%`
+  - visible target sesuai nilai validasi
+  - reduced-motion dikontrol via `MotionConfig`
+- tests deterministic dengan `IntersectionObserver` mock di `apps/web/src/test/setup.ts`
+
+File utama batch ini:
+
+- `apps/web/src/pages/LandingPage.tsx`
+- `apps/web/src/test/landingPage.test.tsx`
+- `apps/web/src/test/setup.ts`
+
 ## Catatan deploy Vercel
 
 Error deploy sebelumnya:
@@ -224,10 +275,9 @@ Catatan penting:
 
 Review terakhir tetap hijau:
 
-- API tests pass `20/20`
-- Web tests pass `10/10`
-- `npm run typecheck` pass
-- `npm run build` pass
+- Web tests pass `14/14`
+- `npm run typecheck --workspace @taptu/web` pass
+- `npm run build:web` pass
 
 ## Menjalankan project
 

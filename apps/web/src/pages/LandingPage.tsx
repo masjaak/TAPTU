@@ -54,6 +54,19 @@ const workflowSteps = [
   ["04", "Laporan", "Data yang lolos guard siap dipakai HR dan payroll."]
 ];
 
+const validationProgress = [
+  {
+    label: "QR Gate Timur",
+    value: 82,
+    color: "#1769ff"
+  },
+  {
+    label: "GPS Kantor Pusat",
+    value: 64,
+    color: "#ff7a45"
+  }
+];
+
 const roleCards = [
   {
     icon: UsersRound,
@@ -93,6 +106,16 @@ const faqs = [
     answer: "Aturan lokasi, struktur shift, kebijakan approval, database produksi, OTP, dan integrasi payroll jika dibutuhkan."
   }
 ];
+
+const floatLoop = {
+  y: [0, -8, 0],
+  transition: { duration: 5, repeat: Infinity, repeatType: "mirror" as const }
+};
+
+const pulseLoop = {
+  scale: [1, 1.08, 1],
+  transition: { duration: 2.8, repeat: Infinity, repeatType: "mirror" as const }
+};
 
 function PrimaryLink({ children, to }: { children: ReactNode; to: string }) {
   return (
@@ -173,6 +196,7 @@ export function LandingPage() {
                 <motion.div
                   className="absolute left-6 top-16 hidden w-56 rotate-[-6deg] rounded-[22px] border border-[#ece3a8] bg-[#fff177] p-5 shadow-[0_24px_60px_rgba(20,24,31,0.16)] lg:block"
                   variants={fadeUp}
+                  animate={floatLoop}
                 >
                   <p className="text-sm font-black leading-6 text-[#37321a]">Catatan shift</p>
                   <p className="mt-2 text-sm leading-6 text-[#5f5623]">Review scan luar radius sebelum tutup payroll.</p>
@@ -181,9 +205,12 @@ export function LandingPage() {
                 <motion.div
                   className="absolute right-10 top-20 hidden w-56 rotate-[7deg] rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.14)] lg:block"
                   variants={fadeUp}
+                  animate={{ y: [0, 7, 0], transition: { duration: 5.5, repeat: Infinity, repeatType: "mirror" } }}
                 >
                   <div className="flex items-center gap-3">
-                    <Bell className="h-9 w-9 rounded-2xl bg-[#f1f5ff] p-2 text-[#1769ff]" />
+                    <motion.div animate={pulseLoop}>
+                      <Bell className="h-9 w-9 rounded-2xl bg-[#f1f5ff] p-2 text-[#1769ff]" />
+                    </motion.div>
                     <div>
                       <p className="text-sm font-black">Reminder</p>
                       <p className="text-xs text-[#7a8495]">Approval izin</p>
@@ -198,14 +225,27 @@ export function LandingPage() {
                 >
                   <p className="text-sm font-black">Validasi hari ini</p>
                   <div className="mt-4 space-y-3">
-                    {["QR Gate Timur", "GPS Kantor Pusat"].map((item, index) => (
-                      <div key={item}>
+                    {validationProgress.map((item) => (
+                      <div key={item.label}>
                         <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#596172]">
-                          <span>{item}</span>
-                          <span>{index === 0 ? "82%" : "64%"}</span>
+                          <span>{item.label}</span>
+                          <span>{item.value}%</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-[#ecf0f6]">
-                          <div className={index === 0 ? "h-full w-[82%] rounded-full bg-[#1769ff]" : "h-full w-[64%] rounded-full bg-[#ff7a45]"} />
+                          <motion.div
+                            aria-label={`${item.label} validation progress`}
+                            aria-valuemax={100}
+                            aria-valuemin={0}
+                            aria-valuenow={item.value}
+                            className="h-full rounded-full"
+                            data-motion-state="visible"
+                            data-motion-target={item.value}
+                            initial={{ width: "0%" }}
+                            animate={{ width: `${item.value}%` }}
+                            transition={{ duration: 1.1, delay: 0.35 }}
+                            role="progressbar"
+                            style={{ backgroundColor: item.color }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -215,13 +255,19 @@ export function LandingPage() {
                 <motion.div
                   className="absolute bottom-12 right-8 hidden w-64 rounded-[24px] border border-[#e7ebf2] bg-white p-5 shadow-[0_24px_70px_rgba(20,24,31,0.12)] md:block"
                   variants={fadeUp}
+                  animate={{ y: [0, -6, 0], transition: { duration: 6, repeat: Infinity, repeatType: "mirror" } }}
                 >
                   <p className="text-sm font-black">Integrasi operasional</p>
                   <div className="mt-4 grid grid-cols-3 gap-3">
                     {[CalendarCheck, ShieldCheck, Clock3].map((Icon, index) => (
-                      <div key={index} className="grid h-14 place-items-center rounded-2xl bg-[#f6f8fb]">
+                      <motion.div
+                        key={index}
+                        className="grid h-14 place-items-center rounded-2xl bg-[#f6f8fb]"
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 2.4, delay: index * 0.18, repeat: Infinity, repeatType: "mirror" }}
+                      >
                         <Icon className="h-6 w-6 text-[#1769ff]" />
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </motion.div>
