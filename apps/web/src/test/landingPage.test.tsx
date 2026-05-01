@@ -70,4 +70,22 @@ describe("landing page", () => {
     expect(screen.getByLabelText(/reminder bell notification/i).getAttribute("data-motion-style")).toBe("bell-ring");
     expect(screen.getByLabelText(/integrasi operasional icons/i).getAttribute("data-motion-style")).toBe("staggered-icons");
   });
+
+  it("trust signals section has a supporting description paragraph", () => {
+    renderAt("/");
+    expect(screen.getByTestId("trust-signals-copy")).toBeTruthy();
+  });
+
+  it("trust signals cards are individually labeled for screen readers", () => {
+    renderAt("/");
+    expect(screen.getByLabelText("30s — QR token refresh")).toBeTruthy();
+    expect(screen.getByLabelText("3 mode — Admin, mobile, scanner")).toBeTruthy();
+    expect(screen.getByLabelText("1 queue — Review pengecualian")).toBeTruthy();
+    expect(screen.getByLabelText("24/7 — Siap untuk shift")).toBeTruthy();
+  });
+
+  it("CTA section uses a visually distinct action link, not the primary blue-on-blue pattern", () => {
+    renderAt("/");
+    expect(screen.getByTestId("cta-demo-action")).toBeTruthy();
+  });
 });

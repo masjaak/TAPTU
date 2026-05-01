@@ -139,6 +139,20 @@ function SectionLink({ children, href }: { children: ReactNode; href: string }) 
   );
 }
 
+function CTAWhiteLink({ children, to }: { children: ReactNode; to: string }) {
+  return (
+    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
+      <Link
+        to={to}
+        data-testid="cta-demo-action"
+        className="inline-flex items-center justify-center rounded-2xl bg-white px-6 py-4 text-sm font-bold text-[#1769ff] shadow-[0_18px_42px_rgba(255,255,255,0.22)] transition hover:bg-[#f0f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+      >
+        {children}
+      </Link>
+    </motion.div>
+  );
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">{children}</p>;
 }
@@ -328,8 +342,8 @@ export function LandingPage() {
                     Attendance desk yang siap dipakai.
                   </h2>
                   <p className="mt-5 max-w-lg text-base leading-8 text-[#596172]">
-                    Desain baru mengikuti pola hero yang bersih: banyak ruang kosong, satu pesan utama, dan UI attendance yang
-                    langsung menjelaskan fungsi produk.
+                    Satu layar untuk semua sinyal kehadiran: siapa hadir, siapa terlambat, dan apa yang butuh keputusan.
+                    Admin bisa ambil tindakan tanpa berpindah aplikasi.
                   </p>
                 </motion.div>
                 <div className="grid gap-4 md:grid-cols-3">
@@ -426,21 +440,29 @@ export function LandingPage() {
               viewport={revealViewport}
               variants={stagger}
             >
-              <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-                <motion.div variants={fadeUp}>
-                  <SectionLabel>Trust signals</SectionLabel>
-                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Sinyal yang membuat admin percaya.
-                  </h2>
-                </motion.div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {trustSignals.map((signal) => (
-                    <motion.div key={signal.label} className="rounded-[26px] bg-white p-6 text-center" variants={fadeUp}>
-                      <p className="text-4xl font-black tracking-[-0.06em] text-[#1769ff]">{signal.value}</p>
-                      <p className="mt-3 text-sm font-bold text-[#596172]">{signal.label}</p>
-                    </motion.div>
-                  ))}
-                </div>
+              <motion.div className="mx-auto max-w-3xl text-center" variants={fadeUp}>
+                <SectionLabel>Trust signals</SectionLabel>
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                  Sinyal yang membuat admin percaya.
+                </h2>
+                <p data-testid="trust-signals-copy" className="mt-5 text-base leading-8 text-[#596172]">
+                  Setiap angka di bawah adalah jaminan bahwa data yang masuk Taptu melewati validasi sebelum dianggap final.
+                </p>
+              </motion.div>
+              <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {trustSignals.map((signal) => (
+                  <motion.div
+                    key={signal.label}
+                    aria-label={`${signal.value} — ${signal.label}`}
+                    className="rounded-[26px] border border-[#edf0f5] bg-white p-8 text-center shadow-[0_8px_24px_rgba(20,24,31,0.06)]"
+                    variants={fadeUp}
+                    whileHover={{ y: -4 }}
+                  >
+                    <p className="text-4xl font-black tracking-[-0.03em] text-[#1769ff]">{signal.value}</p>
+                    <div className="mx-auto mt-4 h-px w-8 bg-[#edf0f5]" />
+                    <p className="mt-4 text-sm font-bold leading-6 text-[#596172]">{signal.label}</p>
+                  </motion.div>
+                ))}
               </div>
             </motion.section>
 
@@ -477,17 +499,17 @@ export function LandingPage() {
               viewport={revealViewport}
               variants={fadeUp}
             >
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">Mulai dari demo</p>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Mulai dari demo</p>
                   <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
                     Coba alur Taptu sebelum masuk produksi.
                   </h2>
                 </div>
-                <PrimaryLink to="/login">
+                <CTAWhiteLink to="/login">
                   Coba demo Taptu
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </PrimaryLink>
+                </CTAWhiteLink>
               </div>
             </motion.section>
           </motion.main>
