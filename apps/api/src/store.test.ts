@@ -14,7 +14,7 @@ afterEach(async () => {
 
 describe("demo store persistence", () => {
   it("creates store file when missing", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "hadiri-store-"));
+    const dir = await mkdtemp(join(tmpdir(), "taptu-store-"));
     tempRoots.push(dir);
     const filePath = join(dir, "demo-store.json");
 
@@ -26,7 +26,7 @@ describe("demo store persistence", () => {
   });
 
   it("round-trips updates to disk", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "hadiri-store-"));
+    const dir = await mkdtemp(join(tmpdir(), "taptu-store-"));
     tempRoots.push(dir);
     const filePath = join(dir, "demo-store.json");
 

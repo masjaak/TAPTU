@@ -460,7 +460,7 @@ export function LandingPage() {
                 {trustSignals.map((signal) => (
                   <motion.div
                     key={signal.label}
-                    aria-label={`${signal.value} — ${signal.label}`}
+                    aria-label={`${signal.value} - ${signal.label}`}
                     className="rounded-[26px] border border-[#edf0f5] bg-white p-8 text-center shadow-[0_8px_24px_rgba(20,24,31,0.06)]"
                     variants={fadeUp}
                     whileHover={{ y: -4 }}

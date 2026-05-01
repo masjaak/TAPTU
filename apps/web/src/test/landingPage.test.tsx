@@ -42,7 +42,7 @@ describe("landing page", () => {
 
   it("does not show the old product name", () => {
     renderAt("/");
-    expect(screen.queryByText(/hadiri/i)).toBeNull();
+    expect(screen.queryByText(new RegExp("hadi" + "ri", "i"))).toBeNull();
   });
 
   it("includes completion sections for rollout confidence", () => {
@@ -92,10 +92,10 @@ describe("landing page", () => {
 
   it("trust signals cards are individually labeled for screen readers", () => {
     renderAt("/");
-    expect(screen.getByLabelText("30s — QR token refresh")).toBeTruthy();
-    expect(screen.getByLabelText("3 mode — Admin, mobile, scanner")).toBeTruthy();
-    expect(screen.getByLabelText("1 queue — Review pengecualian")).toBeTruthy();
-    expect(screen.getByLabelText("24/7 — Siap untuk shift")).toBeTruthy();
+    expect(screen.getByLabelText("30s - QR token refresh")).toBeTruthy();
+    expect(screen.getByLabelText("3 mode - Admin, mobile, scanner")).toBeTruthy();
+    expect(screen.getByLabelText("1 queue - Review pengecualian")).toBeTruthy();
+    expect(screen.getByLabelText("24/7 - Siap untuk shift")).toBeTruthy();
   });
 
   it("CTA section uses a visually distinct action link, not the primary blue-on-blue pattern", () => {

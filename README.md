@@ -1,6 +1,6 @@
-# Hadiri by TAPTU
+# TAPTU
 
-Baseline full-stack project untuk platform absensi Hadiri.
+Baseline full-stack project untuk platform absensi TAPTU.
 
 ## Stack
 
@@ -19,9 +19,9 @@ Baseline full-stack project untuk platform absensi Hadiri.
 
 ## Akun demo
 
-- `admin@hadiri.app / Hadiri123!`
-- `employee@hadiri.app / Hadiri123!`
-- `scanner@hadiri.app / Hadiri123!`
+- `admin@taptu.app / Taptu123!`
+- `employee@taptu.app / Taptu123!`
+- `scanner@taptu.app / Taptu123!`
 
 ## Menjalankan project
 
@@ -38,6 +38,23 @@ Frontend default:
 Backend default:
 
 - `http://localhost:3001`
+
+## Supabase storage
+
+Local development defaults to `local-demo`, which writes `apps/api/data/demo-store.json`.
+To use Supabase:
+
+1. Run `supabase/migrations/202605010001_create_taptu_app_store.sql` in the Supabase SQL editor for project `ajlfwivpllbcmadscmkb`.
+2. Copy `apps/api/.env.example` to `apps/api/.env`.
+3. Set:
+
+```bash
+TAPTU_STORAGE_MODE=supabase
+SUPABASE_URL=https://ajlfwivpllbcmadscmkb.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only. Do not expose it in the web app.
 
 ## Build
 

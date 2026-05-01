@@ -1,7 +1,8 @@
 import cors from "cors";
 import express from "express";
 import jwt from "jsonwebtoken";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 import type {
@@ -23,6 +24,25 @@ import type {
 import { computeAdminOverview, computeEmployeeSummary, createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
 import { getApiConfig } from "./config";
 import { createStorageAdapter } from "./storage";
+import { createSupabaseAdmin, type SupabaseAdmin } from "./supabase";
+import {
+  supabaseSignUp,
+  supabaseSignIn,
+  supabaseGetProfile,
+  supabaseGetTodayAttendance,
+  supabaseUpsertAttendance,
+  supabaseGetAttendanceHistory,
+  supabaseGetAllAttendanceHistory,
+  supabaseGetRequests,
+  supabaseCreateRequest,
+  supabaseGetRequestById,
+  supabaseUpdateRequestStatus,
+  supabaseDeleteRequest,
+  supabaseGetAdminOverview,
+  supabaseGetEmployeeSummary,
+  supabaseGetScannerState,
+  supabaseRefreshScannerToken
+} from "./supabaseQueries";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -66,10 +86,20 @@ const users: Array<AuthUser & { password: string }> = [
   }
 ];
 
-const storePath = join(process.cwd(), "apps", "api", "data", "demo-store.json");
+const apiDir = dirname(fileURLToPath(import.meta.url));
+const storePath = join(apiDir, "..", "data", "demo-store.json");
 const apiConfig = getApiConfig();
-const storage = createStorageAdapter(apiConfig.storageMode, storePath);
+const storage = createStorageAdapter(apiConfig, storePath);
 let store = await storage.load();
+
+const useSupabase = apiConfig.storageMode === "supabase";
+let sb: SupabaseAdmin | null = null;
+if (useSupabase) {
+  sb = createSupabaseAdmin(apiConfig);
+  console.log("Supabase mode enabled — using relational tables.");
+} else {
+  console.log("Local-demo mode — using file-backed JSON store.");
+}
 
 const roleStats: Record<UserRole, DashboardStat[]> = {
   superadmin: [],
@@ -177,6 +207,40 @@ function authenticate(authHeader?: string): AuthUser | null {
   }
 }
 
+async function authenticateSupabase(authHeader?: string): Promise<AuthUser | null> {
+  if (!sb || !authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.slice(7);
+  const { data: { user: supaUser }, error } = await sb.auth.getUser(token);
+
+  if (error || !supaUser) return null;
+
+  return await supabaseGetProfile(sb, supaUser.id);
+}
+
+async function requireUserAsync(req: express.Request, res: express.Response): Promise<AuthUser | null> {
+  if (useSupabase && sb) {
+    const user = await authenticateSupabase(req.header("authorization"));
+    if (!user) {
+      res.status(401).json({ message: "Unauthorized" });
+      return null;
+    }
+    return user;
+  }
+
+  const user = authenticate(req.header("authorization"));
+
+  if (!user) {
+    res.status(401).json({ message: "Unauthorized" });
+    return null;
+  }
+
+  return user;
+}
+
+// Sync version kept for backward compat — delegates to local-only auth
 function requireUser(req: express.Request, res: express.Response): AuthUser | null {
   const user = authenticate(req.header("authorization"));
 
@@ -249,13 +313,23 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body satisfies LoginRequest);
 
   if (!parsed.success) {
     return res.status(400).json({
       message: "Email atau password tidak valid."
     });
+  }
+
+  if (useSupabase && sb) {
+    try {
+      const result = await supabaseSignIn(sb, parsed.data.email, parsed.data.password);
+      const response: LoginResponse = { token: result.accessToken, user: result.user };
+      return res.json(response);
+    } catch (err) {
+      return res.status(401).json({ message: err instanceof Error ? err.message : "Login gagal." });
+    }
   }
 
   const found = users.find((user) => user.email === parsed.data.email && user.password === parsed.data.password);
@@ -275,7 +349,7 @@ app.post("/api/auth/login", (req, res) => {
   return res.json(response);
 });
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body satisfies RegisterRequest);
 
   if (!parsed.success) {
@@ -283,6 +357,21 @@ app.post("/api/auth/register", (req, res) => {
   }
 
   const { fullName, email, password, organizationName, role } = parsed.data;
+
+  if (useSupabase && sb) {
+    try {
+      const newUser = await supabaseSignUp(sb, { email, password, fullName, organizationName, role });
+      const signInResult = await supabaseSignIn(sb, email, password);
+      const response: LoginResponse = { token: signInResult.accessToken, user: newUser };
+      return res.status(201).json(response);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Registrasi gagal.";
+      if (msg.includes("already") || msg.includes("duplicate")) {
+        return res.status(409).json({ message: "Email sudah digunakan." });
+      }
+      return res.status(400).json({ message: msg });
+    }
+  }
 
   if (users.some((u) => u.email === email)) {
     return res.status(409).json({ message: "Email sudah digunakan." });
@@ -308,8 +397,8 @@ app.post("/api/auth/register", (req, res) => {
   return res.status(201).json(response);
 });
 
-app.get("/api/auth/me", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/auth/me", async (req, res) => {
+  const user = await requireUserAsync(req, res);
 
   if (!user) {
     return;
@@ -318,11 +407,34 @@ app.get("/api/auth/me", (req, res) => {
   return res.json({ user });
 });
 
-app.get("/api/dashboard", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/dashboard", async (req, res) => {
+  const user = await requireUserAsync(req, res);
 
   if (!user) {
     return;
+  }
+
+  if (useSupabase && sb) {
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const attendance = await supabaseGetAttendanceHistory(sb, user.id);
+    const todayRecord = await supabaseGetTodayAttendance(sb, user.id);
+    const requests = await supabaseGetRequests(sb, user.id, isAdmin);
+    const scannerState = user.role === "scanner" ? await supabaseGetScannerState(sb) : null;
+
+    const payload: DashboardPayload = {
+      greeting: `Halo, ${user.fullName}`,
+      stats: roleStats[user.role] ?? roleStats.employee,
+      schedule: [
+        { time: "08.00", title: "Check-in kantor", detail: "QR utama akan refresh otomatis tiap 30 detik." },
+        { time: "13.00", title: "Review izin harian", detail: "Approval manager dan rekap lokasi kerja." },
+        { time: "17.00", title: "Check-out", detail: "Sinkron ke laporan harian dan payroll." }
+      ],
+      attendance,
+      attendanceState: todayRecord.state,
+      requests,
+      scannerToken: scannerState?.token
+    };
+    return res.json(payload);
   }
 
   const payload: DashboardPayload = {
@@ -350,24 +462,40 @@ app.get("/api/dashboard", (req, res) => {
   return res.json(payload);
 });
 
-app.get("/api/attendance/today", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/attendance/today", async (req, res) => {
+  const user = await requireUserAsync(req, res);
 
   if (!user) {
     return;
   }
 
+  if (useSupabase && sb) {
+    const record = await supabaseGetTodayAttendance(sb, user.id);
+    return res.json({
+      id: user.id,
+      day: "Hari ini",
+      status: record.state === "idle" ? "Belum check-in" : "Tepat waktu",
+      time: record.checkInAt ? record.checkInAt.slice(11, 16) : "--.--",
+      method: record.checkInMethod ?? "Manual"
+    });
+  }
+
   return res.json(buildAttendanceItem(user.id));
 });
 
-app.get("/api/attendance/history", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/attendance/history", async (req, res) => {
+  const user = await requireUserAsync(req, res);
 
   if (!user) {
     return;
   }
 
   const filter = historyFilterSchema.parse(req.query.filter);
+
+  if (useSupabase && sb) {
+    const items = await supabaseGetAttendanceHistory(sb, user.id, filter);
+    return res.json(items);
+  }
 
   if (user.role === "admin" || user.role === "superadmin") {
     return res.json(filterAttendanceHistory(store.attendanceHistory, filter));
@@ -377,7 +505,7 @@ app.get("/api/attendance/history", (req, res) => {
 });
 
 app.post("/api/attendance/checkin", async (req, res) => {
-  const user = requireUser(req, res);
+  const user = await requireUserAsync(req, res);
 
   if (!user) {
     return;
@@ -387,6 +515,20 @@ app.post("/api/attendance/checkin", async (req, res) => {
 
   if (!parsed.success) {
     return res.status(400).json({ message: "Metode check-in tidak valid." });
+  }
+
+  if (useSupabase && sb) {
+    const current = await supabaseGetTodayAttendance(sb, user.id);
+    const next = reduceAttendance(current, { type: "CHECK_IN", method: parsed.data.method as AttendanceMode, at: new Date().toISOString() });
+    if (next.state === current.state) {
+      return res.status(409).json({ message: "Check-in sudah dilakukan atau state tidak valid." });
+    }
+    await supabaseUpsertAttendance(sb, user.id, next);
+    const response: AttendanceActionResponse = {
+      attendanceState: next.state,
+      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual" }
+    };
+    return res.json(response);
   }
 
   const current = store.attendance[user.id] ?? { userId: user.id, state: "idle" as const };
@@ -414,7 +556,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
 });
 
 app.post("/api/attendance/checkout", async (req, res) => {
-  const user = requireUser(req, res);
+  const user = await requireUserAsync(req, res);
 
   if (!user) {
     return;
@@ -424,6 +566,20 @@ app.post("/api/attendance/checkout", async (req, res) => {
 
   if (!parsed.success) {
     return res.status(400).json({ message: "Metode check-out tidak valid." });
+  }
+
+  if (useSupabase && sb) {
+    const current = await supabaseGetTodayAttendance(sb, user.id);
+    const next = reduceAttendance(current, { type: "CHECK_OUT", method: parsed.data.method as AttendanceMode, at: new Date().toISOString() });
+    if (next.state === current.state) {
+      return res.status(409).json({ message: "Check-out belum bisa dilakukan sebelum check-in." });
+    }
+    await supabaseUpsertAttendance(sb, user.id, next);
+    const response: AttendanceActionResponse = {
+      attendanceState: next.state,
+      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual" }
+    };
+    return res.json(response);
   }
 
   const current = store.attendance[user.id] ?? { userId: user.id, state: "idle" as const };
@@ -450,11 +606,14 @@ app.post("/api/attendance/checkout", async (req, res) => {
   return res.json(response);
 });
 
-app.get("/api/requests", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/requests", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
 
-  if (!user) {
-    return;
+  if (useSupabase && sb) {
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const items = await supabaseGetRequests(sb, user.id, isAdmin);
+    return res.json(items);
   }
 
   if (user.role === "admin") {
@@ -466,37 +625,33 @@ app.get("/api/requests", (req, res) => {
   return res.json(store.requests.filter((item) => item.userId === user.id).map((item) => buildRequestItem(item)));
 });
 
-app.get("/api/requests/:id", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/requests/:id", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
 
-  if (!user) {
-    return;
+  if (useSupabase && sb) {
+    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin);
+    if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+    return res.json(item);
   }
 
   const request = store.requests.find((item) => item.id === req.params.id);
-
-  if (!request) {
-    return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
-  }
-
-  if (user.role === "employee" && request.userId !== user.id) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
+  if (!request) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+  if (user.role === "employee" && request.userId !== user.id) return res.status(403).json({ message: "Forbidden" });
   return res.json(buildRequestItem(request, users.find((entry) => entry.id === request.userId)?.fullName));
 });
 
 app.post("/api/requests", async (req, res) => {
-  const user = requireUser(req, res);
-
-  if (!user) {
-    return;
-  }
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
 
   const parsed = requestSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Judul atau detail pengajuan belum valid." });
 
-  if (!parsed.success) {
-    return res.status(400).json({ message: "Judul atau detail pengajuan belum valid." });
+  if (useSupabase && sb) {
+    const created = await supabaseCreateRequest(sb, user.id, parsed.data);
+    return res.status(201).json({ request: created });
   }
 
   const nextRequest = {
@@ -511,81 +666,58 @@ app.post("/api/requests", async (req, res) => {
     createdAt: new Date().toISOString()
   };
 
-  store.requests = reduceRequests(store.requests, {
-    type: "CREATE",
-    request: nextRequest
-  });
+  store.requests = reduceRequests(store.requests, { type: "CREATE", request: nextRequest });
   await storage.save(store);
-
-  const response: RequestActionResponse = {
-    request: buildRequestItem(nextRequest)
-  };
-
-  return res.status(201).json(response);
+  return res.status(201).json({ request: buildRequestItem(nextRequest) });
 });
 
 app.delete("/api/requests/:id", async (req, res) => {
-  const user = requireUser(req, res);
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
 
-  if (!user) {
-    return;
+  if (useSupabase && sb) {
+    const ok = await supabaseDeleteRequest(sb, req.params.id, user.id);
+    if (!ok) return res.status(409).json({ message: "Pengajuan hanya bisa dibatalkan saat masih menunggu." });
+    return res.json({ id: req.params.id, removed: true });
   }
 
   const existing = store.requests.find((item) => item.id === req.params.id);
+  if (!existing) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+  if (user.role === "employee" && existing.userId !== user.id) return res.status(403).json({ message: "Forbidden" });
 
-  if (!existing) {
-    return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
-  }
-
-  if (user.role === "employee" && existing.userId !== user.id) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-
-  const next = reduceRequests(store.requests, {
-    type: "CANCEL",
-    id: req.params.id,
-    actorRole: user.role
-  });
-
-  if (next.length === store.requests.length) {
-    return res.status(409).json({ message: "Pengajuan hanya bisa dibatalkan saat masih menunggu." });
-  }
+  const next = reduceRequests(store.requests, { type: "CANCEL", id: req.params.id, actorRole: user.role });
+  if (next.length === store.requests.length) return res.status(409).json({ message: "Pengajuan hanya bisa dibatalkan saat masih menunggu." });
 
   store.requests = next;
   await storage.save(store);
-
   return res.json({ id: req.params.id, removed: true });
 });
 
-app.get("/api/admin/requests", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/admin/requests", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
 
-  if (!user) {
-    return;
-  }
-
-  if (user.role !== "admin" && user.role !== "superadmin") {
-    return res.status(403).json({ message: "Forbidden" });
+  if (useSupabase && sb) {
+    const items = await supabaseGetRequests(sb, user.id, true);
+    return res.json(items);
   }
 
   return res.json(store.requests.map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName)));
 });
 
 app.patch("/api/admin/requests/:id", async (req, res) => {
-  const user = requireUser(req, res);
-
-  if (!user) {
-    return;
-  }
-
-  if (user.role !== "admin" && user.role !== "superadmin") {
-    return res.status(403).json({ message: "Forbidden" });
-  }
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
 
   const parsed = approvalSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Status approval tidak valid." });
 
-  if (!parsed.success) {
-    return res.status(400).json({ message: "Status approval tidak valid." });
+  if (useSupabase && sb) {
+    const updated = await supabaseUpdateRequestStatus(sb, req.params.id, parsed.data.status);
+    if (!updated) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+    return res.json({ request: updated });
   }
 
   store.requests = reduceRequests(store.requests, {
@@ -595,72 +727,72 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
   });
 
   const updated = store.requests.find((item) => item.id === req.params.id);
-
-  if (!updated) {
-    return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
-  }
-
-  const response: RequestActionResponse = {
-    request: buildRequestItem(updated, users.find((entry) => entry.id === updated.userId)?.fullName)
-  };
+  if (!updated) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
 
   await storage.save(store);
-
-  return res.json(response);
+  return res.json({ request: buildRequestItem(updated, users.find((entry) => entry.id === updated.userId)?.fullName) });
 });
 
-app.get("/api/admin/overview", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/admin/overview", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
 
-  if (!user) {
-    return;
-  }
-
-  if (user.role !== "admin" && user.role !== "superadmin") {
-    return res.status(403).json({ message: "Forbidden" });
+  if (useSupabase && sb) {
+    const { data: profile } = await sb.from("profiles").select("organization_id").eq("id", user.id).single();
+    if (profile?.organization_id) {
+      const overview = await supabaseGetAdminOverview(sb, profile.organization_id);
+      return res.json(overview);
+    }
   }
 
   const overview: AdminOverview = computeAdminOverview(store, users.filter((u) => u.role === "employee").length);
-
   return res.json(overview);
 });
 
-app.get("/api/employee/summary", (req, res) => {
-  const user = requireUser(req, res);
+app.get("/api/employee/summary", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
 
-  if (!user) {
-    return;
+  if (useSupabase && sb) {
+    const summary = await supabaseGetEmployeeSummary(sb, user.id);
+    return res.json(summary);
   }
 
   const summary: EmployeeSummary = computeEmployeeSummary(store, user.id);
-
   return res.json(summary);
 });
 
 app.get("/api/scanner/token", async (req, res) => {
-  const user = requireUser(req, res);
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "scanner" && user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
 
-  if (!user) {
-    return;
-  }
-
-  if (user.role !== "scanner" && user.role !== "admin" && user.role !== "superadmin") {
-    return res.status(403).json({ message: "Forbidden" });
+  if (useSupabase && sb) {
+    const newToken = refreshScannerToken({ token: "", expiresInSeconds: 30, scansToday: 0, locationName: "" }).token;
+    const state = await supabaseRefreshScannerToken(sb, newToken);
+    return res.json({
+      token: state.token,
+      expiresInSeconds: state.expiresInSeconds,
+      scansToday: state.scansToday,
+      locationName: state.locationName
+    } satisfies ScannerTokenPayload);
   }
 
   store.scanner = refreshScannerToken(store.scanner);
   await storage.save(store);
 
-  const payload: ScannerTokenPayload = {
+  return res.json({
     token: store.scanner.token,
     expiresInSeconds: store.scanner.expiresInSeconds,
     scansToday: store.scanner.scansToday,
     locationName: store.scanner.locationName
-  };
-
-  return res.json(payload);
+  } satisfies ScannerTokenPayload);
 });
 
 app.listen(port, () => {
   console.log(`Taptu API listening on http://localhost:${port}`);
 });
+
+
+
