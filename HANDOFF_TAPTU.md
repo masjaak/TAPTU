@@ -327,6 +327,109 @@ Masalah: outer background `#d9d9d9` terlalu gelap dan kontras, gap `mt-8` (32px)
 - `npm run typecheck --workspace @taptu/web` pass
 - `npm run build:web` pass
 
+## Update auth revamp + superadmin register (2026-05-01)
+
+### DB recommendation: Supabase
+
+Dipilih Supabase (PostgreSQL) dibanding Firebase (Firestore) karena:
+- Data Taptu bersifat relasional: users → attendance → requests → organizations
+- Row Level Security (RLS) cocok untuk role-based access (superadmin/admin/employee/scanner)
+- Auto-generate TypeScript types dari schema, menggantikan manual types di `@taptu/shared`
+- Real-time WebSocket subscription untuk scanner token refresh
+- Open source, bisa self-host di kemudian hari
+
+### LoginPage — full revamp
+
+Desain lama memakai token warna berbeda (`bg-ink`, `bg-sand`, `text-moss`, `font-display`) yang tidak konsisten dengan landing page.
+
+Desain baru sepenuhnya konsisten dengan design system landing page:
+- Outer: `bg-[#e9eaec]` — sama dengan landing page
+- Layout: dua kolom `lg:grid-cols-2` dengan `min-h-[calc(100vh-32px)]`
+- Panel kiri (`bg-[#111827]`): logo Taptu putih, heading "Satu login untuk semua peran.", deskripsi, demo accounts panel
+- Panel kanan (`bg-white`): form login — email, password, submit button
+- Demo accounts panel (`data-testid="demo-accounts-panel"`): 4 akun demo dengan role badge berwarna, **dapat diklik** untuk mengisi form otomatis
+- Role badge colors:
+  - superadmin: amber warm
+  - admin: blue
+  - employee: green
+  - scanner: orange
+- Input style: `rounded-2xl border border-[#e2e7f0] bg-[#f9fafc]` dengan `focus:border-[#1769ff]`
+- Submit button: `bg-[#1769ff]` konsisten dengan landing page primary CTA
+- Link ke `/register` untuk daftarkan akun superadmin
+- Link "Kembali ke beranda" → `/`
+- Tidak memakai `<Shell>` — layout berdiri sendiri
+
+### RegisterPage — new page (`/register`)
+
+Page baru untuk registrasi akun superadmin:
+- Outer: sama `bg-[#e9eaec]`
+- Layout: single column `max-w-lg` centered
+- Taptu logomark di header
+- Card putih `rounded-[32px]`
+- Role badge `data-testid="role-badge-superadmin"` — amber warm, read-only (role selalu superadmin)
+- Fields:
+  - `id="organizationName"` — Nama organisasi
+  - `id="fullName"` — Nama lengkap
+  - `id="email"` — Email
+  - `id="password"` — Password (min 8 karakter)
+  - `id="confirmPassword"` — Konfirmasi password
+- Client-side validation: password match + min length sebelum hit API
+- Error state: rounded pill merah `bg-[#fff2ee]`
+- Submit: `POST /api/auth/register` → langsung navigate ke `/app` dengan session tersimpan
+- Link kembali ke login dan ke beranda
+
+### API — endpoint baru
+
+`POST /api/auth/register`:
+- Validasi via `registerSchema` (zod): fullName min 2, email valid, password min 8, organizationName min 2
+- Reject 409 jika email sudah dipakai
+- Role selalu `"superadmin"` — tidak bisa didelegasi dari client
+- Menambah user ke runtime `users` array
+- Return `{ token, user }` sama seperti login — session langsung aktif
+
+Demo user `superadmin@taptu.app / Taptu123!` ditambahkan ke hardcoded users list.
+
+### Shared types
+
+`RegisterRequest` ditambahkan ke `packages/shared/src/index.ts`:
+```ts
+export interface RegisterRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  organizationName: string;
+}
+```
+
+### Router
+
+`/register` → `RegisterPage` ditambahkan ke `apps/web/src/pages/router.tsx`.
+
+### Web API client
+
+`register(payload: RegisterRequest): Promise<LoginResponse>` ditambahkan ke `apps/web/src/lib/api.ts`.
+
+### Agent rule review
+
+TDD — 11 test merah ditulis sebelum kode produksi:
+- 6 test login page (brand, inputs, demo panel, register link, back link, submit button)
+- 5 test register page (role badge, 5 fields, submit button, login link, back link)
+
+Seluruh test suite:
+- Web tests: `34/34` hijau
+- API tests: `44/44` hijau
+- Typecheck: web + api clean
+- Build: `npm run build:web` clean
+
+### Akun demo sekarang
+
+| Role | Email | Password |
+|------|-------|----------|
+| superadmin | superadmin@taptu.app | Taptu123! |
+| admin | admin@taptu.app | Taptu123! |
+| employee | employee@taptu.app | Taptu123! |
+| scanner | scanner@taptu.app | Taptu123! |
+
 ## Update CTA + footer redesign (2026-05-01)
 
 ### CTA section

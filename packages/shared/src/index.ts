@@ -13,6 +13,13 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  organizationName: string;
+}
+
 export interface LoginResponse {
   token: string;
   user: AuthUser;

@@ -7,6 +7,7 @@ import type {
   LeaveRequestItem,
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
   RequestActionResponse,
   ScannerTokenPayload
 } from "@taptu/shared";
@@ -15,6 +16,13 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001/a
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   return requestJson<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function register(payload: RegisterRequest): Promise<LoginResponse> {
+  return requestJson<LoginResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload)
   });

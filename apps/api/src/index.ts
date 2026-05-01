@@ -15,6 +15,7 @@ import type {
   LeaveRequestItem,
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
   RequestActionResponse,
   ScannerTokenPayload,
   UserRole
@@ -31,6 +32,14 @@ app.use(cors());
 app.use(express.json());
 
 const users: Array<AuthUser & { password: string }> = [
+  {
+    id: "usr-superadmin-01",
+    fullName: "Super Admin",
+    email: "superadmin@taptu.app",
+    password: "Taptu123!",
+    organizationName: "TAPTU HQ",
+    role: "superadmin"
+  },
   {
     id: "usr-admin-01",
     fullName: "Nadia Putri",
@@ -121,6 +130,13 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)
 });
+
+const registerSchema = z.object({
+  fullName: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  organizationName: z.string().min(2)
+} satisfies Record<keyof RegisterRequest, z.ZodTypeAny>);
 
 const attendanceSchema = z.object({
   method: z.enum(["QR", "GPS", "Selfie", "Manual"])
@@ -256,6 +272,39 @@ app.post("/api/auth/login", (req, res) => {
   };
 
   return res.json(response);
+});
+
+app.post("/api/auth/register", (req, res) => {
+  const parsed = registerSchema.safeParse(req.body satisfies RegisterRequest);
+
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Data registrasi tidak valid." });
+  }
+
+  const { fullName, email, password, organizationName } = parsed.data;
+
+  if (users.some((u) => u.email === email)) {
+    return res.status(409).json({ message: "Email sudah digunakan." });
+  }
+
+  const newUser: AuthUser & { password: string } = {
+    id: `usr-superadmin-${Date.now()}`,
+    fullName,
+    email,
+    password,
+    organizationName,
+    role: "superadmin"
+  };
+
+  users.push(newUser);
+
+  const { password: _password, ...user } = newUser;
+  const response: LoginResponse = {
+    token: signUser(user),
+    user
+  };
+
+  return res.status(201).json(response);
 });
 
 app.get("/api/auth/me", (req, res) => {
