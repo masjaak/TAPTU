@@ -228,7 +228,18 @@ Motion implementation:
 - wrapper `MotionConfig reducedMotion="user"`
 - `fadeUp` + `stagger` variants untuk hero dan section reveal
 - floating hero cards memakai loop motion ringan
-- reminder icon memakai pulse motion ringan
+- `Catatan shift` memakai sticky-note motion:
+  - enter dari `opacity: 0`, `y: 30`, `rotate: -11`
+  - loop sway pada `y` dan `rotate`
+  - hover lift + rotate correction
+- `Reminder` bell memakai bell-ring motion:
+  - rotate keyframes `[0, -13, 11, -8, 5, 0]`
+  - scale keyframes untuk efek notif
+  - `repeatDelay` supaya tidak terasa terlalu ramai
+- `Integrasi operasional` memakai staggered icon motion:
+  - parent card float ringan
+  - tiga icon bounce + rotate dengan delay per index
+  - hover icon lift
 - validation bars sekarang data-driven dan animated:
   - `QR Gate Timur` target `82`
   - `GPS Kantor Pusat` target `64`
@@ -236,10 +247,14 @@ Motion implementation:
 - test regression menandai motion state progress bar:
   - `data-motion-state="visible"`
   - `data-motion-target`
+- test regression juga menandai hero motion style:
+  - `data-motion-style="sticky-note"`
+  - `data-motion-style="bell-ring"`
+  - `data-motion-style="staggered-icons"`
 
 Agent rule review:
 
-- TDD dilakukan: test landing motion state dibuat merah dulu, lalu production code dibuat hijau
+- TDD dilakukan: test landing motion state dan hero motion style dibuat merah dulu, lalu production code dibuat hijau
 - state-machine thinking diterapkan pada UI motion state:
   - initial progress `0%`
   - visible target sesuai nilai validasi
@@ -275,7 +290,7 @@ Catatan penting:
 
 Review terakhir tetap hijau:
 
-- Web tests pass `14/14`
+- Web tests pass `15/15`
 - `npm run typecheck --workspace @taptu/web` pass
 - `npm run build:web` pass
 

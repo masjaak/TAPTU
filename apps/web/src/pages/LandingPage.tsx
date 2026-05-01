@@ -291,19 +291,14 @@ export function LandingPage() {
                 </motion.div>
 
                 <motion.div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center pt-20 text-center md:pt-24" variants={fadeUp}>
-                  <div className="grid h-16 w-16 place-items-center rounded-[22px] border border-[#e2e7f0] bg-white shadow-[0_22px_50px_rgba(20,24,31,0.12)]">
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <span className="h-3.5 w-3.5 rounded-full bg-[#1769ff]" />
-                      <span className="h-3.5 w-3.5 rounded-full bg-[#111827]" />
-                      <span className="h-3.5 w-3.5 rounded-full bg-[#7dd3fc]" />
-                      <span className="h-3.5 w-3.5 rounded-full bg-[#a3a3a3]" />
-                    </div>
+                  <div className="grid h-16 w-16 place-items-center rounded-[22px] bg-[#111827] shadow-[0_22px_50px_rgba(20,24,31,0.22)]">
+                    <span className="text-2xl font-black tracking-[-0.02em] text-white">T</span>
                   </div>
-                  <h1 className="mt-9 max-w-4xl text-[46px] font-black leading-[1.02] tracking-[-0.065em] text-[#0f1115] md:text-7xl lg:text-[82px]">
+                  <h1 className="mt-12 max-w-4xl text-[46px] font-black uppercase leading-[1.08] tracking-[-0.03em] text-[#0f1115] md:text-7xl lg:text-[82px]">
                     Kelola absensi tim
                     <span className="block text-[#9aa1ad]">dalam satu alur kerja</span>
                   </h1>
-                  <p className="mt-6 max-w-xl text-base leading-7 text-[#596172] md:text-lg">
+                  <p className="mt-8 max-w-xl text-base leading-7 text-[#596172] md:text-lg">
                     Taptu menyatukan check-in mobile, scanner gate, validasi lokasi, approval izin, dan laporan admin dalam
                     satu workspace yang terasa ringan.
                   </p>
@@ -400,7 +395,7 @@ export function LandingPage() {
               variants={stagger}
             >
               <motion.div className="mx-auto max-w-3xl text-center" variants={fadeUp}>
-                <SectionLabel>Dibuat untuk tiga mode kerja</SectionLabel>
+                <SectionLabel>Roles</SectionLabel>
                 <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
                   Dibuat untuk tiga mode kerja.
                 </h2>
