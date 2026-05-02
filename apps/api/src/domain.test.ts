@@ -1,21 +1,28 @@
 import { describe, expect, it } from "vitest";
 
+import type { AttendanceReportRow, UserRole } from "@taptu/shared";
 import {
   appendScannerAttempt,
+  buildAttendanceReportRows,
   calculateDistanceMeters,
   computeAdminOverview,
+  computeEmployeeList,
   computeEmployeeSummary,
   createAttendanceException,
   createAuditLog,
   createCheckInRecord,
   createInitialStore,
+  createShiftRecord,
+  createWorkLocationItem,
   filterAttendanceHistory,
+  generateCsvFromRows,
   generateScannerToken,
   reduceAttendance,
   reduceExceptionReview,
   reduceRequests,
   refreshScannerToken,
   updateCheckOutRecord,
+  updateShiftRecord,
   validateAttendanceSubmission,
   validateScannerToken
 } from "./domain";
@@ -309,5 +316,95 @@ describe("helpers", () => {
 
   it("calculates location distance in meters", () => {
     expect(calculateDistanceMeters({ latitude: -6.2088, longitude: 106.8456 }, { latitude: -6.2088, longitude: 106.8456 })).toBe(0);
+  });
+});
+
+describe("computeEmployeeList", () => {
+  it("returns employees with absent status when no attendance record", () => {
+    const store = createInitialStore();
+    const users = [
+      { id: "new-emp", fullName: "Test User", email: "test@taptu.app", role: "employee" as UserRole }
+    ];
+    const result = computeEmployeeList(store, users);
+    expect(result).toHaveLength(1);
+    expect(result[0].todayStatus).toBe("absent");
+  });
+
+  it("returns present for checked-in employee", () => {
+    const store = createInitialStore();
+    const users = [
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee" as UserRole }
+    ];
+    const result = computeEmployeeList(store, users);
+    expect(result[0].todayStatus).toBe("present");
+    expect(result[0].checkInTime).toBe("08:03");
+  });
+
+  it("returns late for terlambat employee", () => {
+    const store = createInitialStore();
+    const users = [
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee" as UserRole }
+    ];
+    const result = computeEmployeeList(store, users);
+    expect(result[0].todayStatus).toBe("late");
+  });
+});
+
+describe("createShiftRecord", () => {
+  it("creates a shift with required fields", () => {
+    const shift = createShiftRecord({ name: "Shift Malam", startTime: "22:00", endTime: "06:00" });
+    expect(shift.name).toBe("Shift Malam");
+    expect(shift.gracePeriodMinutes).toBe(10);
+    expect(shift.status).toBe("active");
+    expect(shift.id).toMatch(/^shift-/);
+  });
+});
+
+describe("buildAttendanceReportRows", () => {
+  it("builds rows from store attendance records", () => {
+    const store = createInitialStore();
+    const dir = { "usr-employee-01": "Fikri Maulana", "usr-employee-02": "Anisa Rahma", "usr-employee-03": "Leo Pratama" };
+    const rows = buildAttendanceReportRows(store, dir);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].employeeName).toBeTruthy();
+  });
+
+  it("marks late rows correctly", () => {
+    const store = createInitialStore();
+    const dir = { "usr-employee-02": "Anisa Rahma" };
+    const rows = buildAttendanceReportRows(store, dir);
+    const lateRow = rows.find((r) => r.employeeId === "usr-employee-02");
+    expect(lateRow?.isLate).toBe(true);
+  });
+});
+
+describe("generateCsvFromRows", () => {
+  it("generates a CSV with header and data rows", () => {
+    const store = createInitialStore();
+    const dir = { "usr-employee-01": "Fikri Maulana" };
+    const rows = buildAttendanceReportRows(store, dir);
+    const csv = generateCsvFromRows(rows);
+    expect(csv).toContain("Employee Name");
+    expect(csv).toContain("Fikri Maulana");
+  });
+
+  it("escapes commas in values", () => {
+    const rows: AttendanceReportRow[] = [{
+      id: "r1",
+      employeeName: "Foo, Bar",
+      employeeId: "usr-1",
+      date: "2026-05-02",
+      shiftName: "Shift Pagi",
+      workLocationName: "Kantor Pusat",
+      status: "Tepat waktu",
+      validationStatus: "verified",
+      validationReasons: [],
+      isLate: false,
+      hasException: false,
+      selfieProof: false,
+      deviceValidated: false
+    }];
+    const csv = generateCsvFromRows(rows);
+    expect(csv).toContain('"Foo, Bar"');
   });
 });

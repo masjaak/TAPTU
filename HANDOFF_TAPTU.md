@@ -949,3 +949,112 @@ Screenshot QA dibuat di:
 - Lanjutkan build feature attendance validation setelah UI foundation ini dipertahankan.
 - Jangan mengembalikan token/theme lama yang sudah dibersihkan.
 - Untuk success state, gunakan semantic tone yang subtle dan kompatibel dengan Taptu, bukan hijau dashboard lama.
+
+## Phase 4 Operational Layer Handoff (2026-05-02)
+
+### Yang dibangun di Phase 4
+
+1. **Employee roster** (Tim tab)
+   - Tabel karyawan aktif dengan search dan status summary badge
+   - Filter otomatis: Hadir, Terlambat, Belum hadir, Izin
+   - Kolom: nama, email, role, shift, check-in, status, validasi
+   - Manager hanya melihat employee dan manager di bawah scope yang ada
+
+2. **Work location management** (Lokasi tab)
+   - Daftar work locations aktif dengan radius
+   - Create form: nama, alamat, latitude, longitude, radius
+   - Edit form (admin-only): inline form yang muncul per card
+   - Status aktif/nonaktif ditampilkan per lokasi
+   - Lokasi baru otomatis masuk ke workLocations di store
+
+3. **Shift management** (Lokasi tab, panel kanan)
+   - Daftar shift aktif
+   - Create/edit form: nama, jam mulai, jam selesai, toleransi, lokasi kerja, jam istirahat
+   - Shift dihubungkan ke work location
+   - Status aktif/arsip per shift
+
+4. **Attendance report** (Laporan tab)
+   - Filter panel: dari tanggal, sampai tanggal, status absensi
+   - Tabel rekap: karyawan, tanggal, shift, check-in, check-out, status, validasi, flags
+   - Flag badges: Late, Exception, Selfie, Device
+   - Tombol "Lihat audit trail" untuk toggle audit log
+
+5. **Payroll-ready CSV export** (Laporan tab)
+   - Tombol "Export CSV" yang generate CSV dari data report yang sedang tampil
+   - CSV berisi semua kolom payroll-ready termasuk validasi, lokasi, perangkat
+   - Nama file: `taptu-attendance-report-YYYY-MM.csv`
+   - Export berjalan di browser (Blob API, no backend round-trip)
+   - Filter aktif dihormati: export hanya baris yang tampil
+
+### File yang berubah
+
+- `packages/shared/src/index.ts` - tambah: EmployeeListItem, WorkLocationItem, ShiftRecord, AttendanceReportRow, AttendanceReportFilters
+- `apps/api/src/domain.ts` - tambah: computeEmployeeList, createShiftRecord, updateShiftRecord, createWorkLocationItem, buildAttendanceReportRows, generateCsvFromRows; update DemoStore + createInitialStore
+- `apps/api/src/domain.test.ts` - tambah tests untuk semua domain function baru
+- `apps/api/src/index.ts` - tambah endpoints: /api/admin/employees, /api/admin/work-locations, /api/admin/shifts, /api/admin/reports
+- `apps/web/src/lib/demo.ts` - tambah demo data: DEMO_EMPLOYEES, DEMO_WORK_LOCATIONS, DEMO_SHIFTS, DEMO_REPORT_ROWS + getter functions
+- `apps/web/src/lib/api.ts` - tambah: fetchEmployeeList, fetchWorkLocations, createWorkLocation, updateWorkLocation, fetchShifts, createShift, updateShift, fetchReportRows, exportReportCsv
+- `apps/web/src/pages/AppPage.tsx` - update: renderTeamWorkspace, renderLocationsWorkspace, renderReportsWorkspace + new state + new handlers
+- `apps/web/src/test/appPage.test.tsx` - tambah Phase 4 tests
+
+### Supabase migration status
+
+- Phase 3 migration masih belum di-apply ke Supabase remote (constraint dari Phase 3 tetap berlaku)
+- Phase 4 domain functions memakai local demo store
+- Untuk production: perlu menambahkan tabel `shifts` dan kolom `status`/`address` ke `work_locations`
+- Supabase adapter (supabaseQueries.ts) belum diupdate untuk employee list, shift, dan report endpoints
+
+### Manager role limitation confirmation
+
+- Manager tidak bisa access location/shift management (admin-only POST/PATCH)
+- Manager bisa view: employee list, work locations read, shifts read, reports
+- Manager tidak bisa deactivate/archive shifts atau locations
+- Default scope tetap org-level untuk MVP
+
+### Selfie upload/storage status
+
+- selfie_url tetap nullable
+- Preview capture masih UI-only, storage backend belum dikoneksikan
+- Kolom `selfieProof` di report CSV diambil dari boolean `record.selfieUrl !== ""`
+
+### How to test
+
+#### Test employee list
+1. Login sebagai admin@taptu.app atau manager@taptu.app
+2. Buka tab Tim
+3. Cek roster karyawan muncul dengan status badges
+4. Ketik di kolom search untuk filter
+
+#### Test location management
+1. Login sebagai admin@taptu.app
+2. Buka tab Lokasi
+3. Klik "Tambah lokasi", isi form, klik Simpan
+4. Verifikasi lokasi muncul di daftar
+5. Klik Edit pada lokasi yang ada, ubah radius, simpan
+
+#### Test shift management
+1. Login sebagai admin@taptu.app
+2. Buka tab Lokasi (panel kanan)
+3. Klik "Tambah shift", isi form (nama, jam mulai/selesai, lokasi)
+4. Verifikasi shift muncul di daftar
+
+#### Test reports
+1. Login sebagai admin@taptu.app
+2. Buka tab Laporan
+3. Verifikasi tabel rekap muncul
+4. Coba filter status "Terlambat" dan klik Terapkan filter
+5. Klik "Export CSV" dan verifikasi file didownload
+6. Klik "Lihat audit trail" untuk toggle audit log
+
+### Remaining TODOs before Phase 5
+
+1. Apply Phase 3 migration ke Supabase remote
+2. Update supabaseQueries.ts untuk employee list, shifts, work locations, reports
+3. Tambahkan kolom `address` dan `status` ke `work_locations` tabel di Supabase
+4. Buat tabel `shifts` di Supabase
+5. Koneksikan selfie upload ke storage bucket
+6. Tambahkan pagination ke employee list dan report table (saat data besar)
+7. Tambahkan shift assignment per employee
+8. Team scoping untuk manager (department-level, bukan org-level)
+9. Laporan bulanan dan agregasi (sekarang hanya daily view)
+10. Export template payroll untuk sistem eksternal (misalnya HRIS tertentu)

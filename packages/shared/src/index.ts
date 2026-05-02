@@ -228,3 +228,72 @@ export interface ValidationDecisionPayload {
   status: AttendanceExceptionStatus;
   adminNote: string;
 }
+
+export interface EmployeeListItem {
+  id: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  todayStatus: "present" | "late" | "absent" | "leave";
+  checkInTime?: string;
+  validationStatus?: AttendanceValidationStatus;
+  shiftName?: string;
+  locationName?: string;
+}
+
+export interface WorkLocationItem {
+  id: string;
+  name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  status: "active" | "inactive";
+  createdAt: string;
+}
+
+export interface ShiftRecord {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  gracePeriodMinutes: number;
+  workLocationId?: string;
+  workLocationName?: string;
+  breakStartTime?: string;
+  breakEndTime?: string;
+  status: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttendanceReportRow {
+  id: string;
+  employeeName: string;
+  employeeId: string;
+  date: string;
+  shiftName: string;
+  workLocationName: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  status: "Tepat waktu" | "Terlambat" | "Belum check-in" | "Selesai" | "Izin";
+  validationStatus: AttendanceValidationStatus;
+  validationReasons: string[];
+  locationLat?: number;
+  locationLng?: number;
+  isLate: boolean;
+  hasException: boolean;
+  selfieProof: boolean;
+  deviceValidated: boolean;
+  approvalStatus?: string;
+  adminNote?: string;
+}
+
+export interface AttendanceReportFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  employeeId?: string;
+  shiftId?: string;
+  locationId?: string;
+  status?: string;
+}

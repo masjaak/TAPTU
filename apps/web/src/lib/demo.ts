@@ -3,17 +3,21 @@ import type {
   AttendanceActivityItem,
   AttendanceExceptionItem,
   AttendanceRecord,
+  AttendanceReportRow,
   AttendanceTimelineItem,
   AuditLogItem,
   DashboardPayload,
   DashboardScheduleItem,
   DashboardStat,
+  EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
   LoginResponse,
   ScannerTokenPayload,
   ShiftInfo,
-  UserRole
+  ShiftRecord,
+  UserRole,
+  WorkLocationItem
 } from "@taptu/shared";
 
 const DEMO_PASSWORD = "Taptu123!";
@@ -277,4 +281,47 @@ export function getDemoExceptionQueue() {
 
 export function getDemoAuditLogs() {
   return AUDIT_LOGS;
+}
+
+const DEMO_EMPLOYEES: EmployeeListItem[] = [
+  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
+  { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
+  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", todayStatus: "present", checkInTime: "07:58", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", todayStatus: "present", checkInTime: "08:00", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+];
+
+const DEMO_WORK_LOCATIONS: WorkLocationItem[] = [
+  { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1, Jakarta Pusat", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" },
+  { id: "loc-branch", name: "Kantor Cabang Selatan", address: "Jl. TB Simatupang No. 88, Jakarta Selatan", latitude: -6.295, longitude: 106.814, radiusMeters: 100, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
+];
+
+const DEMO_SHIFTS: ShiftRecord[] = [
+  { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", breakStartTime: "12:00", breakEndTime: "13:00", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" },
+  { id: "shift-sore", name: "Shift Sore", startTime: "13:00", endTime: "22:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
+];
+
+const DEMO_REPORT_ROWS: AttendanceReportRow[] = [
+  { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", checkOutTime: "2026-05-02T17:05:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], locationLat: -6.2087, locationLng: 106.8457, isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
+  { id: "att-demo-02", employeeName: "Anisa Rahma", employeeId: "usr-employee-02", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:24:00.000Z", status: "Terlambat", validationStatus: "needs_review", validationReasons: ["Di luar radius lokasi kerja (603 m).", "Perangkat berbeda dari riwayat sebelumnya."], locationLat: -6.206, locationLng: 106.851, isLate: true, hasException: true, selfieProof: false, deviceValidated: true },
+  { id: "att-demo-03", employeeName: "Leo Pratama", employeeId: "usr-employee-03", date: "2026-05-02", shiftName: "Shift Sore", workLocationName: "Kantor Pusat", status: "Belum check-in", validationStatus: "blocked", validationReasons: ["Belum masuk geofence"], isLate: false, hasException: false, selfieProof: false, deviceValidated: false },
+  { id: "att-demo-04", employeeName: "Budi Santoso", employeeId: "usr-employee-05", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T07:58:00.000Z", checkOutTime: "2026-05-02T17:01:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
+  { id: "att-demo-05", employeeName: "Dina Fitriani", employeeId: "usr-employee-04", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Cabang Selatan", status: "Izin", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: false, deviceValidated: false, approvalStatus: "Disetujui" }
+];
+
+export function getDemoEmployeeList(): EmployeeListItem[] {
+  return DEMO_EMPLOYEES;
+}
+
+export function getDemoWorkLocations(): WorkLocationItem[] {
+  return DEMO_WORK_LOCATIONS;
+}
+
+export function getDemoShifts(): ShiftRecord[] {
+  return DEMO_SHIFTS;
+}
+
+export function getDemoReportRows(): AttendanceReportRow[] {
+  return DEMO_REPORT_ROWS;
 }

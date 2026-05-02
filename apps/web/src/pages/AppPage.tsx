@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  Building2,
+  Calendar,
   Camera,
   CheckCircle2,
   Clock3,
   Crosshair,
+  Download,
   FileClock,
   FolderKanban,
   LogOut,
@@ -13,6 +16,7 @@ import {
   Radar,
   RefreshCw,
   ScanFace,
+  Search,
   ShieldCheck,
   TimerReset,
   Users
@@ -22,14 +26,19 @@ import type {
   AdminOverview,
   AttendanceExceptionItem,
   AttendanceRecord,
+  AttendanceReportFilters,
+  AttendanceReportRow,
   AttendanceTimelineItem,
   AuditLogItem,
   DashboardPayload,
   DashboardScheduleItem,
   DashboardStat,
+  EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
-  UserRole
+  ShiftRecord,
+  UserRole,
+  WorkLocationItem
 } from "@taptu/shared";
 
 import {
@@ -54,17 +63,26 @@ import {
   checkIn,
   checkOut,
   createRequest,
+  createShift,
+  createWorkLocation,
+  exportReportCsv,
   fetchAuditLogs,
   fetchAdminOverview,
   fetchAttendanceHistoryByFilter,
+  fetchEmployeeList,
   fetchEmployeeSummary,
   fetchExceptionQueue,
+  fetchReportRows,
   fetchRequestDetail,
   fetchRequests,
   fetchScannerState,
+  fetchShifts,
+  fetchWorkLocations,
   getDashboard,
   refreshScannerToken,
-  reviewException
+  reviewException,
+  updateShift,
+  updateWorkLocation
 } from "../lib/api";
 import { getNavigationForRole, toAppSection, type AppTabKey } from "../lib/appShellState";
 import {
@@ -138,6 +156,26 @@ export function AppPage() {
     requiredSelfie: true,
     deviceId: ""
   });
+
+  const [employeeList, setEmployeeList] = useState<EmployeeListItem[]>([]);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [workLocations, setWorkLocations] = useState<WorkLocationItem[]>([]);
+  const [shifts, setShifts] = useState<ShiftRecord[]>([]);
+  const [reportRows, setReportRows] = useState<AttendanceReportRow[]>([]);
+  const [reportFilters, setReportFilters] = useState<{ dateFrom: string; dateTo: string; employeeId: string; status: string }>({
+    dateFrom: "",
+    dateTo: "",
+    employeeId: "",
+    status: ""
+  });
+  const [reportLoaded, setReportLoaded] = useState(false);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [locationForm, setLocationForm] = useState({ name: "", address: "", latitude: "", longitude: "", radiusMeters: "150" });
+  const [locationFormOpen, setLocationFormOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<WorkLocationItem | null>(null);
+  const [shiftForm, setShiftForm] = useState({ name: "", startTime: "", endTime: "", gracePeriodMinutes: "10", workLocationId: "", breakStartTime: "", breakEndTime: "" });
+  const [shiftFormOpen, setShiftFormOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
 
   const appNavigation = useMemo(() => getNavigationForRole(sessionRole), [sessionRole]);
   const attendanceTrust = useMemo(
@@ -237,12 +275,36 @@ export function AppPage() {
         .catch(() => undefined);
     }
 
+    if (tab === "team" && (isAdmin || isManager) && employeeList.length === 0) {
+      fetchEmployeeList(session.token)
+        .then((items) => setEmployeeList(items))
+        .catch(() => undefined);
+    }
+
+    if (tab === "locations" && (isAdmin || isManager) && workLocations.length === 0) {
+      fetchWorkLocations(session.token)
+        .then((items) => setWorkLocations(items))
+        .catch(() => undefined);
+      fetchShifts(session.token)
+        .then((items) => setShifts(items))
+        .catch(() => undefined);
+    }
+
     if (tab === "reports" && (isAdmin || isManager) && auditLogs.length === 0) {
       fetchAuditLogs(session.token)
         .then((items) => setAuditLogs(items))
         .catch(() => undefined);
     }
-  }, [adminOverview, auditLogs.length, employeeSummary, exceptionQueue.length, historyFilter, isAdmin, isEmployee, isManager, isScanner, scannerMeta, session, tab]);
+
+    if (tab === "reports" && (isAdmin || isManager) && !reportLoaded) {
+      fetchReportRows(session.token)
+        .then((rows) => {
+          setReportRows(rows);
+          setReportLoaded(true);
+        })
+        .catch(() => undefined);
+    }
+  }, [adminOverview, auditLogs.length, employeeList.length, employeeSummary, exceptionQueue.length, historyFilter, isAdmin, isEmployee, isManager, isScanner, reportLoaded, scannerMeta, session, shifts.length, tab, workLocations.length]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -532,6 +594,97 @@ export function AppPage() {
       setActionMessage("Exception diperbarui.");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Exception gagal diperbarui.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleApplyReportFilters() {
+    setBusyAction("report-filter");
+    try {
+      const rows = await fetchReportRows(currentSession.token, {
+        dateFrom: reportFilters.dateFrom || undefined,
+        dateTo: reportFilters.dateTo || undefined,
+        employeeId: reportFilters.employeeId || undefined,
+        status: reportFilters.status || undefined
+      });
+      setReportRows(rows);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Laporan gagal dimuat.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function handleExportCsv() {
+    if (reportRows.length === 0) {
+      setActionMessage("Tidak ada data untuk diekspor.", "err");
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 7);
+    exportReportCsv(reportRows, `taptu-attendance-report-${today}.csv`);
+    setActionMessage("CSV berhasil diekspor.");
+  }
+
+  async function handleSaveLocation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusyAction("save-location");
+    try {
+      const payload = {
+        name: locationForm.name,
+        address: locationForm.address || undefined,
+        latitude: parseFloat(locationForm.latitude),
+        longitude: parseFloat(locationForm.longitude),
+        radiusMeters: parseInt(locationForm.radiusMeters, 10)
+      };
+      if (editingLocation) {
+        const updated = await updateWorkLocation(currentSession.token, editingLocation.id, payload);
+        setWorkLocations((current) => current.map((l) => l.id === editingLocation.id ? updated : l));
+        setActionMessage("Lokasi berhasil diperbarui.");
+      } else {
+        const created = await createWorkLocation(currentSession.token, payload);
+        setWorkLocations((current) => [...current, created]);
+        setActionMessage("Lokasi baru berhasil ditambahkan.");
+      }
+      setLocationFormOpen(false);
+      setEditingLocation(null);
+      setLocationForm({ name: "", address: "", latitude: "", longitude: "", radiusMeters: "150" });
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Lokasi gagal disimpan.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleSaveShift(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusyAction("save-shift");
+    try {
+      const location = workLocations.find((l) => l.id === shiftForm.workLocationId);
+      const payload = {
+        name: shiftForm.name,
+        startTime: shiftForm.startTime,
+        endTime: shiftForm.endTime,
+        gracePeriodMinutes: parseInt(shiftForm.gracePeriodMinutes, 10),
+        workLocationId: shiftForm.workLocationId || undefined,
+        workLocationName: location?.name,
+        breakStartTime: shiftForm.breakStartTime || undefined,
+        breakEndTime: shiftForm.breakEndTime || undefined
+      };
+      if (editingShift) {
+        const updated = await updateShift(currentSession.token, editingShift.id, payload);
+        setShifts((current) => current.map((s) => s.id === editingShift.id ? updated : s));
+        setActionMessage("Shift berhasil diperbarui.");
+      } else {
+        const created = await createShift(currentSession.token, payload);
+        setShifts((current) => [...current, created]);
+        setActionMessage("Shift baru berhasil ditambahkan.");
+      }
+      setShiftFormOpen(false);
+      setEditingShift(null);
+      setShiftForm({ name: "", startTime: "", endTime: "", gracePeriodMinutes: "10", workLocationId: "", breakStartTime: "", breakEndTime: "" });
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Shift gagal disimpan.", "err");
     } finally {
       setBusyAction(null);
     }
@@ -977,62 +1130,133 @@ export function AppPage() {
   }
 
   function renderTeamWorkspace() {
+    const filteredEmployees = employeeList.filter((emp) =>
+      employeeSearch === "" ||
+      emp.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+      emp.email.toLowerCase().includes(employeeSearch.toLowerCase())
+    );
+
     return (
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <Panel eyebrow="Exception queue" title="Attendance exceptions yang perlu keputusan">
-          {exceptionQueue.length === 0 ? (
-            <EmptyState title="Tidak ada exception aktif" description="Queue ini akan menampung kasus radius, token, selfie, atau device mismatch." />
-          ) : (
-            <div className="space-y-3">
-              {exceptionQueue.map((item) => (
-                <article key={item.id} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-black text-[#111827]">{item.employeeName}</p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.exceptionType}</p>
-                      <p className="mt-2 text-sm leading-6 text-[#596172]">{item.reason}</p>
-                    </div>
-                    <StatusBadge tone={item.status === "Need Review" ? "warning" : item.status === "Rejected" ? "danger" : "success"}>{item.status}</StatusBadge>
-                  </div>
-                  {(isAdmin || isManager) ? (
-                    <div className="mt-4">
-                      <FormInput
-                        label="Catatan review"
-                        value={exceptionNotes[item.id] ?? ""}
-                        onChange={(event) => setExceptionNotes((current) => ({ ...current, [item.id]: event.target.value }))}
-                        placeholder="Tambahkan alasan keputusan"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <PrimaryButton onClick={() => handleExceptionDecision(item.id, "Approved")} disabled={busyAction === `exception-Approved-${item.id}`}>Approve</PrimaryButton>
-                    <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Rejected")} disabled={busyAction === `exception-Rejected-${item.id}`}>Reject</SecondaryButton>
-                    <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Request Correction")} disabled={busyAction === `exception-Request Correction-${item.id}`}>Request correction</SecondaryButton>
-                  </div>
-                </article>
-              ))}
+      <div className="grid gap-5">
+        <Panel eyebrow="Employee roster" title="Daftar karyawan aktif">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative max-w-sm flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8495]" />
+              <input
+                type="text"
+                placeholder="Cari nama atau email..."
+                value={employeeSearch}
+                onChange={(e) => setEmployeeSearch(e.target.value)}
+                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] py-3 pl-10 pr-4 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
+              />
             </div>
+            <div className="flex gap-2">
+              {(["present", "late", "absent", "leave"] as const).map((filter) => {
+                const countMap = {
+                  present: employeeList.filter((e) => e.todayStatus === "present").length,
+                  late: employeeList.filter((e) => e.todayStatus === "late").length,
+                  absent: employeeList.filter((e) => e.todayStatus === "absent").length,
+                  leave: employeeList.filter((e) => e.todayStatus === "leave").length
+                };
+                const labelMap = { present: "Hadir", late: "Terlambat", absent: "Belum hadir", leave: "Izin" };
+                return (
+                  <span key={filter} className="rounded-full border border-[#edf0f5] bg-white px-3 py-1.5 text-xs font-bold text-[#596172]">
+                    {labelMap[filter]}: {countMap[filter]}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          {employeeList.length === 0 ? (
+            <LoadingState label="Memuat daftar karyawan" />
+          ) : filteredEmployees.length === 0 ? (
+            <EmptyState title="Tidak ada karyawan yang cocok" description="Coba kata kunci berbeda atau hapus filter pencarian." />
+          ) : (
+            <DataTable
+              caption="Daftar karyawan aktif"
+              columns={[
+                { key: "name", header: "Karyawan" },
+                { key: "role", header: "Role" },
+                { key: "shift", header: "Shift" },
+                { key: "checkin", header: "Check-in" },
+                { key: "status", header: "Status" },
+                { key: "validation", header: "Validasi" }
+              ]}
+              rows={filteredEmployees.map((emp) => ({
+                id: emp.id,
+                name: (
+                  <div>
+                    <p className="font-black text-[#111827]">{emp.fullName}</p>
+                    <p className="mt-1 text-xs font-semibold text-[#667085]">{emp.email}</p>
+                  </div>
+                ),
+                role: <StatusBadge tone="info">{roleLabels[emp.role]}</StatusBadge>,
+                shift: emp.shiftName ?? "-",
+                checkin: emp.checkInTime ?? "--:--",
+                status: (
+                  <StatusBadge tone={emp.todayStatus === "present" ? "success" : emp.todayStatus === "late" ? "warning" : emp.todayStatus === "leave" ? "info" : "neutral"}>
+                    {emp.todayStatus === "present" ? "Hadir" : emp.todayStatus === "late" ? "Terlambat" : emp.todayStatus === "leave" ? "Izin" : "Belum hadir"}
+                  </StatusBadge>
+                ),
+                validation: emp.validationStatus ? (
+                  <StatusBadge tone={emp.validationStatus === "verified" ? "success" : emp.validationStatus === "needs_review" ? "warning" : "danger"}>
+                    {emp.validationStatus === "verified" ? "Verified" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
+                  </StatusBadge>
+                ) : <span className="text-xs text-[#7a8495]">-</span>
+              }))}
+            />
           )}
         </Panel>
 
-        <Panel eyebrow="Exception types" title="Apa yang sedang divalidasi">
-          <div className="grid gap-3">
-            {[
-              "Outside radius",
-              "Late check-in",
-              "Invalid QR",
-              "Expired QR",
-              "Different device",
-              "Missing selfie"
-            ].map((item) => (
-              <div key={item} className="rounded-[20px] border border-[#edf0f5] bg-white p-4">
-                <p className="text-sm font-black text-[#111827]">{item}</p>
-                <p className="mt-2 text-sm leading-6 text-[#667085]">Kasus ini tidak dibuang. Taptu menyimpannya sebagai exception agar HR tetap bisa memutuskan dengan jejak audit.</p>
+        <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+          <Panel eyebrow="Exception queue" title="Attendance exceptions yang perlu keputusan">
+            {exceptionQueue.length === 0 ? (
+              <EmptyState title="Tidak ada exception aktif" description="Queue ini akan menampung kasus radius, token, selfie, atau device mismatch." />
+            ) : (
+              <div className="space-y-3">
+                {exceptionQueue.map((item) => (
+                  <article key={item.id} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-black text-[#111827]">{item.employeeName}</p>
+                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.exceptionType}</p>
+                        <p className="mt-2 text-sm leading-6 text-[#596172]">{item.reason}</p>
+                      </div>
+                      <StatusBadge tone={item.status === "Need Review" ? "warning" : item.status === "Rejected" ? "danger" : "success"}>{item.status}</StatusBadge>
+                    </div>
+                    {(isAdmin || isManager) ? (
+                      <div className="mt-4">
+                        <FormInput
+                          label="Catatan review"
+                          value={exceptionNotes[item.id] ?? ""}
+                          onChange={(event) => setExceptionNotes((current) => ({ ...current, [item.id]: event.target.value }))}
+                          placeholder="Tambahkan alasan keputusan"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <PrimaryButton onClick={() => handleExceptionDecision(item.id, "Approved")} disabled={busyAction === `exception-Approved-${item.id}`}>Approve</PrimaryButton>
+                      <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Rejected")} disabled={busyAction === `exception-Rejected-${item.id}`}>Reject</SecondaryButton>
+                      <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Request Correction")} disabled={busyAction === `exception-Request Correction-${item.id}`}>Request correction</SecondaryButton>
+                    </div>
+                  </article>
+                ))}
               </div>
-            ))}
-          </div>
-        </Panel>
-      </section>
+            )}
+          </Panel>
+
+          <Panel eyebrow="Exception types" title="Apa yang sedang divalidasi">
+            <div className="grid gap-3">
+              {["Outside radius", "Late check-in", "Invalid QR", "Expired QR", "Different device", "Missing selfie"].map((item) => (
+                <div key={item} className="rounded-[20px] border border-[#edf0f5] bg-white p-4">
+                  <p className="text-sm font-black text-[#111827]">{item}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#667085]">Kasus ini tidak dibuang. Taptu menyimpannya sebagai exception agar HR tetap bisa memutuskan dengan jejak audit.</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </section>
+      </div>
     );
   }
 
@@ -1098,40 +1322,281 @@ export function AppPage() {
 
   function renderLocationsWorkspace() {
     return (
-      <Panel eyebrow="Geofence logic" title="Validasi lokasi kerja">
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatCard label="Work location" value="Kantor Pusat" detail="Radius 150 meter" />
-          <StatCard label="Current distance" value={`${attendanceTrustSignal.distanceFromOfficeMeters ?? 0} m`} detail="Diambil dari perangkat employee saat verifikasi" />
-          <StatCard label="Validation mode" value="Persist then review" detail="Di luar radius membuat exception, bukan langsung hilang." />
-        </div>
-      </Panel>
+      <div className="grid gap-5">
+        <section className="grid gap-5 xl:grid-cols-2">
+          <Panel eyebrow="Work locations" title="Geofence dan radius validasi">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm leading-6 text-[#596172]">Lokasi kerja dipakai sebagai titik validasi GPS saat karyawan absen.</p>
+              {isAdmin && (
+                <PrimaryButton onClick={() => { setEditingLocation(null); setLocationForm({ name: "", address: "", latitude: "", longitude: "", radiusMeters: "150" }); setLocationFormOpen(true); }}>
+                  <Building2 className="mr-2 h-4 w-4" />
+                  Tambah lokasi
+                </PrimaryButton>
+              )}
+            </div>
+            {workLocations.length === 0 ? (
+              <LoadingState label="Memuat lokasi kerja" />
+            ) : (
+              <div className="space-y-3">
+                {workLocations.map((loc) => (
+                  <div key={loc.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-[#111827]">{loc.name}</p>
+                        {loc.address && <p className="mt-1 text-xs font-semibold text-[#667085]">{loc.address}</p>}
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-[#7a8495]">
+                          <span>Radius: {loc.radiusMeters} m</span>
+                          <span>Lat: {loc.latitude.toFixed(4)}</span>
+                          <span>Lng: {loc.longitude.toFixed(4)}</span>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <StatusBadge tone={loc.status === "active" ? "success" : "neutral"}>{loc.status === "active" ? "Aktif" : "Nonaktif"}</StatusBadge>
+                        {isAdmin && (
+                          <SecondaryButton
+                            onClick={() => {
+                              setEditingLocation(loc);
+                              setLocationForm({ name: loc.name, address: loc.address ?? "", latitude: String(loc.latitude), longitude: String(loc.longitude), radiusMeters: String(loc.radiusMeters) });
+                              setLocationFormOpen(true);
+                            }}
+                          >
+                            Edit
+                          </SecondaryButton>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {locationFormOpen && isAdmin && (
+              <div className="mt-5 rounded-[24px] border border-[#d6def0] bg-white p-5">
+                <p className="mb-4 text-sm font-black text-[#111827]">{editingLocation ? "Edit lokasi" : "Tambah lokasi baru"}</p>
+                <form className="grid gap-4" onSubmit={handleSaveLocation}>
+                  <FormInput label="Nama lokasi" value={locationForm.name} onChange={(e) => setLocationForm((c) => ({ ...c, name: e.target.value }))} placeholder="Kantor Pusat" required />
+                  <FormInput label="Alamat (opsional)" value={locationForm.address} onChange={(e) => setLocationForm((c) => ({ ...c, address: e.target.value }))} placeholder="Jl. Sudirman No. 1" />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormInput label="Latitude" type="number" step="any" value={locationForm.latitude} onChange={(e) => setLocationForm((c) => ({ ...c, latitude: e.target.value }))} placeholder="-6.2088" required />
+                    <FormInput label="Longitude" type="number" step="any" value={locationForm.longitude} onChange={(e) => setLocationForm((c) => ({ ...c, longitude: e.target.value }))} placeholder="106.8456" required />
+                  </div>
+                  <FormInput label="Radius (meter)" type="number" value={locationForm.radiusMeters} onChange={(e) => setLocationForm((c) => ({ ...c, radiusMeters: e.target.value }))} placeholder="150" required />
+                  <div className="flex gap-3">
+                    <PrimaryButton type="submit" disabled={busyAction === "save-location"}>{busyAction === "save-location" ? "Menyimpan..." : "Simpan lokasi"}</PrimaryButton>
+                    <SecondaryButton type="button" onClick={() => { setLocationFormOpen(false); setEditingLocation(null); }}>Batal</SecondaryButton>
+                  </div>
+                </form>
+              </div>
+            )}
+          </Panel>
+
+          <Panel eyebrow="Shift management" title="Konfigurasi waktu dan lokasi kerja">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm leading-6 text-[#596172]">Shift menentukan jam masuk, toleransi keterlambatan, dan lokasi validasi.</p>
+              {isAdmin && (
+                <PrimaryButton onClick={() => { setEditingShift(null); setShiftForm({ name: "", startTime: "", endTime: "", gracePeriodMinutes: "10", workLocationId: "", breakStartTime: "", breakEndTime: "" }); setShiftFormOpen(true); }}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Tambah shift
+                </PrimaryButton>
+              )}
+            </div>
+            {shifts.length === 0 ? (
+              <LoadingState label="Memuat shift" />
+            ) : (
+              <div className="space-y-3">
+                {shifts.map((shift) => (
+                  <div key={shift.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black text-[#111827]">{shift.name}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-[#7a8495]">
+                          <span>{shift.startTime} - {shift.endTime}</span>
+                          <span>Toleransi: {shift.gracePeriodMinutes} mnt</span>
+                          {shift.workLocationName && <span>{shift.workLocationName}</span>}
+                          {shift.breakStartTime && <span>Istirahat: {shift.breakStartTime} - {shift.breakEndTime}</span>}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <StatusBadge tone={shift.status === "active" ? "success" : "neutral"}>{shift.status === "active" ? "Aktif" : "Arsip"}</StatusBadge>
+                        {isAdmin && (
+                          <SecondaryButton
+                            onClick={() => {
+                              setEditingShift(shift);
+                              setShiftForm({ name: shift.name, startTime: shift.startTime, endTime: shift.endTime, gracePeriodMinutes: String(shift.gracePeriodMinutes), workLocationId: shift.workLocationId ?? "", breakStartTime: shift.breakStartTime ?? "", breakEndTime: shift.breakEndTime ?? "" });
+                              setShiftFormOpen(true);
+                            }}
+                          >
+                            Edit
+                          </SecondaryButton>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {shiftFormOpen && isAdmin && (
+              <div className="mt-5 rounded-[24px] border border-[#d6def0] bg-white p-5">
+                <p className="mb-4 text-sm font-black text-[#111827]">{editingShift ? "Edit shift" : "Tambah shift baru"}</p>
+                <form className="grid gap-4" onSubmit={handleSaveShift}>
+                  <FormInput label="Nama shift" value={shiftForm.name} onChange={(e) => setShiftForm((c) => ({ ...c, name: e.target.value }))} placeholder="Shift Pagi" required />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormInput label="Jam mulai" type="time" value={shiftForm.startTime} onChange={(e) => setShiftForm((c) => ({ ...c, startTime: e.target.value }))} required />
+                    <FormInput label="Jam selesai" type="time" value={shiftForm.endTime} onChange={(e) => setShiftForm((c) => ({ ...c, endTime: e.target.value }))} required />
+                  </div>
+                  <FormInput label="Toleransi terlambat (menit)" type="number" value={shiftForm.gracePeriodMinutes} onChange={(e) => setShiftForm((c) => ({ ...c, gracePeriodMinutes: e.target.value }))} />
+                  <SelectInput label="Lokasi kerja" value={shiftForm.workLocationId} onChange={(e) => setShiftForm((c) => ({ ...c, workLocationId: e.target.value }))}>
+                    <option value="">Pilih lokasi...</option>
+                    {workLocations.filter((l) => l.status === "active").map((l) => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </SelectInput>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormInput label="Istirahat mulai (opsional)" type="time" value={shiftForm.breakStartTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakStartTime: e.target.value }))} />
+                    <FormInput label="Istirahat selesai (opsional)" type="time" value={shiftForm.breakEndTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakEndTime: e.target.value }))} />
+                  </div>
+                  <div className="flex gap-3">
+                    <PrimaryButton type="submit" disabled={busyAction === "save-shift"}>{busyAction === "save-shift" ? "Menyimpan..." : "Simpan shift"}</PrimaryButton>
+                    <SecondaryButton type="button" onClick={() => { setShiftFormOpen(false); setEditingShift(null); }}>Batal</SecondaryButton>
+                  </div>
+                </form>
+              </div>
+            )}
+          </Panel>
+        </section>
+
+        <Panel eyebrow="Validation logic" title="Bagaimana lokasi dan shift dipakai">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Work locations aktif" value={String(workLocations.filter((l) => l.status === "active").length)} detail="Dipakai untuk validasi GPS karyawan" />
+            <StatCard label="Shifts aktif" value={String(shifts.filter((s) => s.status === "active").length)} detail="Menentukan jam masuk dan toleransi" />
+            <StatCard label="Validation mode" value="Persist then review" detail="Di luar radius membuat exception, bukan langsung tolak" />
+          </div>
+        </Panel>
+      </div>
     );
   }
 
   function renderReportsWorkspace() {
+    const statusOptions = ["", "Tepat waktu", "Terlambat", "Belum check-in", "Selesai", "Izin"];
+
+    const validationTone = (status: string): "success" | "warning" | "danger" | "neutral" => {
+      if (status === "verified") return "success";
+      if (status === "needs_review") return "warning";
+      if (status === "blocked" || status === "rejected") return "danger";
+      return "neutral";
+    };
+
     return (
-      <Panel eyebrow="Audit trail" title="Jejak keputusan operasional">
-        {auditLogs.length === 0 ? (
-          <EmptyState title="Belum ada audit log" description="Approve/reject exception, approval request, dan scanner invalid attempt akan tampil di sini." />
-        ) : (
-          <DataTable
-            caption="Audit logs"
-            columns={[
-              { key: "action", header: "Action" },
-              { key: "actor", header: "Actor" },
-              { key: "detail", header: "Detail" },
-              { key: "time", header: "Time" }
-            ]}
-            rows={auditLogs.map((item) => ({
-              id: item.id,
-              action: item.action,
-              actor: `${item.actorName} · ${item.actorRole}`,
-              detail: item.detail,
-              time: new Date(item.createdAt).toLocaleString("id-ID")
-            }))}
-          />
+      <div className="grid gap-5">
+        <Panel eyebrow="Report filters" title="Filter laporan kehadiran">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <FormInput label="Dari tanggal" type="date" value={reportFilters.dateFrom} onChange={(e) => setReportFilters((c) => ({ ...c, dateFrom: e.target.value }))} />
+            <FormInput label="Sampai tanggal" type="date" value={reportFilters.dateTo} onChange={(e) => setReportFilters((c) => ({ ...c, dateTo: e.target.value }))} />
+            <SelectInput label="Status absensi" value={reportFilters.status} onChange={(e) => setReportFilters((c) => ({ ...c, status: e.target.value }))}>
+              {statusOptions.map((opt) => <option key={opt} value={opt}>{opt || "Semua status"}</option>)}
+            </SelectInput>
+            <div className="flex items-end gap-2">
+              <PrimaryButton className="flex-1" onClick={handleApplyReportFilters} disabled={busyAction === "report-filter"}>
+                {busyAction === "report-filter" ? "Memfilter..." : "Terapkan filter"}
+              </PrimaryButton>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel eyebrow="Attendance report" title="Rekap kehadiran validasi">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm leading-6 text-[#596172]">
+              {reportRows.length} baris data{reportFilters.status || reportFilters.dateFrom ? " (filter aktif)" : ""}.
+              Laporan mencakup status validasi, lokasi, perangkat, dan selfie proof.
+            </p>
+            <div className="flex gap-2">
+              <SecondaryButton onClick={() => setShowAuditTrail(!showAuditTrail)}>
+                {showAuditTrail ? "Sembunyikan audit" : "Lihat audit trail"}
+              </SecondaryButton>
+              <PrimaryButton onClick={handleExportCsv} data-testid="export-csv-button">
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </PrimaryButton>
+            </div>
+          </div>
+          {!reportLoaded ? (
+            <LoadingState label="Memuat laporan" />
+          ) : reportRows.length === 0 ? (
+            <EmptyState title="Tidak ada data laporan" description="Coba ubah filter atau pastikan sudah ada data absensi hari ini." />
+          ) : (
+            <DataTable
+              caption="Laporan kehadiran"
+              columns={[
+                { key: "employee", header: "Karyawan" },
+                { key: "date", header: "Tanggal" },
+                { key: "shift", header: "Shift" },
+                { key: "checkin", header: "Check-in" },
+                { key: "checkout", header: "Check-out" },
+                { key: "status", header: "Status" },
+                { key: "validation", header: "Validasi" },
+                { key: "flags", header: "Flags" }
+              ]}
+              rows={reportRows.map((row) => ({
+                id: row.id,
+                employee: (
+                  <div>
+                    <p className="font-black text-[#111827]">{row.employeeName}</p>
+                    <p className="mt-1 text-xs font-semibold text-[#667085]">{row.workLocationName}</p>
+                  </div>
+                ),
+                date: row.date,
+                shift: row.shiftName,
+                checkin: row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--",
+                checkout: row.checkOutTime ? row.checkOutTime.slice(11, 16) : "--:--",
+                status: (
+                  <StatusBadge tone={row.status === "Belum check-in" ? "neutral" : row.status === "Terlambat" ? "warning" : row.status === "Izin" ? "info" : "success"}>
+                    {row.status}
+                  </StatusBadge>
+                ),
+                validation: (
+                  <StatusBadge tone={validationTone(row.validationStatus)}>
+                    {row.validationStatus === "verified" ? "Verified" : row.validationStatus === "needs_review" ? "Review" : row.validationStatus}
+                  </StatusBadge>
+                ),
+                flags: (
+                  <div className="flex flex-wrap gap-1">
+                    {row.isLate && <span className="rounded-full bg-[#fff8ed] px-2 py-1 text-xs font-bold text-[#8a5c00]">Late</span>}
+                    {row.hasException && <span className="rounded-full bg-[#fff5f5] px-2 py-1 text-xs font-bold text-[#8a2f2f]">Exception</span>}
+                    {row.selfieProof && <span className="rounded-full bg-[#f0fdf4] px-2 py-1 text-xs font-bold text-[#16a34a]">Selfie</span>}
+                    {row.deviceValidated && <span className="rounded-full bg-[#f1f5ff] px-2 py-1 text-xs font-bold text-[#1769ff]">Device</span>}
+                  </div>
+                )
+              }))}
+            />
+          )}
+        </Panel>
+
+        {showAuditTrail && (
+          <Panel eyebrow="Audit trail" title="Jejak keputusan operasional">
+            {auditLogs.length === 0 ? (
+              <EmptyState title="Belum ada audit log" description="Approve/reject exception, approval request, dan scanner invalid attempt akan tampil di sini." />
+            ) : (
+              <DataTable
+                caption="Audit logs"
+                columns={[
+                  { key: "action", header: "Action" },
+                  { key: "actor", header: "Actor" },
+                  { key: "detail", header: "Detail" },
+                  { key: "time", header: "Time" }
+                ]}
+                rows={auditLogs.map((item) => ({
+                  id: item.id,
+                  action: item.action,
+                  actor: `${item.actorName} · ${item.actorRole}`,
+                  detail: item.detail,
+                  time: new Date(item.createdAt).toLocaleString("id-ID")
+                }))}
+              />
+            )}
+          </Panel>
         )}
-      </Panel>
+      </div>
     );
   }
 

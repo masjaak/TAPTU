@@ -2,9 +2,11 @@ import type {
   AdminOverview,
   AttendanceActionResponse,
   AttendanceExceptionItem,
+  AttendanceReportRow,
   AttendanceTimelineItem,
   AuditLogItem,
   DashboardPayload,
+  EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
   LoginRequest,
@@ -12,19 +14,25 @@ import type {
   RegisterRequest,
   RequestActionResponse,
   ScannerTokenPayload,
-  ValidationDecisionPayload
+  ShiftRecord,
+  ValidationDecisionPayload,
+  WorkLocationItem
 } from "@taptu/shared";
 
 import {
   getDemoAdminOverview,
   getDemoAttendanceHistory,
   getDemoDashboard,
+  getDemoEmployeeList,
   getDemoExceptionQueue,
   getDemoEmployeeSummary,
   getDemoRequests,
   getDemoAuditLogs,
+  getDemoReportRows,
   getDemoScannerState,
   getDemoScannerToken,
+  getDemoShifts,
+  getDemoWorkLocations,
   isDemoToken,
   tryDemoLogin
 } from "./demo";
@@ -219,6 +227,110 @@ export async function reviewException(token: string, id: string, payload: Valida
 export async function fetchAuditLogs(token: string) {
   if (isDemoToken(token)) return Promise.resolve(getDemoAuditLogs());
   return requestJson<AuditLogItem[]>("/admin/audit-logs", {}, token);
+}
+
+export async function fetchEmployeeList(token: string): Promise<EmployeeListItem[]> {
+  if (isDemoToken(token)) return Promise.resolve(getDemoEmployeeList());
+  return requestJson<EmployeeListItem[]>("/admin/employees", {}, token);
+}
+
+export async function fetchWorkLocations(token: string): Promise<WorkLocationItem[]> {
+  if (isDemoToken(token)) return Promise.resolve(getDemoWorkLocations());
+  return requestJson<WorkLocationItem[]>("/admin/work-locations", {}, token);
+}
+
+export async function createWorkLocation(token: string, payload: Omit<WorkLocationItem, "id" | "status" | "createdAt">): Promise<WorkLocationItem> {
+  if (isDemoToken(token)) {
+    return Promise.resolve({ ...payload, id: `loc-${Date.now()}`, status: "active", createdAt: new Date().toISOString() });
+  }
+  return requestJson<WorkLocationItem>("/admin/work-locations", { method: "POST", body: JSON.stringify(payload) }, token);
+}
+
+export async function updateWorkLocation(token: string, id: string, patch: Partial<WorkLocationItem>): Promise<WorkLocationItem> {
+  if (isDemoToken(token)) {
+    const all = getDemoWorkLocations();
+    const found = all.find((l) => l.id === id) ?? all[0];
+    return Promise.resolve({ ...found, ...patch });
+  }
+  return requestJson<WorkLocationItem>(`/admin/work-locations/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
+}
+
+export async function fetchShifts(token: string): Promise<ShiftRecord[]> {
+  if (isDemoToken(token)) return Promise.resolve(getDemoShifts());
+  return requestJson<ShiftRecord[]>("/admin/shifts", {}, token);
+}
+
+export async function createShift(token: string, payload: Omit<ShiftRecord, "id" | "status" | "createdAt" | "updatedAt">): Promise<ShiftRecord> {
+  if (isDemoToken(token)) {
+    const now = new Date().toISOString();
+    return Promise.resolve({ ...payload, id: `shift-${Date.now()}`, status: "active", createdAt: now, updatedAt: now });
+  }
+  return requestJson<ShiftRecord>("/admin/shifts", { method: "POST", body: JSON.stringify(payload) }, token);
+}
+
+export async function updateShift(token: string, id: string, patch: Partial<ShiftRecord>): Promise<ShiftRecord> {
+  if (isDemoToken(token)) {
+    const all = getDemoShifts();
+    const found = all.find((s) => s.id === id) ?? all[0];
+    return Promise.resolve({ ...found, ...patch });
+  }
+  return requestJson<ShiftRecord>(`/admin/shifts/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
+}
+
+export async function fetchReportRows(token: string, filters?: { dateFrom?: string; dateTo?: string; employeeId?: string; status?: string }): Promise<AttendanceReportRow[]> {
+  if (isDemoToken(token)) {
+    const rows = getDemoReportRows();
+    if (filters?.status) return Promise.resolve(rows.filter((r) => r.status === filters.status));
+    if (filters?.employeeId) return Promise.resolve(rows.filter((r) => r.employeeId === filters.employeeId));
+    return Promise.resolve(rows);
+  }
+  const params = new URLSearchParams();
+  if (filters?.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters?.dateTo) params.set("dateTo", filters.dateTo);
+  if (filters?.employeeId) params.set("employeeId", filters.employeeId);
+  if (filters?.status) params.set("status", filters.status);
+  const query = params.toString();
+  return requestJson<AttendanceReportRow[]>(`/admin/reports${query ? `?${query}` : ""}`, {}, token);
+}
+
+export function exportReportCsv(rows: AttendanceReportRow[], fileName?: string): void {
+  const headers = [
+    "Employee Name", "Employee ID", "Date", "Shift", "Work Location",
+    "Check-in Time", "Check-out Time", "Status", "Validation Status",
+    "Validation Reasons", "Latitude", "Longitude", "Is Late", "Has Exception",
+    "Selfie Proof", "Device Validated", "Approval Status", "Admin Note"
+  ];
+
+  const escape = (value: string | number | boolean | undefined) => {
+    if (value === undefined || value === null) return "";
+    const str = String(value);
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) return `"${str.replace(/"/g, '""')}"`;
+    return str;
+  };
+
+  const dataRows = rows.map((row) => [
+    escape(row.employeeName), escape(row.employeeId), escape(row.date),
+    escape(row.shiftName), escape(row.workLocationName),
+    escape(row.checkInTime ? row.checkInTime.slice(11, 16) : ""),
+    escape(row.checkOutTime ? row.checkOutTime.slice(11, 16) : ""),
+    escape(row.status), escape(row.validationStatus),
+    escape(row.validationReasons.join(" | ")),
+    escape(row.locationLat), escape(row.locationLng),
+    escape(row.isLate), escape(row.hasException),
+    escape(row.selfieProof), escape(row.deviceValidated),
+    escape(row.approvalStatus ?? ""), escape(row.adminNote ?? "")
+  ].join(","));
+
+  const csv = [headers.join(","), ...dataRows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName ?? `taptu-attendance-report-${new Date().toISOString().slice(0, 7)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 async function requestJson<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {

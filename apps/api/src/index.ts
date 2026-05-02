@@ -8,6 +8,7 @@ import { z } from "zod";
 import type {
   AdminOverview,
   AttendanceExceptionItem,
+  AttendanceReportFilters,
   AttendanceTimelineItem,
   AttendanceActionResponse,
   AttendanceValidationStatus,
@@ -27,19 +28,25 @@ import type {
 } from "@taptu/shared";
 import {
   appendScannerAttempt,
+  buildAttendanceReportRows,
   calculateDistanceMeters,
   computeAdminOverview,
+  computeEmployeeList,
   computeEmployeeSummary,
   createAttendanceException,
   createAuditLog,
   createInitialStore,
+  createShiftRecord,
+  createWorkLocationItem,
   filterAttendanceHistory,
+  generateCsvFromRows,
   generateScannerToken,
   reduceAttendance,
   reduceExceptionReview,
   reduceRequests,
   refreshScannerToken,
   toExceptionItem,
+  updateShiftRecord,
   validateAttendanceSubmission,
   validateScannerToken,
   type AttendanceMode
@@ -1316,6 +1323,170 @@ app.get("/api/admin/audit-logs", async (req, res) => {
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, 20)
   );
+});
+
+// Employee list
+app.get("/api/admin/employees", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const employeeUsers = users.filter((u) => u.role === "employee" || u.role === "manager");
+  const list = computeEmployeeList(store, employeeUsers);
+  return res.json(list);
+});
+
+// Work locations
+app.get("/api/admin/work-locations", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  return res.json(store.workLocationItems);
+});
+
+const workLocationSchema = z.object({
+  name: z.string().min(2),
+  address: z.string().optional(),
+  latitude: z.number(),
+  longitude: z.number(),
+  radiusMeters: z.number().min(10).max(5000)
+});
+
+app.post("/api/admin/work-locations", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const parsed = workLocationSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data lokasi tidak valid." });
+
+  const location = createWorkLocationItem(parsed.data);
+  store.workLocationItems = [...store.workLocationItems, location];
+  store.workLocations = [...store.workLocations, {
+    id: location.id,
+    name: location.name,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    radiusMeters: location.radiusMeters
+  }];
+  await storage.save(store);
+  return res.status(201).json(location);
+});
+
+app.patch("/api/admin/work-locations/:id", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const existing = store.workLocationItems.find((l) => l.id === req.params.id);
+  if (!existing) return res.status(404).json({ message: "Lokasi tidak ditemukan." });
+
+  const patchSchema = workLocationSchema.partial().extend({ status: z.enum(["active", "inactive"]).optional() });
+  const parsed = patchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data update tidak valid." });
+
+  const updated = { ...existing, ...parsed.data };
+  store.workLocationItems = store.workLocationItems.map((l) => l.id === req.params.id ? updated : l);
+  await storage.save(store);
+  return res.json(updated);
+});
+
+// Shifts
+app.get("/api/admin/shifts", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  return res.json(store.shifts);
+});
+
+const shiftSchema = z.object({
+  name: z.string().min(2),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Format hh:mm"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Format hh:mm"),
+  gracePeriodMinutes: z.number().min(0).max(60).optional(),
+  workLocationId: z.string().optional(),
+  workLocationName: z.string().optional(),
+  breakStartTime: z.string().optional(),
+  breakEndTime: z.string().optional()
+});
+
+app.post("/api/admin/shifts", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const parsed = shiftSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data shift tidak valid." });
+
+  const location = store.workLocationItems.find((l) => l.id === parsed.data.workLocationId);
+  const shift = createShiftRecord({
+    ...parsed.data,
+    workLocationName: location?.name ?? parsed.data.workLocationName
+  });
+  store.shifts = [...store.shifts, shift];
+  await storage.save(store);
+  return res.status(201).json(shift);
+});
+
+app.patch("/api/admin/shifts/:id", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const existing = store.shifts.find((s) => s.id === req.params.id);
+  if (!existing) return res.status(404).json({ message: "Shift tidak ditemukan." });
+
+  const patchSchema = shiftSchema.partial().extend({ status: z.enum(["active", "archived"]).optional() });
+  const parsed = patchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data update shift tidak valid." });
+
+  const updated = updateShiftRecord(existing, parsed.data);
+  store.shifts = store.shifts.map((s) => s.id === req.params.id ? updated : s);
+  await storage.save(store);
+  return res.json(updated);
+});
+
+// Attendance reports
+app.get("/api/admin/reports", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const filters: AttendanceReportFilters = {
+    dateFrom: typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined,
+    dateTo: typeof req.query.dateTo === "string" ? req.query.dateTo : undefined,
+    employeeId: typeof req.query.employeeId === "string" ? req.query.employeeId : undefined,
+    status: typeof req.query.status === "string" ? req.query.status : undefined
+  };
+
+  const dir = Object.fromEntries(users.map((u) => [u.id, u.fullName]));
+  const rows = buildAttendanceReportRows(store, dir, filters);
+
+  if (req.query.format === "csv") {
+    const csv = generateCsvFromRows(rows);
+    const today = new Date().toISOString().slice(0, 7);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="taptu-attendance-report-${today}.csv"`);
+    return res.send(csv);
+  }
+
+  return res.json(rows);
 });
 
 app.get("/api/scanner/state", async (req, res) => {

@@ -5,13 +5,18 @@ import type {
   AttendanceExceptionStatus,
   AttendanceExceptionType,
   AttendanceRecord as SharedAttendanceRecord,
+  AttendanceReportFilters,
+  AttendanceReportRow,
   AttendanceState,
   AttendanceTimelineItem,
   AttendanceValidationStatus,
   AuditLogItem,
+  EmployeeListItem,
   ShiftInfo,
+  ShiftRecord,
   UserRole,
-  WorkLocation
+  WorkLocation,
+  WorkLocationItem
 } from "@taptu/shared";
 
 export type AttendanceMode = "QR" | "GPS" | "Selfie" | "Manual";
@@ -110,6 +115,8 @@ export interface DemoStore {
   exceptions: ExceptionRecord[];
   auditLogs: AuditLogRecord[];
   workLocations: WorkLocation[];
+  workLocationItems: WorkLocationItem[];
+  shifts: ShiftRecord[];
 }
 
 export interface ValidationContext {
@@ -770,6 +777,258 @@ export function createInitialStore(): DemoStore {
         createdAt: "2026-05-02T08:09:00.000Z"
       }
     ],
-    workLocations: [DEFAULT_LOCATION]
+    workLocations: [DEFAULT_LOCATION],
+    workLocationItems: [
+      {
+        id: "loc-hq",
+        name: "Kantor Pusat",
+        address: "Jl. Sudirman No. 1, Jakarta Pusat",
+        latitude: -6.2088,
+        longitude: 106.8456,
+        radiusMeters: 150,
+        status: "active" as const,
+        createdAt: "2026-05-01T00:00:00.000Z"
+      },
+      {
+        id: "loc-branch",
+        name: "Kantor Cabang Selatan",
+        address: "Jl. TB Simatupang No. 88, Jakarta Selatan",
+        latitude: -6.295,
+        longitude: 106.814,
+        radiusMeters: 100,
+        status: "active" as const,
+        createdAt: "2026-05-01T00:00:00.000Z"
+      }
+    ],
+    shifts: [
+      {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        gracePeriodMinutes: 10,
+        workLocationId: "loc-hq",
+        workLocationName: "Kantor Pusat",
+        breakStartTime: "12:00",
+        breakEndTime: "13:00",
+        status: "active" as const,
+        createdAt: "2026-05-01T00:00:00.000Z",
+        updatedAt: "2026-05-01T00:00:00.000Z"
+      },
+      {
+        id: "shift-sore",
+        name: "Shift Sore",
+        startTime: "13:00",
+        endTime: "22:00",
+        gracePeriodMinutes: 10,
+        workLocationId: "loc-hq",
+        workLocationName: "Kantor Pusat",
+        status: "active" as const,
+        createdAt: "2026-05-01T00:00:00.000Z",
+        updatedAt: "2026-05-01T00:00:00.000Z"
+      }
+    ]
   };
+}
+
+export function computeEmployeeList(
+  store: DemoStore,
+  rawUsers: Array<{ id: string; fullName: string; email: string; role: UserRole }>
+): EmployeeListItem[] {
+  return rawUsers
+    .filter((user) => user.role === "employee" || user.role === "manager")
+    .map((user) => {
+      const record = store.attendance[user.id];
+      let todayStatus: EmployeeListItem["todayStatus"] = "absent";
+      let checkInTime: string | undefined;
+      let validationStatus: AttendanceValidationStatus | undefined;
+
+      if (record) {
+        if (record.state === "checked_in" || record.state === "checked_out") {
+          todayStatus = record.status === "Terlambat" ? "late" : "present";
+          checkInTime = record.checkInAt?.slice(11, 16);
+          validationStatus = record.validationStatus;
+        }
+      }
+
+      const hasLeave = store.requests.some(
+        (r) => r.userId === user.id && r.status === "Disetujui" && (r.category === "Izin" || r.category === "Cuti" || r.category === "Sakit")
+      );
+      if (hasLeave && todayStatus === "absent") {
+        todayStatus = "leave";
+      }
+
+      return {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        todayStatus,
+        checkInTime,
+        validationStatus,
+        shiftName: DEFAULT_SHIFT.name,
+        locationName: DEFAULT_LOCATION.name
+      };
+    });
+}
+
+export function createShiftRecord(data: {
+  name: string;
+  startTime: string;
+  endTime: string;
+  gracePeriodMinutes?: number;
+  workLocationId?: string;
+  workLocationName?: string;
+  breakStartTime?: string;
+  breakEndTime?: string;
+}): ShiftRecord {
+  const now = new Date().toISOString();
+  return {
+    id: `shift-${Date.now()}`,
+    name: data.name,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    gracePeriodMinutes: data.gracePeriodMinutes ?? 10,
+    workLocationId: data.workLocationId,
+    workLocationName: data.workLocationName,
+    breakStartTime: data.breakStartTime,
+    breakEndTime: data.breakEndTime,
+    status: "active",
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export function updateShiftRecord(existing: ShiftRecord, patch: Partial<ShiftRecord>): ShiftRecord {
+  return { ...existing, ...patch, id: existing.id, updatedAt: new Date().toISOString() };
+}
+
+export function createWorkLocationItem(data: {
+  name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+}): WorkLocationItem {
+  const now = new Date().toISOString();
+  return {
+    id: `loc-${Date.now()}`,
+    name: data.name,
+    address: data.address,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    radiusMeters: data.radiusMeters,
+    status: "active",
+    createdAt: now
+  };
+}
+
+export function buildAttendanceReportRows(
+  store: DemoStore,
+  userDirectory: Record<string, string>,
+  filters?: AttendanceReportFilters
+): AttendanceReportRow[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows: AttendanceReportRow[] = [];
+
+  for (const [userId, record] of Object.entries(store.attendance)) {
+    const employeeName = userDirectory[userId] ?? "Employee";
+
+    if (filters?.employeeId && filters.employeeId !== userId) continue;
+    if (filters?.status && record.status !== filters.status) continue;
+
+    const hasException = store.exceptions.some((e) => e.attendanceRecordId === record.id && (e.status === "Need Review" || e.status === "Request Correction"));
+    const approvedLeave = store.requests.find((r) => r.userId === userId && r.status === "Disetujui" && (r.category === "Izin" || r.category === "Cuti" || r.category === "Sakit"));
+
+    rows.push({
+      id: record.id ?? `report-${userId}`,
+      employeeName,
+      employeeId: userId,
+      date: today,
+      shiftName: record.shiftName,
+      workLocationName: record.locationName,
+      checkInTime: record.checkInAt,
+      checkOutTime: record.checkOutAt,
+      status: record.status,
+      validationStatus: record.validationStatus,
+      validationReasons: record.validationReasons,
+      locationLat: record.locationLat,
+      locationLng: record.locationLng,
+      isLate: record.status === "Terlambat",
+      hasException,
+      selfieProof: Boolean(record.selfieUrl),
+      deviceValidated: Boolean(record.deviceId),
+      approvalStatus: approvedLeave?.status,
+      adminNote: undefined
+    });
+  }
+
+  for (const histItem of store.attendanceHistory) {
+    if (histItem.day === "Hari ini") continue;
+    if (filters?.status && histItem.status !== filters.status) continue;
+
+    const alreadyCovered = rows.some((r) => r.id === histItem.id);
+    if (alreadyCovered) continue;
+
+    rows.push({
+      id: histItem.id ?? `hist-${histItem.day}`,
+      employeeName: userDirectory[Object.keys(store.attendance)[0]] ?? "Employee",
+      employeeId: Object.keys(store.attendance)[0] ?? "unknown",
+      date: histItem.day,
+      shiftName: DEFAULT_SHIFT.name,
+      workLocationName: DEFAULT_LOCATION.name,
+      checkInTime: undefined,
+      checkOutTime: undefined,
+      status: histItem.status === "Izin" ? "Izin" : histItem.status,
+      validationStatus: "verified",
+      validationReasons: [],
+      isLate: histItem.status === "Terlambat",
+      hasException: false,
+      selfieProof: false,
+      deviceValidated: false
+    });
+  }
+
+  return rows;
+}
+
+export function generateCsvFromRows(rows: AttendanceReportRow[]): string {
+  const headers = [
+    "Employee Name", "Employee ID", "Date", "Shift", "Work Location",
+    "Check-in Time", "Check-out Time", "Status", "Validation Status",
+    "Validation Reasons", "Latitude", "Longitude", "Is Late", "Has Exception",
+    "Selfie Proof", "Device Validated", "Approval Status", "Admin Note"
+  ];
+
+  const escape = (value: string | number | boolean | undefined) => {
+    if (value === undefined || value === null) return "";
+    const str = String(value);
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const dataRows = rows.map((row) => [
+    escape(row.employeeName),
+    escape(row.employeeId),
+    escape(row.date),
+    escape(row.shiftName),
+    escape(row.workLocationName),
+    escape(row.checkInTime ? row.checkInTime.slice(11, 16) : ""),
+    escape(row.checkOutTime ? row.checkOutTime.slice(11, 16) : ""),
+    escape(row.status),
+    escape(row.validationStatus),
+    escape(row.validationReasons.join(" | ")),
+    escape(row.locationLat),
+    escape(row.locationLng),
+    escape(row.isLate),
+    escape(row.hasException),
+    escape(row.selfieProof),
+    escape(row.deviceValidated),
+    escape(row.approvalStatus ?? ""),
+    escape(row.adminNote ?? "")
+  ].join(","));
+
+  return [headers.join(","), ...dataRows].join("\n");
 }
