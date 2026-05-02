@@ -19,7 +19,7 @@ export const router = createBrowserRouter([
     element: <RegisterPage />
   },
   {
-    path: "/app",
+    path: "/app/:section?",
     element: <AppPage />
   }
 ]);

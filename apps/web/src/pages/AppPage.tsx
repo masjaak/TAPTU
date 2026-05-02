@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Bell,
   CheckCircle2,
@@ -29,7 +29,13 @@ import type {
 } from "@taptu/shared";
 
 import { Button } from "../components/Button";
-import { Shell } from "../components/Shell";
+import {
+  AppShell,
+  EmptyState,
+  PageHeader,
+  Panel,
+  SecondaryButton
+} from "../components/app";
 import { StatusPill } from "../components/StatusPill";
 import {
   approveRequest,
@@ -46,7 +52,7 @@ import {
   getDashboard,
   refreshScannerToken
 } from "../lib/api";
-import { getTabsForRole, transitionTab, type AppTabKey } from "../lib/appShellState";
+import { getNavigationForRole, toAppSection, type AppTabKey } from "../lib/appShellState";
 import {
   calculateDistanceMeters,
   evaluateAttendanceTrust,
@@ -61,6 +67,10 @@ const attendanceFilters = ["all", "present", "issue"] as const;
 
 export function AppPage() {
   const session = readSession();
+  const navigate = useNavigate();
+  const { section } = useParams<{ section?: string }>();
+  const sessionRole = session?.user.role ?? "employee";
+  const activeSection = useMemo(() => toAppSection(section, sessionRole), [section, sessionRole]);
   const [stats, setStats] = useState<DashboardStat[]>([]);
   const [schedule, setSchedule] = useState<DashboardScheduleItem[]>([]);
   const [attendance, setAttendance] = useState<AttendanceTimelineItem[]>([]);
@@ -69,7 +79,7 @@ export function AppPage() {
   const [scannerToken, setScannerToken] = useState<string | undefined>();
   const [scannerMeta, setScannerMeta] = useState<{ expiresInSeconds: number; scansToday: number; locationName: string } | null>(null);
   const [greeting, setGreeting] = useState("");
-  const [tab, setTab] = useState<AppTabKey>("home");
+  const [tab, setTab] = useState<AppTabKey>(activeSection);
   const [requestForm, setRequestForm] = useState({
     category: "Izin" as "Izin" | "Cuti" | "Sakit",
     startDate: "",
@@ -91,7 +101,7 @@ export function AppPage() {
   });
   const groupedAttendance = groupAttendanceHistory(attendance);
 
-  const tabs = useMemo(() => getTabsForRole(session?.user.role ?? "employee"), [session?.user.role]);
+  const appNavigation = useMemo(() => getNavigationForRole(sessionRole), [sessionRole]);
   const attendanceTrust = useMemo(
     () => evaluateAttendanceTrust(attendanceTrustSignal, secureAttendancePolicy),
     [attendanceTrustSignal]
@@ -119,6 +129,10 @@ export function AppPage() {
         location.assign("/login");
       });
   }, [session]);
+
+  useEffect(() => {
+    setTab(activeSection);
+  }, [activeSection]);
 
   useEffect(() => {
     if (!session) {
@@ -392,27 +406,43 @@ export function AppPage() {
     }
   }
 
+  const roleLabel = {
+    superadmin: "Superadmin",
+    admin: "Admin HR",
+    employee: "Employee",
+    scanner: "Scanner Kiosk"
+  }[currentSession.user.role];
+
   return (
-    <Shell>
-      <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
-        <main className="mx-auto flex max-w-7xl flex-col gap-6 overflow-hidden rounded-[34px] border border-white/70 bg-[#f9fafc] p-4 shadow-[0_34px_90px_rgba(20,24,31,0.16)] sm:p-6 lg:p-8">
-        <header className="flex flex-col gap-5 rounded-[28px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] md:flex-row md:items-center md:justify-between md:p-6">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">{currentSession.user.role} workspace</p>
-            <h1 className="font-display mt-3 text-2xl font-bold tracking-[-0.03em] text-[#101217] sm:text-4xl">{greeting || `Halo, ${currentSession.user.fullName}`}</h1>
-            <p className="mt-2 max-w-2xl text-base leading-7 text-[#596172]">{currentSession.user.organizationName} · Attendance desk dengan guard waktu, lokasi, dan integritas perangkat.</p>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              clearSession();
-              location.assign("/login");
-            }}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Keluar
-          </Button>
-        </header>
+    <AppShell
+      user={{
+        fullName: currentSession.user.fullName,
+        organizationName: currentSession.user.organizationName,
+        roleLabel
+      }}
+      navigation={appNavigation}
+      activeKey={tab}
+      onNavigate={(item) => {
+        setTab(item.key as AppTabKey);
+        navigate(item.path);
+      }}
+      actions={
+        <SecondaryButton
+          onClick={() => {
+            clearSession();
+            location.assign("/login");
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Keluar
+        </SecondaryButton>
+      }
+    >
+        <PageHeader
+          eyebrow={`${roleLabel} workspace`}
+          title={greeting || `Halo, ${currentSession.user.fullName}`}
+          description={`${currentSession.user.organizationName} · Attendance desk dengan guard waktu, lokasi, dan integritas perangkat.`}
+        />
 
         {feedback ? (
           <div
@@ -425,39 +455,6 @@ export function AppPage() {
             {feedback.message}
           </div>
         ) : null}
-
-        <nav className="sticky top-4 z-10 rounded-[24px] border border-[#edf0f5] bg-white/92 p-2 shadow-[0_18px_44px_rgba(20,24,31,0.10)] backdrop-blur">
-          <div className={`grid gap-2 ${tabs.length >= 5 ? "grid-cols-5" : "grid-cols-4"}`}>
-            {tabs.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() =>
-                  setTab((current) =>
-                    transitionTab(currentSession.user.role, current, {
-                      type:
-                        item.key === "home"
-                          ? "OPEN_HOME"
-                          : item.key === "attendance"
-                            ? "OPEN_ATTENDANCE"
-                            : item.key === "requests"
-                              ? "OPEN_REQUESTS"
-                              : item.key === "scanner"
-                                ? "OPEN_SCANNER"
-                                : "OPEN_PROFILE"
-                    })
-                  )
-                }
-                className={`flex flex-col items-center justify-center rounded-[18px] px-2 py-3 text-center text-xs font-bold transition ${
-                  tab === item.key ? "bg-[#111827] text-white" : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
-                }`}
-              >
-                <item.icon className="mb-2 h-4 w-4" />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </nav>
 
         {tab === "home" ? (
           <>
@@ -1005,8 +1002,26 @@ export function AppPage() {
             </div>
           </section>
         ) : null}
-        </main>
-      </div>
-    </Shell>
+
+        {(["team", "locations", "reports", "settings"] as AppTabKey[]).includes(tab) ? (
+          <Panel
+            eyebrow="Design foundation"
+            title={
+              tab === "team"
+                ? "Tim dan struktur kerja"
+                : tab === "locations"
+                  ? "Lokasi dan geofence"
+                  : tab === "reports"
+                    ? "Laporan operasional"
+                    : "Pengaturan workspace"
+            }
+          >
+            <EmptyState
+              title="Section shell sudah siap"
+              description="Phase ini menyiapkan layout, navigasi, dan komponen bersama. Data produk detail akan diisi pada phase berikutnya."
+            />
+          </Panel>
+        ) : null}
+    </AppShell>
   );
 }
