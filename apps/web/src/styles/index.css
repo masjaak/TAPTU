@@ -6,8 +6,8 @@
 
 :root {
   font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
-  color: #15231f;
-  background: #f3f1eb;
+  color: #101217;
+  background: #e9eaec;
 }
 
 html,
@@ -18,7 +18,7 @@ body,
 
 body {
   margin: 0;
-  background: #f3f1eb;
+  background: #e9eaec;
 }
 
 * {

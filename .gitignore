@@ -6,5 +6,4 @@ dist
 !.env.example
 !**/.env.example
 coverage
-apps/web/ios
 apps/web/.capacitor

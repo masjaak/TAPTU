@@ -96,9 +96,9 @@ const useSupabase = apiConfig.storageMode === "supabase";
 let sb: SupabaseAdmin | null = null;
 if (useSupabase) {
   sb = createSupabaseAdmin(apiConfig);
-  console.log("Supabase mode enabled — using relational tables.");
+  console.log("Supabase mode enabled - using relational tables.");
 } else {
-  console.log("Local-demo mode — using file-backed JSON store.");
+  console.log("Local-demo mode - using file-backed JSON store.");
 }
 
 const roleStats: Record<UserRole, DashboardStat[]> = {
@@ -240,7 +240,7 @@ async function requireUserAsync(req: express.Request, res: express.Response): Pr
   return user;
 }
 
-// Sync version kept for backward compat — delegates to local-only auth
+// Sync version kept for backward compat. Delegates to local-only auth.
 function requireUser(req: express.Request, res: express.Response): AuthUser | null {
   const user = authenticate(req.header("authorization"));
 
@@ -793,6 +793,5 @@ app.get("/api/scanner/token", async (req, res) => {
 app.listen(port, () => {
   console.log(`Taptu API listening on http://localhost:${port}`);
 });
-
 
 

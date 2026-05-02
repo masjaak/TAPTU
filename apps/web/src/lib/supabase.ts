@@ -5,7 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 
 /**
  * Supabase client for the web frontend.
- * Uses the anon (public) key — all operations go through RLS.
+ * Uses the anon (public) key. All operations go through RLS.
  *
  * If VITE_SUPABASE_URL is not set, the client will be null
  * and the app falls back to the Express API.

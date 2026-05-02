@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Bell, Clock3, LogOut, MapPinned, QrCode, ScanFace, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  Clock3,
+  Crosshair,
+  LockKeyhole,
+  LogOut,
+  MapPinned,
+  QrCode,
+  Radar,
+  RefreshCw,
+  ScanFace,
+  ShieldCheck,
+  SmartphoneNfc,
+  TrendingUp,
+  Users
+} from "lucide-react";
 
 import type {
   AdminOverview,
@@ -31,6 +47,12 @@ import {
   refreshScannerToken
 } from "../lib/api";
 import { getTabsForRole, transitionTab, type AppTabKey } from "../lib/appShellState";
+import {
+  calculateDistanceMeters,
+  evaluateAttendanceTrust,
+  secureAttendancePolicy,
+  type AttendanceTrustSignal
+} from "../lib/attendanceTrust";
 import { formatAttendanceGroupLabel, groupAttendanceHistory, nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow";
 import { clearSession, readSession } from "../lib/session";
 
@@ -61,9 +83,19 @@ export function AppPage() {
   const [employeeSummary, setEmployeeSummary] = useState<EmployeeSummary | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [attendanceTrustSignal, setAttendanceTrustSignal] = useState<AttendanceTrustSignal>({
+    serverTimeSkewMinutes: 0,
+    distanceFromOfficeMeters: 96,
+    locationAccuracyMeters: 24,
+    mockLocationDetected: false
+  });
   const groupedAttendance = groupAttendanceHistory(attendance);
 
   const tabs = useMemo(() => getTabsForRole(session?.user.role ?? "employee"), [session?.user.role]);
+  const attendanceTrust = useMemo(
+    () => evaluateAttendanceTrust(attendanceTrustSignal, secureAttendancePolicy),
+    [attendanceTrustSignal]
+  );
   const scannerRoleActive = session?.user.role === "scanner";
   const isAdmin = session?.user.role === "admin" || session?.user.role === "superadmin";
 
@@ -166,7 +198,61 @@ export function AppPage() {
     window.setTimeout(() => setFeedback(null), 2800);
   }
 
+  async function handleVerifyAttendanceDevice() {
+    if (!navigator.geolocation) {
+      setAttendanceTrustSignal({
+        serverTimeSkewMinutes: 0,
+        mockLocationDetected: true
+      });
+      setActionMessage("Perangkat ini tidak mendukung verifikasi lokasi.", "err");
+      return;
+    }
+
+    setBusyAction("verify-device");
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 9000
+        });
+      });
+      const distance = calculateDistanceMeters(
+        {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        },
+        {
+          latitude: secureAttendancePolicy.officeLatitude,
+          longitude: secureAttendancePolicy.officeLongitude
+        }
+      );
+
+      setAttendanceTrustSignal({
+        serverTimeSkewMinutes: 0,
+        distanceFromOfficeMeters: distance,
+        locationAccuracyMeters: position.coords.accuracy,
+        mockLocationDetected: false
+      });
+      setActionMessage("Verifikasi perangkat selesai.");
+    } catch {
+      setAttendanceTrustSignal({
+        serverTimeSkewMinutes: 0,
+        mockLocationDetected: true
+      });
+      setActionMessage("Lokasi tidak bisa diverifikasi. Izinkan GPS lalu coba lagi.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function handleCheckIn(method: (typeof attendanceMethods)[number]) {
+    if (!attendanceTrust.canClock) {
+      setActionMessage(attendanceTrust.detail, "err");
+      return;
+    }
+
     setBusyAction(`checkin-${method}`);
 
     try {
@@ -185,6 +271,11 @@ export function AppPage() {
   }
 
   async function handleCheckOut(method: (typeof attendanceMethods)[number]) {
+    if (!attendanceTrust.canClock) {
+      setActionMessage(attendanceTrust.detail, "err");
+      return;
+    }
+
     setBusyAction(`checkout-${method}`);
 
     try {
@@ -303,12 +394,13 @@ export function AppPage() {
 
   return (
     <Shell>
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
-        <header className="flex flex-col gap-5 rounded-[30px] border border-[#dbe5dc] bg-white p-5 shadow-panel md:flex-row md:items-center md:justify-between md:p-6">
+      <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
+        <main className="mx-auto flex max-w-7xl flex-col gap-6 overflow-hidden rounded-[34px] border border-white/70 bg-[#f9fafc] p-4 shadow-[0_34px_90px_rgba(20,24,31,0.16)] sm:p-6 lg:p-8">
+        <header className="flex flex-col gap-5 rounded-[28px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] md:flex-row md:items-center md:justify-between md:p-6">
           <div>
-            <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-moss">{currentSession.user.role} workspace</p>
-            <h1 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-3xl">{greeting || `Halo, ${currentSession.user.fullName}`}</h1>
-            <p className="mt-2 text-base text-[#63746d]">{currentSession.user.organizationName} · Responsive PWA untuk website dan mobile wrapper.</p>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">{currentSession.user.role} workspace</p>
+            <h1 className="font-display mt-3 text-2xl font-bold tracking-[-0.03em] text-[#101217] sm:text-4xl">{greeting || `Halo, ${currentSession.user.fullName}`}</h1>
+            <p className="mt-2 max-w-2xl text-base leading-7 text-[#596172]">{currentSession.user.organizationName} · Attendance desk dengan guard waktu, lokasi, dan integritas perangkat.</p>
           </div>
           <Button
             variant="secondary"
@@ -324,17 +416,17 @@ export function AppPage() {
 
         {feedback ? (
           <div
-            className={`rounded-[24px] border px-4 py-3 text-sm shadow-panel ${
+            className={`rounded-[22px] border px-4 py-3 text-sm shadow-[0_12px_32px_rgba(20,24,31,0.06)] ${
               feedback.tone === "err"
-                ? "border-[#f0d9d9] bg-[#fdf4f4] text-[#7a3535]"
-                : "border-[#d9e2da] bg-white text-[#2b3e37]"
+                ? "border-[#f2caca] bg-[#fff5f5] text-[#8a2f2f]"
+                : "border-[#d7e5ff] bg-white text-[#174ea6]"
             }`}
           >
             {feedback.message}
           </div>
         ) : null}
 
-        <nav className="sticky top-4 z-10 rounded-[28px] border border-[#dbe4da] bg-white/92 p-2 shadow-panel backdrop-blur">
+        <nav className="sticky top-4 z-10 rounded-[24px] border border-[#edf0f5] bg-white/92 p-2 shadow-[0_18px_44px_rgba(20,24,31,0.10)] backdrop-blur">
           <div className={`grid gap-2 ${tabs.length >= 5 ? "grid-cols-5" : "grid-cols-4"}`}>
             {tabs.map((item) => (
               <button
@@ -356,8 +448,8 @@ export function AppPage() {
                     })
                   )
                 }
-                className={`flex flex-col items-center justify-center rounded-[22px] px-3 py-3 text-center text-xs font-semibold transition ${
-                  tab === item.key ? "bg-ink text-white" : "text-[#5c6d67] hover:bg-[#f3f6f1]"
+                className={`flex flex-col items-center justify-center rounded-[18px] px-2 py-3 text-center text-xs font-bold transition ${
+                  tab === item.key ? "bg-[#111827] text-white" : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
                 }`}
               >
                 <item.icon className="mb-2 h-4 w-4" />
@@ -485,20 +577,87 @@ export function AppPage() {
 
         {tab === "attendance" ? (
           <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-            <div className="rounded-[30px] border border-[#dae5db] bg-[#10211c] p-5 text-white shadow-panel sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Absensi hari ini</p>
-              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em]">Check-in dan check-out sekarang sudah punya jalur aksi nyata.</h2>
-              <p className="mt-4 text-sm leading-7 text-[#b9cfc5]">Pilih metode yang cocok untuk shift hari ini. Guard state akan menolak transisi yang tidak valid.</p>
+            <div className="rounded-[30px] border border-[#111827] bg-[#111827] p-5 text-white shadow-[0_24px_70px_rgba(17,24,39,0.22)] sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8bb8ff]">Absensi aman</p>
+                  <h2 className="font-display mt-3 text-2xl font-bold tracking-[-0.03em]">Clock-in hanya aktif saat perangkat lolos guard.</h2>
+                  <p className="mt-4 text-sm leading-7 text-[#cbd5e1]">
+                    Timestamp final memakai server, radius lokasi dicek sebelum aksi, dan sinyal GPS yang mencurigakan memblokir tombol absen.
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold ${
+                    attendanceTrust.canClock ? "bg-[#e9f7ef] text-[#11703d]" : "bg-[#fff1d6] text-[#8a5c00]"
+                  }`}
+                >
+                  {attendanceTrust.canClock ? <CheckCircle2 className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
+                  {attendanceTrust.canClock ? "Siap absen" : "Terkunci"}
+                </span>
+              </div>
+
+              <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-1 h-5 w-5 text-[#8bb8ff]" />
+                  <div>
+                    <p className="text-sm font-bold">{attendanceTrust.title}</p>
+                    <p className="mt-2 text-sm leading-6 text-[#cbd5e1]">{attendanceTrust.detail}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  className="mt-4 w-full border-white/15 bg-white/10 text-white hover:bg-white/15"
+                  disabled={busyAction === "verify-device"}
+                  onClick={handleVerifyAttendanceDevice}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {busyAction === "verify-device" ? "Memverifikasi..." : "Verifikasi ulang perangkat"}
+                </Button>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  {
+                    icon: Clock3,
+                    label: "Waktu server",
+                    value: `${attendanceTrustSignal.serverTimeSkewMinutes ?? 0} menit`,
+                    detail: "Jam HP bukan sumber final."
+                  },
+                  {
+                    icon: Crosshair,
+                    label: "Geofence",
+                    value:
+                      attendanceTrustSignal.distanceFromOfficeMeters === undefined
+                        ? "Belum dicek"
+                        : `${attendanceTrustSignal.distanceFromOfficeMeters} m`,
+                    detail: `${secureAttendancePolicy.allowedRadiusMeters} m dari kantor.`
+                  },
+                  {
+                    icon: Radar,
+                    label: "Fake GPS",
+                    value: attendanceTrustSignal.mockLocationDetected ? "Diblokir" : "Bersih",
+                    detail: "Akurasi lokasi ikut diperiksa."
+                  }
+                ].map((item) => (
+                  <div key={item.label} className="rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
+                    <item.icon className="h-5 w-5 text-[#8bb8ff]" />
+                    <p className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-[#94a3b8]">{item.label}</p>
+                    <p className="mt-2 text-lg font-bold">{item.value}</p>
+                    <p className="mt-1 text-xs leading-5 text-[#cbd5e1]">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+
               <div className="mt-6 grid gap-3">
                 {attendanceMethods.map((method) => (
                   <div key={method} className="grid gap-3 sm:grid-cols-2">
-                    <Button className="w-full" disabled={attendanceState !== "idle" || busyAction !== null} onClick={() => handleCheckIn(method)}>
+                    <Button className="w-full" disabled={!attendanceTrust.canClock || attendanceState !== "idle" || busyAction !== null} onClick={() => handleCheckIn(method)}>
                       {busyAction === `checkin-${method}` ? "Memproses..." : `Check-in via ${method}`}
                     </Button>
                     <Button
                       variant="secondary"
                       className="w-full border-white/20 bg-white/8 text-white hover:bg-white/12"
-                      disabled={attendanceState !== "checked_in" || busyAction !== null}
+                      disabled={!attendanceTrust.canClock || attendanceState !== "checked_in" || busyAction !== null}
                       onClick={() => handleCheckOut(method)}
                     >
                       {busyAction === `checkout-${method}` ? "Memproses..." : `Check-out via ${method}`}
@@ -511,18 +670,18 @@ export function AppPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">{attendanceState}</span>
                   <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">Shift Pagi</span>
-                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">Lokasi utama</span>
+                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">{attendanceTrust.status}</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+            <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Riwayat singkat</p>
-                  <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">Jejak kehadiran terbaru</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">Riwayat singkat</p>
+                  <h2 className="font-display mt-3 text-2xl font-bold tracking-[-0.03em] text-[#101217]">Jejak kehadiran terbaru</h2>
                 </div>
-                <ShieldCheck className="h-6 w-6 text-moss" />
+                <SmartphoneNfc className="h-6 w-6 text-[#1769ff]" />
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 {attendanceFilters.map((filter) => (
@@ -846,6 +1005,7 @@ export function AppPage() {
             </div>
           </section>
         ) : null}
+        </main>
       </div>
     </Shell>
   );

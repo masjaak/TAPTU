@@ -1,15 +1,15 @@
 <svg width="1284" height="2778" viewBox="0 0 1284 2778" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1284" height="2778" fill="#F3F1EB"/>
-  <rect x="292" y="806" width="700" height="700" rx="168" fill="#15231F"/>
-  <rect x="388" y="902" width="508" height="508" rx="132" fill="#2C6B5A"/>
-  <path d="M550 1004C550 984.118 566.118 968 586 968H698C717.882 968 734 984.118 734 1004V1036H550V1004Z" fill="#ECF5EF"/>
-  <path d="M522 1088C522 1068.12 538.118 1052 558 1052H726C745.882 1052 762 1068.12 762 1088V1246C762 1294.6 722.601 1334 674 1334H610C561.399 1334 522 1294.6 522 1246V1088Z" fill="#FDFEFC"/>
-  <rect x="572" y="1148" width="140" height="24" rx="12" fill="#1F8F6C"/>
-  <rect x="572" y="1198" width="104" height="24" rx="12" fill="#D6E8DE"/>
-  <rect x="572" y="1248" width="120" height="24" rx="12" fill="#D6E8DE"/>
-  <circle cx="642" cy="1322" r="50" fill="#E6F6EF"/>
-  <path d="M617 1323.5L634 1340.5L671 1303.5" stroke="#1F8F6C" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="642" y="1654" text-anchor="middle" fill="#10211C" font-family="Poppins, Arial, sans-serif" font-size="120" font-weight="700">Taptu</text>
-  <text x="642" y="1752" text-anchor="middle" fill="#5B6B65" font-family="Poppins, Arial, sans-serif" font-size="52" font-weight="500">Absensi yang lebih rapi untuk tim modern</text>
-  <text x="642" y="1888" text-anchor="middle" fill="#2C6B5A" font-family="Poppins, Arial, sans-serif" font-size="38" font-weight="600" letter-spacing="8">ATTENDANCE OS</text>
+  <rect width="1284" height="2778" fill="#E9EAEC"/>
+  <rect x="118" y="374" width="1048" height="1840" rx="86" fill="#F9FAFC" stroke="white" stroke-width="4"/>
+  <circle cx="642" cy="986" r="256" fill="#111827"/>
+  <rect x="502" y="844" width="280" height="220" rx="48" fill="#1769FF"/>
+  <path d="M548 902H736" stroke="white" stroke-width="24" stroke-linecap="round"/>
+  <path d="M548 964H658" stroke="#DCE8FF" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="744" cy="1056" r="78" fill="#F9FAFC"/>
+  <path d="M710 1057L732 1079L778 1027" stroke="#1769FF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="642" y="1442" text-anchor="middle" fill="#101217" font-family="Poppins, Arial, sans-serif" font-size="132" font-weight="700">Taptu</text>
+  <text x="642" y="1542" text-anchor="middle" fill="#596172" font-family="Instrument Sans, Arial, sans-serif" font-size="54" font-weight="600">Attendance desk dengan guard lokasi</text>
+  <rect x="434" y="1642" width="416" height="92" rx="30" fill="#1769FF"/>
+  <text x="642" y="1704" text-anchor="middle" fill="white" font-family="Instrument Sans, Arial, sans-serif" font-size="34" font-weight="800" letter-spacing="4">SECURE CLOCK</text>
+  <text x="642" y="1948" text-anchor="middle" fill="#8A93A3" font-family="Instrument Sans, Arial, sans-serif" font-size="34" font-weight="600">Server time · Geofence · Device integrity</text>
 </svg>
