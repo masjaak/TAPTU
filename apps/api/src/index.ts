@@ -7,8 +7,11 @@ import { z } from "zod";
 
 import type {
   AdminOverview,
+  AttendanceExceptionItem,
   AttendanceTimelineItem,
   AttendanceActionResponse,
+  AttendanceValidationStatus,
+  AuditLogItem,
   AuthUser,
   DashboardPayload,
   DashboardStat,
@@ -19,9 +22,28 @@ import type {
   RegisterRequest,
   RequestActionResponse,
   ScannerTokenPayload,
+  ValidationDecisionPayload,
   UserRole
 } from "@taptu/shared";
-import { computeAdminOverview, computeEmployeeSummary, createInitialStore, filterAttendanceHistory, reduceAttendance, reduceRequests, refreshScannerToken, type AttendanceMode } from "./domain";
+import {
+  appendScannerAttempt,
+  calculateDistanceMeters,
+  computeAdminOverview,
+  computeEmployeeSummary,
+  createAttendanceException,
+  createAuditLog,
+  createInitialStore,
+  filterAttendanceHistory,
+  generateScannerToken,
+  reduceAttendance,
+  reduceExceptionReview,
+  reduceRequests,
+  refreshScannerToken,
+  toExceptionItem,
+  validateAttendanceSubmission,
+  validateScannerToken,
+  type AttendanceMode
+} from "./domain";
 import { getApiConfig } from "./config";
 import { createStorageAdapter } from "./storage";
 import { createSupabaseAdmin, type SupabaseAdmin } from "./supabase";
@@ -40,8 +62,14 @@ import {
   supabaseDeleteRequest,
   supabaseGetAdminOverview,
   supabaseGetEmployeeSummary,
+  supabaseGetExceptions,
+  supabaseGetAuditLogs,
   supabaseGetScannerState,
-  supabaseRefreshScannerToken
+  supabaseGetPrimaryWorkLocation,
+  supabaseRefreshScannerToken,
+  supabaseReviewException,
+  supabaseCreateAuditLog,
+  supabaseCreateAttendanceException
 } from "./supabaseQueries";
 
 const app = express();
@@ -69,9 +97,33 @@ const users: Array<AuthUser & { password: string }> = [
     role: "admin"
   },
   {
+    id: "usr-manager-01",
+    fullName: "Raka Saputra",
+    email: "manager@taptu.app",
+    password: "Taptu123!",
+    organizationName: "TAPTU HQ",
+    role: "manager"
+  },
+  {
     id: "usr-employee-01",
     fullName: "Fikri Maulana",
     email: "employee@taptu.app",
+    password: "Taptu123!",
+    organizationName: "TAPTU HQ",
+    role: "employee"
+  },
+  {
+    id: "usr-employee-02",
+    fullName: "Anisa Rahma",
+    email: "anisa@taptu.app",
+    password: "Taptu123!",
+    organizationName: "TAPTU HQ",
+    role: "employee"
+  },
+  {
+    id: "usr-employee-03",
+    fullName: "Leo Pratama",
+    email: "leo@taptu.app",
     password: "Taptu123!",
     organizationName: "TAPTU HQ",
     role: "employee"
@@ -102,16 +154,25 @@ if (useSupabase) {
 }
 
 const roleStats: Record<UserRole, DashboardStat[]> = {
-  superadmin: [],
+  superadmin: [
+    { label: "Cabang Aktif", value: "18", detail: "Semua gate sinkron sebelum 09.00" },
+    { label: "Kehadiran Hari Ini", value: "91%", detail: "Naik 4% dibanding minggu lalu" },
+    { label: "Exception Queue", value: "5", detail: "Perlu review sebelum payroll cut-off" }
+  ],
   admin: [
-    { label: "Karyawan Aktif", value: "248", detail: "18 cabang tersinkron hari ini" },
-    { label: "Check-in Tepat Waktu", value: "91%", detail: "Naik 7% dibanding kemarin" },
-    { label: "Permintaan Izin", value: "14", detail: "6 perlu approval segera" }
+    { label: "Karyawan Hadir", value: "187", detail: "Tim lapangan dan kantor pusat" },
+    { label: "Approval Pending", value: "6", detail: "Butuh keputusan sebelum siang" },
+    { label: "Butuh Review", value: "5", detail: "Validasi lokasi atau selfie belum final" }
+  ],
+  manager: [
+    { label: "Tim Hadir", value: "26", detail: "3 shift masih berjalan" },
+    { label: "Late Arrivals", value: "2", detail: "Butuh follow-up supervisor" },
+    { label: "Open Approvals", value: "3", detail: "Izin tim menunggu review" }
   ],
   employee: [
-    { label: "Status Hari Ini", value: "Check-in", detail: "Masuk 08.03 WIB via lokasi utama" },
-    { label: "Shift Aktif", value: "Pagi", detail: "08.00 - 17.00 WIB" },
-    { label: "Sisa Cuti", value: "8 Hari", detail: "2 pengajuan sedang diproses" }
+    { label: "Status Hari Ini", value: "Sudah check-in", detail: "Masuk 08.03 WIB via lokasi utama" },
+    { label: "Shift Aktif", value: "08.00 - 17.00", detail: "Kantor pusat · Shift Pagi" },
+    { label: "Riwayat Minggu Ini", value: "4 hadir", detail: "1 pengajuan izin sedang diproses" }
   ],
   scanner: [
     { label: "Token Aktif", value: "00:27", detail: "QR akan refresh otomatis" },
@@ -121,38 +182,53 @@ const roleStats: Record<UserRole, DashboardStat[]> = {
 };
 
 const attendanceFeed: Record<UserRole, AttendanceTimelineItem[]> = {
-  superadmin: [],
+  superadmin: [
+    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
+    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" },
+    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07.58", method: "QR" }
+  ],
   admin: [
-    { day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { day: "Kemarin", status: "Terlambat", time: "08.19", method: "GPS" },
-    { day: "Senin", status: "Tepat waktu", time: "07.58", method: "QR" }
+    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
+    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" },
+    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07.58", method: "QR" }
+  ],
+  manager: [
+    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
+    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" },
+    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07.58", method: "QR" }
   ],
   employee: [
-    { day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { day: "Kemarin", status: "Tepat waktu", time: "07.55", method: "Selfie" },
-    { day: "Senin", status: "Izin", time: "08.00", method: "Manual" }
+    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
+    { id: "a-02", day: "Kemarin", status: "Tepat waktu", time: "07.55", method: "Selfie" },
+    { id: "a-03", day: "Senin", status: "Izin", time: "08.00", method: "Manual" }
   ],
   scanner: [
-    { day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },
-    { day: "08.07", status: "Tepat waktu", time: "Ilham Fadli", method: "QR" },
-    { day: "08.09", status: "Belum check-in", time: "1 scan gagal radius", method: "Manual" }
+    { id: "a-01", day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },
+    { id: "a-02", day: "08.07", status: "Tepat waktu", time: "Ilham Fadli", method: "QR" },
+    { id: "a-03", day: "08.09", status: "Belum check-in", time: "1 scan gagal radius", method: "Manual" }
   ]
 };
 
 const requestFeed: Record<UserRole, LeaveRequestItem[]> = {
-  superadmin: [],
+  superadmin: [
+    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final." },
+    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." }
+  ],
   admin: [
-    { title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Butuh approval hari ini sebelum 12.00." },
-    { title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." },
-    { title: "Tukar shift · Leo Pratama", status: "Menunggu", detail: "Menunggu manager operasional." }
+    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Butuh approval hari ini sebelum 12.00." },
+    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." },
+    { id: "req-03", title: "Tukar shift · Leo Pratama", status: "Menunggu", detail: "Menunggu manager operasional." }
+  ],
+  manager: [
+    { id: "req-01", title: "Izin tim lapangan", status: "Menunggu", detail: "Butuh keputusan supervisor sebelum jam 12.00." }
   ],
   employee: [
-    { title: "Cuti tahunan", status: "Disetujui", detail: "2 hari kerja disetujui untuk minggu depan." },
-    { title: "Izin pribadi", status: "Menunggu", detail: "Dokumen pendukung sedang direview admin." }
+    { id: "req-01", title: "Cuti tahunan", status: "Disetujui", detail: "2 hari kerja disetujui untuk minggu depan." },
+    { id: "req-02", title: "Izin pribadi", status: "Menunggu", detail: "Dokumen pendukung sedang direview admin." }
   ],
   scanner: [
-    { title: "Token gate timur", status: "Disetujui", detail: "QR aktif dan sinkron sampai 30 detik ke depan." },
-    { title: "Permintaan reset scanner", status: "Menunggu", detail: "Tunggu admin memperbarui PIN perangkat." }
+    { id: "req-01", title: "Token gate timur", status: "Disetujui", detail: "QR aktif dan sinkron sampai 30 detik ke depan." },
+    { id: "req-02", title: "Permintaan reset scanner", status: "Menunggu", detail: "Tunggu admin memperbarui PIN perangkat." }
   ]
 };
 
@@ -166,15 +242,21 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   organizationName: z.string().min(2),
-  role: z.enum(["superadmin", "admin", "employee"]).default("superadmin")
+  role: z.enum(["superadmin", "admin", "manager", "employee"]).default("superadmin")
 });
 
 const attendanceSchema = z.object({
-  method: z.enum(["QR", "GPS", "Selfie", "Manual"])
+  method: z.enum(["QR", "GPS", "Selfie", "Manual"]),
+  locationLat: z.number().optional(),
+  locationLng: z.number().optional(),
+  selfieUrl: z.string().optional(),
+  deviceId: z.string().min(4).optional(),
+  scannerToken: z.string().optional(),
+  requiredSelfie: z.boolean().optional().default(false)
 });
 
 const requestSchema = z.object({
-  category: z.enum(["Izin", "Cuti", "Sakit"]),
+  category: z.enum(["Izin", "Cuti", "Sakit", "Permission", "Attendance Correction", "Forgot Check-in/out"]),
   startDate: z.string().min(10),
   endDate: z.string().min(10),
   title: z.string().min(3),
@@ -184,7 +266,13 @@ const requestSchema = z.object({
 });
 
 const approvalSchema = z.object({
-  status: z.enum(["Disetujui", "Ditolak"])
+  status: z.enum(["Disetujui", "Ditolak"]),
+  adminNote: z.string().trim().min(2).optional()
+});
+
+const exceptionDecisionSchema = z.object({
+  status: z.enum(["Need Review", "Approved", "Rejected", "Request Correction"]),
+  adminNote: z.string().trim().min(2)
 });
 
 const historyFilterSchema = z.enum(["all", "present", "issue"]).catch("all");
@@ -252,31 +340,55 @@ function requireUser(req: express.Request, res: express.Response): AuthUser | nu
   return user;
 }
 
+function createEmptyAttendanceRecord(userId: string) {
+  const template = createInitialStore().attendance["usr-employee-03"];
+
+  return {
+    ...template,
+    id: `att-${userId}-${new Date().toISOString().slice(0, 10)}`,
+    userId,
+    state: "idle" as const,
+    status: "Belum check-in" as const,
+    checkInAt: undefined,
+    checkInMethod: undefined,
+    checkOutAt: undefined,
+    checkOutMethod: undefined,
+    locationLat: undefined,
+    locationLng: undefined,
+    validationStatus: "verified" as const,
+    validationReasons: [],
+    selfieUrl: "",
+    deviceId: undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function buildAttendanceItem(userId: string): AttendanceTimelineItem {
-  const record = store.attendance[userId] ?? { userId, state: "idle" as const };
+  const record = store.attendance[userId] ?? createEmptyAttendanceRecord(userId);
 
   if (record.state === "checked_in") {
     return {
-      id: userId,
+      id: record.id,
       day: "Hari ini",
-      status: "Tepat waktu",
-      time: record.checkInAt?.slice(11, 16).replace("T", "") ?? "--.--",
+      status: record.status === "Terlambat" ? "Terlambat" : "Tepat waktu",
+      time: record.checkInAt?.slice(11, 16) ?? "--.--",
       method: record.checkInMethod ?? "QR"
     };
   }
 
   if (record.state === "checked_out") {
     return {
-      id: userId,
+      id: record.id,
       day: "Hari ini",
       status: "Tepat waktu",
-      time: record.checkOutAt?.slice(11, 16).replace("T", "") ?? "--.--",
+      time: record.checkOutAt?.slice(11, 16) ?? "--.--",
       method: record.checkOutMethod ?? "QR"
     };
   }
 
   return {
-    id: userId,
+    id: record.id,
     day: "Hari ini",
     status: "Belum check-in",
     time: "--.--",
@@ -300,8 +412,46 @@ function buildRequestItem(request: (typeof store.requests)[number], actorName?: 
     title: request.title,
     detail: request.detail,
     status: request.status,
-    requester: actorName
+    requester: actorName,
+    adminNote: request.adminNote,
+    createdAt: request.createdAt,
+    reviewedBy: request.reviewedBy,
+    reviewedAt: request.reviewedAt
   };
+}
+
+function buildScannerPayload() {
+  const expiresInSeconds = Math.max(0, Math.ceil((new Date(store.scanner.expiresAt).getTime() - Date.now()) / 1000));
+
+  return {
+    id: store.scanner.id,
+    token: store.scanner.token,
+    expiresInSeconds,
+    scansToday: store.scanner.scansToday,
+    locationName: store.scanner.locationName,
+    expiresAt: store.scanner.expiresAt,
+    status: store.scanner.status
+  } satisfies ScannerTokenPayload;
+}
+
+function userDirectory() {
+  return Object.fromEntries(users.map((entry) => [entry.id, entry.fullName]));
+}
+
+function listExceptionItems(): AttendanceExceptionItem[] {
+  return store.exceptions
+    .slice()
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .map((item) => toExceptionItem(item, userDirectory()));
+}
+
+async function getOrganizationIdForUser(userId: string) {
+  if (!sb) {
+    return null;
+  }
+
+  const { data: profile } = await sb.from("profiles").select("organization_id").eq("id", userId).maybeSingle();
+  return profile?.organization_id ?? null;
 }
 
 app.get("/api/health", (_req, res) => {
@@ -416,9 +566,10 @@ app.get("/api/dashboard", async (req, res) => {
 
   if (useSupabase && sb) {
     const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const organizationId = isAdmin || user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
     const attendance = await supabaseGetAttendanceHistory(sb, user.id);
     const todayRecord = await supabaseGetTodayAttendance(sb, user.id);
-    const requests = await supabaseGetRequests(sb, user.id, isAdmin);
+    const requests = await supabaseGetRequests(sb, user.id, isAdmin || user.role === "manager", organizationId ?? undefined);
     const scannerState = user.role === "scanner" ? await supabaseGetScannerState(sb) : null;
 
     const payload: DashboardPayload = {
@@ -517,25 +668,151 @@ app.post("/api/attendance/checkin", async (req, res) => {
     return res.status(400).json({ message: "Metode check-in tidak valid." });
   }
 
+  const now = new Date().toISOString();
+
   if (useSupabase && sb) {
     const current = await supabaseGetTodayAttendance(sb, user.id);
-    const next = reduceAttendance(current, { type: "CHECK_IN", method: parsed.data.method as AttendanceMode, at: new Date().toISOString() });
+    const organizationId = await getOrganizationIdForUser(user.id);
+    const location = organizationId ? await supabaseGetPrimaryWorkLocation(sb, organizationId) : store.workLocations[0];
+    const validation = validateAttendanceSubmission({
+      locationLat: parsed.data.locationLat,
+      locationLng: parsed.data.locationLng,
+      selfieUrl: parsed.data.selfieUrl,
+      deviceId: parsed.data.deviceId,
+      scannerToken: parsed.data.scannerToken,
+      requiredSelfie: parsed.data.requiredSelfie,
+      previousDeviceId: current.deviceId,
+      location,
+      now
+    });
+    const reasons = [...validation.reasons];
+    let scannerTokenId: string | undefined;
+
+    if (parsed.data.method === "QR") {
+      const scanner = await supabaseGetScannerState(sb);
+      scannerTokenId = scanner.id;
+      const scannerValidation = validateScannerToken(scanner, parsed.data.scannerToken);
+      if (!scannerValidation.valid) {
+        reasons.push(scannerValidation.reason ?? "Token scanner tidak valid.");
+        validation.status = "needs_review";
+        validation.exceptionType = scannerValidation.exceptionType;
+        await supabaseCreateAuditLog(
+          sb,
+          createAuditLog(
+            "scanner_token_invalid_attempt",
+            user.fullName,
+            user.role,
+            user.id,
+            scannerValidation.reason ?? "Token scanner tidak valid."
+          )
+        );
+      }
+    }
+
+    const next = reduceAttendance(current, {
+      type: "CHECK_IN",
+      method: parsed.data.method as AttendanceMode,
+      at: now,
+      locationLat: parsed.data.locationLat,
+      locationLng: parsed.data.locationLng,
+      validationStatus: validation.status,
+      validationReasons: reasons,
+      selfieUrl: parsed.data.selfieUrl,
+      deviceId: parsed.data.deviceId,
+      scannerTokenId
+    });
     if (next.state === current.state) {
       return res.status(409).json({ message: "Check-in sudah dilakukan atau state tidak valid." });
     }
-    await supabaseUpsertAttendance(sb, user.id, next);
+    const persisted = await supabaseUpsertAttendance(sb, user.id, next);
+
+    if (validation.exceptionType) {
+      await supabaseCreateAttendanceException(
+        sb,
+        createAttendanceException(persisted, user.id, validation.exceptionType, reasons[0] ?? "Butuh review.")
+      );
+    }
+
+    if (persisted.status === "Terlambat") {
+      await supabaseCreateAttendanceException(
+        sb,
+        createAttendanceException(
+          persisted,
+          user.id,
+          "Late check-in",
+          "Check-in melebihi toleransi 10 menit dari awal shift."
+        )
+      );
+    }
+
+    if (reasons.some((item) => item.includes("Perangkat berbeda"))) {
+      await supabaseCreateAuditLog(
+        sb,
+        createAuditLog("device_mismatch_exception", user.fullName, user.role, persisted.id ?? user.id, reasons.join(" | "))
+      );
+    }
+
     const response: AttendanceActionResponse = {
-      attendanceState: next.state,
-      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual" }
+      attendanceState: persisted.state,
+      validationStatus: persisted.validationStatus,
+      validationReasons: persisted.validationReasons,
+      record: {
+        day: "Hari ini",
+        status: persisted.status === "Terlambat" ? "Terlambat" : "Tepat waktu",
+        time: new Date().toTimeString().slice(0, 5),
+        method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual"
+      }
     };
     return res.json(response);
   }
 
-  const current = store.attendance[user.id] ?? { userId: user.id, state: "idle" as const };
+  const current = store.attendance[user.id] ?? createEmptyAttendanceRecord(user.id);
+  const validation = validateAttendanceSubmission({
+    locationLat: parsed.data.locationLat,
+    locationLng: parsed.data.locationLng,
+    selfieUrl: parsed.data.selfieUrl,
+    deviceId: parsed.data.deviceId,
+    scannerToken: parsed.data.scannerToken,
+    requiredSelfie: parsed.data.requiredSelfie,
+    previousDeviceId: current.deviceId,
+    location: store.workLocations[0],
+    now
+  });
+  const reasons = [...validation.reasons];
+
+  if (parsed.data.method === "QR") {
+    const scannerValidation = validateScannerToken(store.scanner, parsed.data.scannerToken);
+
+    if (!scannerValidation.valid) {
+      const scannerReason = scannerValidation.reason ?? "Token scanner tidak valid.";
+      reasons.push(scannerReason);
+      validation.status = "needs_review";
+      validation.exceptionType = scannerValidation.exceptionType;
+      store.scanner = appendScannerAttempt(store.scanner, {
+        id: `scan-${Date.now()}`,
+        employeeId: user.id,
+        employeeName: user.fullName,
+        status: scannerValidation.exceptionType === "Expired QR" ? "expired" : "invalid",
+        detail: scannerReason,
+        createdAt: now
+      });
+      store.auditLogs.unshift(
+        createAuditLog("scanner_token_invalid_attempt", "System", "scanner", user.id, scannerReason)
+      );
+    }
+  }
+
   const next = reduceAttendance(current, {
     type: "CHECK_IN",
     method: parsed.data.method as AttendanceMode,
-    at: new Date().toISOString()
+    at: now,
+    locationLat: parsed.data.locationLat,
+    locationLng: parsed.data.locationLng,
+    validationStatus: validation.status,
+    validationReasons: reasons,
+    selfieUrl: parsed.data.selfieUrl,
+    deviceId: parsed.data.deviceId,
+    scannerTokenId: store.scanner.id
   });
 
   if (next.state === current.state) {
@@ -545,10 +822,33 @@ app.post("/api/attendance/checkin", async (req, res) => {
   store.attendance[user.id] = next;
   const historyItem = buildAttendanceItem(user.id);
   store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
+
+  if (validation.exceptionType) {
+    store.exceptions.unshift(createAttendanceException(next, user.id, validation.exceptionType, reasons[0] ?? "Butuh review."));
+  }
+
+  if (next.status === "Terlambat") {
+    store.exceptions.unshift(createAttendanceException(next, user.id, "Late check-in", "Check-in melebihi toleransi 10 menit dari awal shift."));
+  }
+
+  if (reasons.some((item) => item.includes("Perangkat berbeda"))) {
+    store.auditLogs.unshift(createAuditLog("device_mismatch_exception", user.fullName, user.role, next.id ?? user.id, reasons.join(" | ")));
+  }
+
+  store.scanner = appendScannerAttempt(store.scanner, {
+    id: `scan-${Date.now()}-ok`,
+    employeeId: user.id,
+    employeeName: user.fullName,
+    status: "success",
+    detail: `${parsed.data.method} check-in tercatat.`,
+    createdAt: now
+  });
   await storage.save(store);
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
+    validationStatus: next.validationStatus,
+    validationReasons: next.validationReasons,
     record: historyItem
   };
 
@@ -568,25 +868,81 @@ app.post("/api/attendance/checkout", async (req, res) => {
     return res.status(400).json({ message: "Metode check-out tidak valid." });
   }
 
+  const now = new Date().toISOString();
+
   if (useSupabase && sb) {
     const current = await supabaseGetTodayAttendance(sb, user.id);
-    const next = reduceAttendance(current, { type: "CHECK_OUT", method: parsed.data.method as AttendanceMode, at: new Date().toISOString() });
+    const organizationId = await getOrganizationIdForUser(user.id);
+    const location = organizationId ? await supabaseGetPrimaryWorkLocation(sb, organizationId) : store.workLocations[0];
+    const validation = validateAttendanceSubmission({
+      locationLat: parsed.data.locationLat,
+      locationLng: parsed.data.locationLng,
+      selfieUrl: parsed.data.selfieUrl,
+      deviceId: parsed.data.deviceId,
+      scannerToken: parsed.data.scannerToken,
+      previousDeviceId: current.deviceId,
+      location,
+      now
+    });
+    const next = reduceAttendance(current, {
+      type: "CHECK_OUT",
+      method: parsed.data.method as AttendanceMode,
+      at: now,
+      locationLat: parsed.data.locationLat,
+      locationLng: parsed.data.locationLng,
+      validationStatus: validation.status,
+      validationReasons: validation.reasons,
+      selfieUrl: parsed.data.selfieUrl,
+      deviceId: parsed.data.deviceId
+    });
     if (next.state === current.state) {
       return res.status(409).json({ message: "Check-out belum bisa dilakukan sebelum check-in." });
     }
-    await supabaseUpsertAttendance(sb, user.id, next);
+    const persisted = await supabaseUpsertAttendance(sb, user.id, next);
+
+    if (validation.exceptionType) {
+      await supabaseCreateAttendanceException(
+        sb,
+        createAttendanceException(
+          persisted,
+          user.id,
+          validation.exceptionType,
+          validation.reasons[0] ?? "Check-out perlu review."
+        )
+      );
+    }
+
     const response: AttendanceActionResponse = {
-      attendanceState: next.state,
+      attendanceState: persisted.state,
+      validationStatus: persisted.validationStatus,
+      validationReasons: persisted.validationReasons,
       record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual" }
     };
     return res.json(response);
   }
 
-  const current = store.attendance[user.id] ?? { userId: user.id, state: "idle" as const };
+  const current = store.attendance[user.id] ?? createEmptyAttendanceRecord(user.id);
+  const validation = validateAttendanceSubmission({
+    locationLat: parsed.data.locationLat,
+    locationLng: parsed.data.locationLng,
+    selfieUrl: parsed.data.selfieUrl,
+    deviceId: parsed.data.deviceId,
+    scannerToken: parsed.data.scannerToken,
+    previousDeviceId: current.deviceId,
+    location: store.workLocations[0],
+    now
+  });
   const next = reduceAttendance(current, {
     type: "CHECK_OUT",
     method: parsed.data.method as AttendanceMode,
-    at: new Date().toISOString()
+    at: now,
+    locationLat: parsed.data.locationLat,
+    locationLng: parsed.data.locationLng,
+    validationStatus: validation.status,
+    validationReasons: validation.reasons,
+    selfieUrl: parsed.data.selfieUrl,
+    deviceId: parsed.data.deviceId,
+    scannerTokenId: store.scanner.id
   });
 
   if (next.state === current.state) {
@@ -596,10 +952,15 @@ app.post("/api/attendance/checkout", async (req, res) => {
   store.attendance[user.id] = next;
   const historyItem = buildAttendanceItem(user.id);
   store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
+  if (validation.exceptionType) {
+    store.exceptions.unshift(createAttendanceException(next, user.id, validation.exceptionType, validation.reasons[0] ?? "Check-out perlu review."));
+  }
   await storage.save(store);
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
+    validationStatus: next.validationStatus,
+    validationReasons: next.validationReasons,
     record: historyItem
   };
 
@@ -611,14 +972,17 @@ app.get("/api/requests", async (req, res) => {
   if (!user) return;
 
   if (useSupabase && sb) {
-    const isAdmin = user.role === "admin" || user.role === "superadmin";
-    const items = await supabaseGetRequests(sb, user.id, isAdmin);
+    const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
+    const organizationId = isAdmin ? await getOrganizationIdForUser(user.id) : undefined;
+    const items = await supabaseGetRequests(sb, user.id, isAdmin, organizationId ?? undefined);
     return res.json(items);
   }
 
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "superadmin" || user.role === "manager") {
     return res.json(
-      store.requests.map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName))
+      store.requests
+        .filter((item) => user.role !== "manager" || ["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(item.category))
+        .map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName))
     );
   }
 
@@ -630,15 +994,21 @@ app.get("/api/requests/:id", async (req, res) => {
   if (!user) return;
 
   if (useSupabase && sb) {
-    const isAdmin = user.role === "admin" || user.role === "superadmin";
+    const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
     const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin);
     if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+    if (user.role === "manager" && item.category && !["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(item.category)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
     return res.json(item);
   }
 
   const request = store.requests.find((item) => item.id === req.params.id);
   if (!request) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
   if (user.role === "employee" && request.userId !== user.id) return res.status(403).json({ message: "Forbidden" });
+  if (user.role === "manager" && !["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(request.category)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
   return res.json(buildRequestItem(request, users.find((entry) => entry.id === request.userId)?.fullName));
 });
 
@@ -696,10 +1066,11 @@ app.delete("/api/requests/:id", async (req, res) => {
 app.get("/api/admin/requests", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
-  if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") return res.status(403).json({ message: "Forbidden" });
 
   if (useSupabase && sb) {
-    const items = await supabaseGetRequests(sb, user.id, true);
+    const organizationId = await getOrganizationIdForUser(user.id);
+    const items = await supabaseGetRequests(sb, user.id, true, organizationId ?? undefined);
     return res.json(items);
   }
 
@@ -709,26 +1080,58 @@ app.get("/api/admin/requests", async (req, res) => {
 app.patch("/api/admin/requests/:id", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
-  if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") return res.status(403).json({ message: "Forbidden" });
 
   const parsed = approvalSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Status approval tidak valid." });
 
   if (useSupabase && sb) {
-    const updated = await supabaseUpdateRequestStatus(sb, req.params.id, parsed.data.status);
+    if (user.role === "manager") {
+      const existing = await supabaseGetRequestById(sb, req.params.id, user.id, true);
+      if (!existing || !existing.category || !["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(existing.category)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+    }
+    const updated = await supabaseUpdateRequestStatus(sb, req.params.id, parsed.data.status, parsed.data.adminNote);
     if (!updated) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+    await supabaseCreateAuditLog(
+      sb,
+      createAuditLog(
+        parsed.data.status === "Disetujui" ? "approval_request_approved" : "approval_request_rejected",
+        user.fullName,
+        user.role,
+        req.params.id,
+        parsed.data.adminNote ?? `${updated.category} ${parsed.data.status.toLowerCase()}`
+      )
+    );
     return res.json({ request: updated });
   }
 
   store.requests = reduceRequests(store.requests, {
     type: parsed.data.status === "Disetujui" ? "APPROVE" : "REJECT",
     id: req.params.id,
-    actorRole: user.role
+    actorRole: user.role,
+    adminNote: parsed.data.adminNote,
+    reviewedBy: user.fullName,
+    reviewedAt: new Date().toISOString()
   });
 
   const updated = store.requests.find((item) => item.id === req.params.id);
   if (!updated) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
 
+  if (updated.status === "Menunggu") {
+    return res.status(403).json({ message: "Role ini tidak boleh memproses request tersebut." });
+  }
+
+  store.auditLogs.unshift(
+    createAuditLog(
+      parsed.data.status === "Disetujui" ? "approval_request_approved" : "approval_request_rejected",
+      user.fullName,
+      user.role,
+      updated.id,
+      parsed.data.adminNote ?? `${updated.category} ${parsed.data.status.toLowerCase()}`
+    )
+  );
   await storage.save(store);
   return res.json({ request: buildRequestItem(updated, users.find((entry) => entry.id === updated.userId)?.fullName) });
 });
@@ -739,14 +1142,18 @@ app.get("/api/admin/overview", async (req, res) => {
   if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
 
   if (useSupabase && sb) {
-    const { data: profile } = await sb.from("profiles").select("organization_id").eq("id", user.id).single();
-    if (profile?.organization_id) {
-      const overview = await supabaseGetAdminOverview(sb, profile.organization_id);
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (organizationId) {
+      const overview = await supabaseGetAdminOverview(sb, organizationId);
       return res.json(overview);
     }
   }
 
-  const overview: AdminOverview = computeAdminOverview(store, users.filter((u) => u.role === "employee").length);
+  const overview: AdminOverview = computeAdminOverview(
+    store,
+    users.filter((entry) => entry.role === "employee").length,
+    Object.fromEntries(users.map((entry) => [entry.id, entry.fullName]))
+  );
   return res.json(overview);
 });
 
@@ -763,35 +1170,213 @@ app.get("/api/employee/summary", async (req, res) => {
   return res.json(summary);
 });
 
+app.get("/api/admin/exceptions", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  if (useSupabase && sb) {
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (!organizationId) return res.json([]);
+    return res.json(await supabaseGetExceptions(sb, organizationId));
+  }
+
+  return res.json(listExceptionItems());
+});
+
+app.patch("/api/admin/exceptions/:id", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const parsed = exceptionDecisionSchema.safeParse(req.body satisfies ValidationDecisionPayload);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Keputusan exception tidak valid." });
+  }
+
+  if (useSupabase && sb) {
+    const reviewed = await supabaseReviewException(sb, req.params.id, {
+      status: parsed.data.status,
+      adminNote: parsed.data.adminNote,
+      reviewedBy: user.id
+    });
+
+    if (parsed.data.status === "Approved") {
+      await sb
+        .from("attendance_records")
+        .update({ validation_status: "corrected", updated_at: new Date().toISOString() })
+        .eq("id", reviewed.attendance_record_id);
+    }
+
+    if (parsed.data.status === "Rejected") {
+      await sb
+        .from("attendance_records")
+        .update({ validation_status: "rejected", updated_at: new Date().toISOString() })
+        .eq("id", reviewed.attendance_record_id);
+    }
+
+    await supabaseCreateAuditLog(
+      sb,
+      createAuditLog(
+        parsed.data.status === "Approved"
+          ? "exception_approved"
+          : parsed.data.status === "Rejected"
+            ? "exception_rejected"
+            : "correction_requested",
+        user.fullName,
+        user.role,
+        req.params.id,
+        parsed.data.adminNote
+      )
+    );
+    return res.json({
+      exception: {
+        id: reviewed.id,
+        attendanceRecordId: reviewed.attendance_record_id,
+        employeeId: reviewed.employee_id,
+        employeeName: "Employee",
+        exceptionType: reviewed.exception_type,
+        reason: reviewed.reason,
+        status: reviewed.status,
+        adminNote: reviewed.admin_note ?? undefined,
+        reviewedBy: reviewed.reviewed_by ?? undefined,
+        reviewedAt: reviewed.reviewed_at ?? undefined,
+        createdAt: reviewed.created_at
+      }
+    });
+  }
+
+  store.exceptions = reduceExceptionReview(store.exceptions, {
+    id: req.params.id,
+    status: parsed.data.status,
+    actorName: user.fullName,
+    actorRole: user.role,
+    adminNote: parsed.data.adminNote,
+    reviewedAt: new Date().toISOString()
+  });
+
+  const updated = store.exceptions.find((item) => item.id === req.params.id);
+  if (!updated) {
+    return res.status(404).json({ message: "Exception tidak ditemukan." });
+  }
+
+  if (parsed.data.status === "Approved") {
+    const record = Object.values(store.attendance).find((item) => item.id === updated.attendanceRecordId);
+    if (record) {
+      record.validationStatus = "corrected";
+      record.validationReasons = record.validationReasons.filter((reason) => reason !== updated.reason);
+      record.updatedAt = new Date().toISOString();
+    }
+  }
+
+  if (parsed.data.status === "Rejected") {
+    const record = Object.values(store.attendance).find((item) => item.id === updated.attendanceRecordId);
+    if (record) {
+      record.validationStatus = "rejected";
+      record.updatedAt = new Date().toISOString();
+    }
+  }
+
+  store.auditLogs.unshift(
+    createAuditLog(
+      parsed.data.status === "Approved"
+        ? "exception_approved"
+        : parsed.data.status === "Rejected"
+          ? "exception_rejected"
+          : "correction_requested",
+      user.fullName,
+      user.role,
+      updated.id,
+      parsed.data.adminNote
+    )
+  );
+  await storage.save(store);
+
+  return res.json({ exception: toExceptionItem(updated, userDirectory()) });
+});
+
+app.get("/api/admin/audit-logs", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  if (useSupabase && sb) {
+    return res.json(await supabaseGetAuditLogs(sb));
+  }
+
+  return res.json(
+    store.auditLogs
+      .slice()
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, 20)
+  );
+});
+
+app.get("/api/scanner/state", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "scanner" && user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  if (useSupabase && sb) {
+    const scanner = await supabaseGetScannerState(sb);
+    return res.json({
+      id: scanner.id,
+      token: scanner.token,
+      expiresInSeconds: Math.max(0, Math.ceil((new Date(scanner.expiresAt).getTime() - Date.now()) / 1000)),
+      scansToday: scanner.scansToday,
+      locationName: scanner.locationName,
+      expiresAt: scanner.expiresAt,
+      status: scanner.status,
+      recentScans: scanner.recentScans
+    });
+  }
+
+  return res.json({
+    ...buildScannerPayload(),
+    recentScans: store.scanner.recentScans.map((scan) => ({
+      id: scan.id,
+      employeeName: scan.employeeName ?? "Employee",
+      status: scan.status,
+      time: scan.createdAt.slice(11, 16),
+      detail: scan.detail
+    }))
+  });
+});
+
 app.get("/api/scanner/token", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
   if (user.role !== "scanner" && user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
 
   if (useSupabase && sb) {
-    const newToken = refreshScannerToken({ token: "", expiresInSeconds: 30, scansToday: 0, locationName: "" }).token;
+    const newToken = generateScannerToken();
     const state = await supabaseRefreshScannerToken(sb, newToken);
     return res.json({
+      id: state.id,
       token: state.token,
-      expiresInSeconds: state.expiresInSeconds,
+      expiresInSeconds: Math.max(0, Math.ceil((new Date(state.expiresAt).getTime() - Date.now()) / 1000)),
       scansToday: state.scansToday,
-      locationName: state.locationName
+      locationName: state.locationName,
+      expiresAt: state.expiresAt,
+      status: state.status
     } satisfies ScannerTokenPayload);
   }
 
   store.scanner = refreshScannerToken(store.scanner);
+  store.auditLogs.unshift(createAuditLog("attendance_record_updated", user.fullName, user.role, store.scanner.id, "Scanner token diperbarui."));
   await storage.save(store);
 
-  return res.json({
-    token: store.scanner.token,
-    expiresInSeconds: store.scanner.expiresInSeconds,
-    scansToday: store.scanner.scansToday,
-    locationName: store.scanner.locationName
-  } satisfies ScannerTokenPayload);
+  return res.json(buildScannerPayload());
 });
 
 app.listen(port, () => {
   console.log(`Taptu API listening on http://localhost:${port}`);
 });
-
-

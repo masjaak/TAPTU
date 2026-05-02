@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "npm run build --workspace @taptu/shared && tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "typecheck": "npm run typecheck --workspace @taptu/shared && tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run build --workspace @taptu/shared && tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

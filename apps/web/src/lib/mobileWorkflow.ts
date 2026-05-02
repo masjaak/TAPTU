@@ -1,7 +1,7 @@
 import type { AttendanceTimelineItem } from "@taptu/shared";
 
 export interface RequestFormState {
-  category: "Izin" | "Cuti" | "Sakit";
+  category: "Izin" | "Cuti" | "Sakit" | "Permission" | "Attendance Correction" | "Forgot Check-in/out";
   startDate: string;
   endDate: string;
   title: string;

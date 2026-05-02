@@ -60,6 +60,14 @@ describe("demo mode login", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("returns session for manager demo credentials without calling fetch", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = await login({ email: "manager@taptu.app", password: "Taptu123!" });
+    expect(result.user.role).toBe("manager");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("falls through to API when demo email is used with wrong password", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     await expect(login({ email: "admin@taptu.app", password: "WrongPassword1" })).rejects.toThrow(
@@ -86,6 +94,14 @@ describe("demo mode dashboard", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const result = await getDashboard("demo:employee");
     expect(result.greeting).toContain("Fikri");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns mock dashboard for manager demo token without calling fetch", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = await getDashboard("demo:manager");
+    expect(result.greeting).toContain("Raka");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

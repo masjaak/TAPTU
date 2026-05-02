@@ -11,7 +11,7 @@ import {
   Users
 } from "lucide-react";
 
-export type NavigationRole = UserRole | "manager";
+export type NavigationRole = UserRole;
 
 export type AppSectionKey =
   | "home"
@@ -61,22 +61,23 @@ const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
   superadmin: ["home", "team", "attendance", "requests", "locations", "reports", "settings", "profile"],
   admin: ["home", "team", "attendance", "requests", "locations", "reports", "profile"],
   manager: ["home", "team", "attendance", "requests", "reports", "profile"],
-  employee: ["home", "attendance", "requests", "profile"],
-  scanner: ["scanner", "attendance", "profile"]
+  employee: ["attendance", "requests", "profile"],
+  scanner: ["scanner", "profile"]
 };
 
 const compactNavigation: Record<UserRole, AppSectionKey[]> = {
   superadmin: ["home", "attendance", "requests", "profile"],
   admin: ["home", "attendance", "requests", "profile"],
-  employee: ["home", "attendance", "requests", "profile"],
-  scanner: ["home", "attendance", "requests", "scanner", "profile"]
+  manager: ["home", "attendance", "requests", "profile"],
+  employee: ["attendance", "requests", "profile"],
+  scanner: ["scanner", "profile"]
 };
 
 const defaultSection: Record<NavigationRole, AppSectionKey> = {
   superadmin: "home",
   admin: "home",
   manager: "home",
-  employee: "home",
+  employee: "attendance",
   scanner: "scanner"
 };
 

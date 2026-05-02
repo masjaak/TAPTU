@@ -1,7 +1,9 @@
 import type {
   AdminOverview,
   AttendanceActionResponse,
+  AttendanceExceptionItem,
   AttendanceTimelineItem,
+  AuditLogItem,
   DashboardPayload,
   EmployeeSummary,
   LeaveRequestItem,
@@ -9,15 +11,19 @@ import type {
   LoginResponse,
   RegisterRequest,
   RequestActionResponse,
-  ScannerTokenPayload
+  ScannerTokenPayload,
+  ValidationDecisionPayload
 } from "@taptu/shared";
 
 import {
   getDemoAdminOverview,
   getDemoAttendanceHistory,
   getDemoDashboard,
+  getDemoExceptionQueue,
   getDemoEmployeeSummary,
   getDemoRequests,
+  getDemoAuditLogs,
+  getDemoScannerState,
   getDemoScannerToken,
   isDemoToken,
   tryDemoLogin
@@ -46,17 +52,30 @@ export async function getDashboard(token: string): Promise<DashboardPayload> {
   return requestJson<DashboardPayload>("/dashboard", {}, token);
 }
 
-export async function checkIn(token: string, method: "QR" | "GPS" | "Selfie" | "Manual") {
+export async function checkIn(
+  token: string,
+  payload: {
+    method: "QR" | "GPS" | "Selfie" | "Manual";
+    locationLat?: number;
+    locationLng?: number;
+    selfieUrl?: string;
+    deviceId?: string;
+    scannerToken?: string;
+    requiredSelfie?: boolean;
+  }
+) {
   if (isDemoToken(token)) {
     const response: AttendanceActionResponse = {
       attendanceState: "checked_in",
-      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method }
+      validationStatus: payload.selfieUrl ? "verified" : "needs_review",
+      validationReasons: payload.selfieUrl ? [] : ["Selfie wajib belum dilampirkan."],
+      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: payload.method }
     };
     return Promise.resolve(response);
   }
   return requestJson<AttendanceActionResponse>(
     "/attendance/checkin",
-    { method: "POST", body: JSON.stringify({ method }) },
+    { method: "POST", body: JSON.stringify(payload) },
     token
   );
 }
@@ -76,24 +95,36 @@ export async function fetchAttendanceHistoryByFilter(token: string, filter: "all
   return requestJson<AttendanceTimelineItem[]>(`/attendance/history?filter=${filter}`, {}, token);
 }
 
-export async function checkOut(token: string, method: "QR" | "GPS" | "Selfie" | "Manual") {
+export async function checkOut(
+  token: string,
+  payload: {
+    method: "QR" | "GPS" | "Selfie" | "Manual";
+    locationLat?: number;
+    locationLng?: number;
+    selfieUrl?: string;
+    deviceId?: string;
+    scannerToken?: string;
+  }
+) {
   if (isDemoToken(token)) {
     const response: AttendanceActionResponse = {
       attendanceState: "checked_out",
-      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method }
+      validationStatus: "verified",
+      validationReasons: [],
+      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: payload.method }
     };
     return Promise.resolve(response);
   }
   return requestJson<AttendanceActionResponse>(
     "/attendance/checkout",
-    { method: "POST", body: JSON.stringify({ method }) },
+    { method: "POST", body: JSON.stringify(payload) },
     token
   );
 }
 
 export async function createRequest(
   token: string,
-  payload: { category: "Izin" | "Cuti" | "Sakit"; startDate: string; endDate: string; title: string; detail: string }
+  payload: { category: "Izin" | "Cuti" | "Sakit" | "Permission" | "Attendance Correction" | "Forgot Check-in/out"; startDate: string; endDate: string; title: string; detail: string }
 ) {
   if (isDemoToken(token)) {
     const response: RequestActionResponse = {
@@ -108,16 +139,16 @@ export async function createRequest(
   );
 }
 
-export async function approveRequest(token: string, id: string, status: "Disetujui" | "Ditolak") {
+export async function approveRequest(token: string, id: string, status: "Disetujui" | "Ditolak", adminNote?: string) {
   if (isDemoToken(token)) {
     const response: RequestActionResponse = {
-      request: { id, title: "Demo request", status, detail: "Demo approval." }
+      request: { id, title: "Demo request", status, detail: "Demo approval.", adminNote }
     };
     return Promise.resolve(response);
   }
   return requestJson<RequestActionResponse>(
     `/admin/requests/${id}`,
-    { method: "PATCH", body: JSON.stringify({ status }) },
+    { method: "PATCH", body: JSON.stringify({ status, adminNote }) },
     token
   );
 }
@@ -151,6 +182,11 @@ export async function refreshScannerToken(token: string) {
   return requestJson<ScannerTokenPayload>("/scanner/token", {}, token);
 }
 
+export async function fetchScannerState(token: string) {
+  if (isDemoToken(token)) return Promise.resolve(getDemoScannerState());
+  return requestJson<ScannerTokenPayload & { recentScans: Array<{ id: string; employeeName: string; status: "success" | "invalid" | "expired"; time: string; detail: string }> }>("/scanner/state", {}, token);
+}
+
 export async function fetchAdminOverview(token: string) {
   if (isDemoToken(token)) return Promise.resolve(getDemoAdminOverview());
   return requestJson<AdminOverview>("/admin/overview", {}, token);
@@ -159,6 +195,30 @@ export async function fetchAdminOverview(token: string) {
 export async function fetchEmployeeSummary(token: string) {
   if (isDemoToken(token)) return Promise.resolve(getDemoEmployeeSummary());
   return requestJson<EmployeeSummary>("/employee/summary", {}, token);
+}
+
+export async function fetchExceptionQueue(token: string) {
+  if (isDemoToken(token)) return Promise.resolve(getDemoExceptionQueue());
+  return requestJson<AttendanceExceptionItem[]>("/admin/exceptions", {}, token);
+}
+
+export async function reviewException(token: string, id: string, payload: ValidationDecisionPayload) {
+  if (isDemoToken(token)) {
+    const found = getDemoExceptionQueue().find((item) => item.id === id);
+    return Promise.resolve({
+      exception: found ? { ...found, status: payload.status, adminNote: payload.adminNote, reviewedBy: "Demo Admin", reviewedAt: new Date().toISOString() } : null
+    });
+  }
+  return requestJson<{ exception: AttendanceExceptionItem }>(
+    `/admin/exceptions/${id}`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+    token
+  );
+}
+
+export async function fetchAuditLogs(token: string) {
+  if (isDemoToken(token)) return Promise.resolve(getDemoAuditLogs());
+  return requestJson<AuditLogItem[]>("/admin/audit-logs", {}, token);
 }
 
 async function requestJson<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {

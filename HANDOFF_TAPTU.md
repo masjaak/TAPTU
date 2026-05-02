@@ -74,16 +74,16 @@ Sebelum menutup batch baru:
 
 ## Kondisi build terakhir
 
-Terakhir diverifikasi hijau setelah Phase 1.5:
+Terakhir diverifikasi hijau setelah Phase 3 pada `2026-05-02 22:46:08 WIB`:
 
-- `npm run test --workspace @taptu/api` pass: `47/47`
-- `npm run test --workspace @taptu/web` pass: `55/55`
-- `npm run test --workspace @taptu/web -- designSystem` pass
+- `npm run test --workspace @taptu/api` pass: `53/53`
+- `npm run test --workspace @taptu/web` pass: `59/59`
 - `npm run typecheck` pass
 - `npm run build` pass
 - `npx cap sync ios` pass
-- Xcode build iPhone 15 Pro Max iOS 17.5 pass
-- Simulator install dan launch `com.taptu.attendance` pass
+- `xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'platform=iOS Simulator,id=78A68F51-2700-457D-8D2F-A448FB40969D' build` pass
+- simulator install pass
+- simulator launch `com.taptu.attendance` pass
 
 ## Struktur state penting
 
@@ -112,6 +112,26 @@ Terakhir diverifikasi hijau setelah Phase 1.5:
 - Token refresh menghasilkan token baru
 - TTL direset ke `30` detik
 
+### Attendance validation
+
+- Validation status:
+  - `verified`
+  - `needs_review`
+  - `blocked`
+  - `rejected`
+  - `corrected`
+- Exception status:
+  - `Need Review`
+  - `Approved`
+  - `Rejected`
+  - `Request Correction`
+- Guard dan side effect yang aktif:
+  - geofence di luar radius tidak langsung menolak attendance, tapi membuat exception
+  - QR invalid / expired masuk ke validation reason dan audit flow
+  - device mismatch masuk ke validation reason dan audit flow
+  - missing selfie bisa masuk ke validation reason / exception bila required
+  - approve/reject exception dapat mengubah `attendance_records.validation_status`
+
 ## File penting
 
 - Frontend shell:
@@ -127,14 +147,20 @@ Terakhir diverifikasi hijau setelah Phase 1.5:
   - `apps/api/src/index.ts`
 - Backend state machine:
   - `apps/api/src/domain.ts`
-- Backend persistence:
-  - `apps/api/src/store.ts`
+- Backend Supabase adapter:
+  - `apps/api/src/supabaseQueries.ts`
 - Tests:
   - `apps/api/src/domain.test.ts`
   - `apps/api/src/store.test.ts`
   - `apps/web/src/test/appShellState.test.ts`
   - `apps/web/src/test/designSystem.test.tsx`
   - `apps/web/src/test/landingPage.test.tsx`
+  - `apps/web/src/test/appPage.test.tsx`
+  - `apps/web/src/test/api.test.ts`
+- Shared types:
+  - `packages/shared/src/index.ts`
+- Supabase migration:
+  - `supabase/migrations/202605020002_attendance_validation_phase3.sql`
 
 ## Local persistence
 
@@ -167,16 +193,88 @@ Status terbaru: tidak lagi menjadi blocker untuk Phase 1.5.
 - app berhasil di-install ke simulator iPhone 15 Pro Max iOS 17.5
 - bundle `com.taptu.attendance` berhasil launch di simulator
 
+## Phase 3 update (2026-05-02)
+
+Batch ini menyelesaikan lapisan validasi attendance dan workflow operasional yang sebelumnya masih placeholder.
+
+### Yang ditambahkan
+
+- Supabase migration baru untuk persistence Phase 3:
+  - `attendance_records`
+  - `attendance_exceptions`
+  - `scanner_tokens`
+  - `work_locations`
+  - `approval_requests`
+  - `audit_logs`
+  - support role `manager` di `profiles`
+- Domain/state-machine backend diperluas untuk:
+  - geofence validation
+  - scanner token validation
+  - attendance exception creation
+  - audit log creation
+  - manager approval guard
+  - scanner scan history append
+- API backend diperluas:
+  - `GET /api/admin/exceptions`
+  - `PATCH /api/admin/exceptions/:id`
+  - `GET /api/admin/audit-logs`
+  - `GET /api/scanner/state`
+  - `GET /api/scanner/token`
+  - attendance check-in / check-out kini membawa:
+    - `locationLat`
+    - `locationLng`
+    - `selfieUrl`
+    - `deviceId`
+    - `scannerToken`
+    - `requiredSelfie`
+- Supabase adapter kini memakai tabel relasional Phase 3, bukan flow lama
+- Post-login web UI diperluas:
+  - employee attendance page punya capture selfie, token QR input, device id, validation status/reasons
+  - scanner kiosk page punya dynamic token, countdown, recent scan list, expired/invalid states
+  - admin/manager team workspace punya exception queue dengan action approve/reject/request correction
+  - reports workspace kini menampilkan audit trail
+  - approval queue kini mendukung catatan approval
+
+### Behavior penting yang sekarang aktif
+
+- Di luar radius lokasi kerja:
+  - attendance tetap tersimpan
+  - `validation_status = needs_review`
+  - exception dibuat ke queue admin
+- QR invalid / expired:
+  - validation reason ditambahkan
+  - scanner attempt masuk audit / queue
+- Device mismatch:
+  - validation reason ditambahkan
+  - audit log dibuat
+- Selfie:
+  - UI capture/upload sudah aktif
+  - field backend nullable tetap dipertahankan bila storage belum final
+- Manager:
+  - tetap role operasional terbatas
+  - hanya boleh review request kategori operasional
+
+### Review gate batch ini
+
+- TDD tetap dipakai sesuai `agent_rule.txt`
+- tests baru ditambahkan di domain dan web
+- state-machine tetap eksplisit di attendance / request / exception flow
+
+## Migration notes
+
+- File migration sudah dibuat:
+  - `supabase/migrations/202605020002_attendance_validation_phase3.sql`
+- Dari environment ini migration belum di-apply ke project Supabase remote
+- API dan query layer sudah disesuaikan ke schema baru, jadi deploy DB migration harus dilakukan sebelum mengandalkan persistence live sepenuhnya
+
 ## Next pass yang paling masuk akal
 
-1. ~~Jadikan tab `Scanner` benar-benar fullscreen operational screen~~ selesai
-2. ~~Tambahkan filter attendance history~~ selesai
-3. ~~Tambahkan request detail dan cancel untuk request pending milik employee~~ selesai
-4. ~~Admin overview + employee summary dari real store data~~ selesai
-5. Admin karyawan list - tabel karyawan yang hadir/belum hadir hari ini (dari `/api/admin/overview`)
-6. Attendance reset harian - reset state `attendance` store ke `idle` setiap hari baru
-7. Notifikasi in-app - badge di tab Izin saat ada request pending untuk admin
-8. Mulai storage DB layer produksi (SQLite atau Postgres adapter)
+1. Apply migration Phase 3 ke project Supabase remote
+2. Sambungkan upload selfie ke storage bucket Supabase atau storage backend final
+3. Tambahkan team scoping yang lebih granular untuk role `manager`
+4. Tambahkan admin employee list / live roster di dashboard
+5. Tambahkan attendance reset harian / scheduled job untuk flow operasional nyata
+6. Tambahkan reporting dan payroll-ready export di atas `attendance_records` + `audit_logs`
 
 ## Update batch terbaru (2026-04-30)
 

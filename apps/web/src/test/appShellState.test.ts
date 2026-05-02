@@ -48,11 +48,11 @@ describe("app shell state", () => {
 
   it("keeps scanner users in kiosk-first navigation", () => {
     expect(getDefaultAppSection("scanner")).toBe("scanner");
-    expect(getNavigationForRole("scanner").map((item) => item.key)).toEqual(["scanner", "attendance", "profile"]);
+    expect(getNavigationForRole("scanner").map((item) => item.key)).toEqual(["scanner", "profile"]);
   });
 
   it("falls back to the default section for unknown route segments", () => {
-    expect(toAppSection("not-a-section", "employee")).toBe("home");
+    expect(toAppSection("not-a-section", "employee")).toBe("attendance");
     expect(toAppSection(undefined, "scanner")).toBe("scanner");
   });
 });
