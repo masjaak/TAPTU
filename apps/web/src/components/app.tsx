@@ -5,8 +5,9 @@ import type {
   ReactNode,
   SelectHTMLAttributes
 } from "react";
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Menu, X } from "lucide-react";
 
 export interface AppNavItem {
   key: string;
@@ -37,10 +38,44 @@ export function AppShell({
   children: ReactNode;
   actions?: ReactNode;
 }) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeItem = navigation.find((item) => item.key === activeKey) ?? navigation[0];
+
+  function handleNavigate(item: AppNavItem) {
+    onNavigate(item);
+    setDrawerOpen(false);
+  }
+
+  const navButtonClass = (key: string) =>
+    clsx(
+      "flex items-center gap-3 rounded-[18px] px-3 py-3 text-left text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+      activeKey === key
+        ? "bg-[#111827] text-white shadow-[0_14px_30px_rgba(20,24,31,0.16)]"
+        : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
+    );
+
   return (
-    <div className="min-h-screen bg-[#e9eaec] px-4 py-4 text-[#101217] sm:px-6 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
-      <main className="mx-auto grid min-h-[calc(100vh-32px)] max-w-7xl gap-4 overflow-hidden rounded-[34px] border border-white/70 bg-[#f9fafc] p-4 shadow-[0_34px_90px_rgba(20,24,31,0.16)] lg:grid-cols-[260px_1fr] lg:p-6">
-        <aside className="flex flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)]">
+    <div className="min-h-screen bg-[#e9eaec] px-3 py-3 text-[#101217] sm:px-6 sm:py-4 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
+      <main className="mx-auto flex max-w-7xl flex-col gap-3 overflow-hidden rounded-[28px] border border-white/70 bg-[#f9fafc] p-3 shadow-[0_24px_70px_rgba(20,24,31,0.14)] sm:rounded-[34px] sm:p-4 lg:grid lg:min-h-[calc(100vh-32px)] lg:grid-cols-[260px_1fr] lg:gap-4 lg:p-6">
+        <header data-testid="mobile-app-header" className="flex items-center justify-between rounded-[24px] border border-[#edf0f5] bg-white px-4 py-3 shadow-[0_12px_28px_rgba(20,24,31,0.07)] lg:hidden">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
+            <div className="min-w-0">
+              <p className="text-sm font-black tracking-[-0.02em] text-[#111827]">Taptu</p>
+              <p className="truncate text-xs font-semibold text-[#596172]">{activeItem?.label ?? "Workspace"}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Buka navigasi"
+            onClick={() => setDrawerOpen(true)}
+            className="grid h-10 w-10 place-items-center rounded-2xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </header>
+
+        <aside data-testid="desktop-app-sidebar" className="hidden flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] lg:flex">
           <div className="flex items-center gap-3 px-1 py-2">
             <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
             <div>
@@ -54,13 +89,8 @@ export function AppShell({
               <button
                 key={item.key}
                 type="button"
-                onClick={() => onNavigate(item)}
-                className={clsx(
-                  "flex items-center gap-3 rounded-[18px] px-3 py-3 text-left text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
-                  activeKey === item.key
-                    ? "bg-[#111827] text-white shadow-[0_14px_30px_rgba(20,24,31,0.16)]"
-                    : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
-                )}
+                onClick={() => handleNavigate(item)}
+                className={navButtonClass(item.key)}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 <span>{item.label}</span>
@@ -72,18 +102,54 @@ export function AppShell({
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
             <p className="mt-2 text-sm font-black text-[#111827]">{user.fullName}</p>
             <p className="mt-1 text-xs font-semibold text-[#7a8495]">{user.organizationName}</p>
+            {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col gap-4">
-          {actions ? (
-            <div className="flex justify-end">
-              {actions}
-            </div>
-          ) : null}
+        <section className="flex min-w-0 flex-col gap-3 lg:gap-4">
           {children}
         </section>
       </main>
+
+      {drawerOpen ? (
+        <div className="fixed inset-0 z-50 bg-[#101217]/45 p-3 lg:hidden" role="presentation">
+          <div data-testid="mobile-nav-drawer" className="ml-auto flex h-full w-full max-w-sm flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
+                <div>
+                  <p className="text-sm font-black tracking-[-0.02em] text-[#111827]">Taptu</p>
+                  <p className="text-xs font-semibold text-[#596172]">{user.organizationName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup navigasi"
+                onClick={() => setDrawerOpen(false)}
+                className="grid h-10 w-10 place-items-center rounded-2xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="mt-6 grid gap-2" aria-label="Mobile workspace navigation">
+              {navigation.map((item) => (
+                <button key={item.key} type="button" onClick={() => handleNavigate(item)} className={navButtonClass(item.key)}>
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            <div className="mt-auto rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
+              <p className="mt-2 text-sm font-black text-[#111827]">{user.fullName}</p>
+              <p className="mt-1 text-xs font-semibold text-[#7a8495]">{user.organizationName}</p>
+              {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -127,7 +193,7 @@ export function StatusBadge({ children, tone = "neutral" }: { children: ReactNod
   return (
     <span
       className={clsx("inline-flex items-center rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em]", {
-        "bg-[#e9f7ef] text-[#11703d]": tone === "success",
+        "bg-[#edf4ff] text-[#174ea6]": tone === "success",
         "bg-[#fff3dc] text-[#92600a]": tone === "warning",
         "bg-[#fff2ee] text-[#a54c2f]": tone === "danger",
         "bg-[#f1f5ff] text-[#1769ff]": tone === "info",

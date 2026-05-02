@@ -2,18 +2,18 @@ import { clsx } from "clsx";
 
 type Props = {
   children: string;
-  tone?: "green" | "amber" | "slate";
+  tone?: "success" | "warning" | "neutral";
 };
 
-export function StatusPill({ children, tone = "green" }: Props) {
+export function StatusPill({ children, tone = "success" }: Props) {
   return (
     <span
       className={clsx(
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
+        "inline-flex items-center rounded-full px-3 py-1 text-xs font-bold",
         {
-          "bg-[#e7f6ef] text-[#15795a]": tone === "green",
-          "bg-[#fff3e7] text-[#aa6a26]": tone === "amber",
-          "bg-[#eff3ef] text-[#566660]": tone === "slate"
+          "bg-[#edf4ff] text-[#174ea6]": tone === "success",
+          "bg-[#fff3dc] text-[#92600a]": tone === "warning",
+          "bg-[#eff3f7] text-[#596172]": tone === "neutral"
         }
       )}
     >

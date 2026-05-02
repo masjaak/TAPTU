@@ -199,12 +199,12 @@ export function AppPage() {
 
   function toneForStatus(status: AttendanceTimelineItem["status"] | LeaveRequestItem["status"]) {
     if (status === "Terlambat" || status === "Menunggu") {
-      return "amber" as const;
+      return "warning" as const;
     }
     if (status === "Belum check-in" || status === "Ditolak") {
-      return "slate" as const;
+      return "neutral" as const;
     }
-    return "green" as const;
+    return "success" as const;
   }
 
   function setActionMessage(message: string, tone: "ok" | "err" = "ok") {
@@ -466,20 +466,20 @@ export function AppPage() {
                   { label: "Tingkat Kehadiran", value: adminOverview.totalEmployees > 0 ? `${Math.round((adminOverview.checkedInToday / adminOverview.totalEmployees) * 100)}%` : "0%", detail: "Dari total karyawan aktif" },
                   { label: "Permintaan Pending", value: String(adminOverview.pendingRequests), detail: "Menunggu approval admin" }
                 ].map((item) => (
-                  <article key={item.label} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel sm:p-6">
-                    <p className="text-sm font-semibold text-[#52645d]">{item.label}</p>
-                    <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
-                    <p className="mt-3 text-sm leading-6 text-[#667770]">{item.detail}</p>
+                  <article key={item.label} className="rounded-[28px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+                    <p className="text-sm font-semibold text-[#596172]">{item.label}</p>
+                    <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#111827] sm:text-4xl">{item.value}</p>
+                    <p className="mt-3 text-sm leading-6 text-[#667085]">{item.detail}</p>
                   </article>
                 ))}
               </section>
             ) : !isAdmin ? (
               <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {stats.map((item) => (
-                  <article key={item.label} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel sm:p-6">
-                    <p className="text-sm font-semibold text-[#52645d]">{item.label}</p>
-                    <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-ink sm:text-4xl">{item.value}</p>
-                    <p className="mt-3 text-sm leading-6 text-[#667770]">{item.detail}</p>
+                  <article key={item.label} className="rounded-[28px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+                    <p className="text-sm font-semibold text-[#596172]">{item.label}</p>
+                    <p className="font-display mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#111827] sm:text-4xl">{item.value}</p>
+                    <p className="mt-3 text-sm leading-6 text-[#667085]">{item.detail}</p>
                   </article>
                 ))}
               </section>
@@ -487,49 +487,49 @@ export function AppPage() {
 
             <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
               {isAdmin && adminOverview ? (
-                <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+                <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Ringkasan kehadiran</p>
-                      <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Aktivitas hari ini langsung dari store yang aktif.</h2>
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Ringkasan kehadiran</p>
+                      <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-[#111827] sm:text-2xl">Aktivitas hari ini langsung dari store yang aktif.</h2>
                     </div>
-                    <Users className="h-6 w-6 text-moss" />
+                    <Users className="h-6 w-6 text-[#1769ff]" />
                   </div>
                   <div className="mt-6">
                     <div className="mb-3 flex items-center justify-between text-sm">
-                      <span className="font-semibold text-ink">Check-in rate</span>
-                      <span className="text-[#5d6e67]">
+                      <span className="font-semibold text-[#111827]">Check-in rate</span>
+                      <span className="text-[#596172]">
                         {adminOverview.checkedInToday} / {adminOverview.totalEmployees} karyawan
                       </span>
                     </div>
-                    <div className="h-3 w-full overflow-hidden rounded-full bg-[#eef2ee]">
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-[#edf0f5]">
                       <div
-                        className="h-full rounded-full bg-[#2d5246] transition-all"
+                        className="h-full rounded-full bg-[#1769ff] transition-all"
                         style={{ width: adminOverview.totalEmployees > 0 ? `${Math.round((adminOverview.checkedInToday / adminOverview.totalEmployees) * 100)}%` : "0%" }}
                       />
                     </div>
                   </div>
                   <div className="mt-6 grid gap-3 sm:grid-cols-3">
                     {[
-                      { label: "Tepat waktu", value: adminOverview.onTimeToday, color: "text-[#2d5246]" },
+                      { label: "Tepat waktu", value: adminOverview.onTimeToday, color: "text-[#1769ff]" },
                       { label: "Terlambat", value: adminOverview.lateToday, color: "text-[#8a5c2e]" },
                       { label: "Belum hadir", value: Math.max(0, adminOverview.totalEmployees - adminOverview.checkedInToday), color: "text-[#5c5c6a]" }
                     ].map((item) => (
-                      <div key={item.label} className="rounded-[22px] border border-[#e4ebe4] bg-[#fbfcf8] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">{item.label}</p>
+                      <div key={item.label} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">{item.label}</p>
                         <p className={`font-display mt-2 text-2xl font-semibold tracking-[-0.04em] ${item.color}`}>{item.value}</p>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+                <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Fokus hari ini</p>
-                      <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-ink sm:text-2xl">Absensi, izin, dan scanner berjalan dari satu fondasi yang sama.</h2>
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Fokus hari ini</p>
+                      <h2 className="font-display mt-3 text-xl font-semibold tracking-[-0.03em] text-[#111827] sm:text-2xl">Absensi, izin, dan scanner berjalan dari satu fondasi yang sama.</h2>
                     </div>
-                    <Bell className="h-6 w-6 text-moss" />
+                    <Bell className="h-6 w-6 text-[#1769ff]" />
                   </div>
                   <div className="mt-7 grid gap-4 md:grid-cols-3">
                     {[
@@ -537,21 +537,21 @@ export function AppPage() {
                       [MapPinned, "Izin lebih rapi", "Employee kirim pengajuan, admin review dari panel yang sama."],
                       [ScanFace, "Scanner aktif", "Token QR bisa di-refresh dari mode scanner kapan saja."]
                     ].map(([Icon, title, detail]) => (
-                      <div key={title as string} className="rounded-[24px] border border-[#e4ebe4] bg-[#fbfcf8] p-5">
-                        <Icon className="h-10 w-10 rounded-2xl bg-white p-2.5 text-moss shadow-sm" />
-                        <h3 className="mt-5 text-lg font-semibold text-ink">{title as string}</h3>
-                        <p className="mt-3 text-sm leading-6 text-[#62736d]">{detail as string}</p>
+                      <div key={title as string} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-5">
+                        <Icon className="h-10 w-10 rounded-2xl bg-white p-2.5 text-[#1769ff] shadow-sm" />
+                        <h3 className="mt-5 text-lg font-semibold text-[#111827]">{title as string}</h3>
+                        <p className="mt-3 text-sm leading-6 text-[#596172]">{detail as string}</p>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="rounded-[30px] border border-[#dae5db] bg-[#12261f] p-5 text-white shadow-panel sm:p-6">
+              <div className="rounded-[30px] border border-[#edf0f5] bg-[#111827] p-5 text-white shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
                 <div className="flex items-center gap-3">
-                  <Clock3 className="h-6 w-6 text-[#97d7be]" />
+                  <Clock3 className="h-6 w-6 text-[#8bb8ff]" />
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Rencana kerja</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8bb8ff]">Rencana kerja</p>
                     <h2 className="font-display mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl">Flow mobile utama yang sekarang sudah aktif</h2>
                   </div>
                 </div>
@@ -560,10 +560,10 @@ export function AppPage() {
                     <div key={item.time + item.title} className="rounded-[24px] border border-white/10 bg-white/6 p-4">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-lg font-semibold">{item.time}</p>
-                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-[#bdd9cc]">Aktif</span>
+                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-[#cbd5e1]">Aktif</span>
                       </div>
                       <p className="mt-4 text-base font-medium">{item.title}</p>
-                      <p className="mt-2 text-sm leading-6 text-[#b8cec3]">{item.detail}</p>
+                      <p className="mt-2 text-sm leading-6 text-[#cbd5e1]">{item.detail}</p>
                     </div>
                   ))}
                 </div>
@@ -585,7 +585,7 @@ export function AppPage() {
                 </div>
                 <span
                   className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold ${
-                    attendanceTrust.canClock ? "bg-[#e9f7ef] text-[#11703d]" : "bg-[#fff1d6] text-[#8a5c00]"
+                    attendanceTrust.canClock ? "bg-[#edf4ff] text-[#174ea6]" : "bg-[#fff1d6] text-[#8a5c00]"
                   }`}
                 >
                   {attendanceTrust.canClock ? <CheckCircle2 className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
@@ -665,9 +665,9 @@ export function AppPage() {
               <div className="mt-6 rounded-[24px] border border-white/10 bg-white/6 p-4">
                 <p className="text-sm font-semibold">State saat ini</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">{attendanceState}</span>
-                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">Shift Pagi</span>
-                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#d3e2db]">{attendanceTrust.status}</span>
+                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#cbd5e1]">{attendanceState}</span>
+                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#cbd5e1]">Shift Pagi</span>
+                  <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-[#cbd5e1]">{attendanceTrust.status}</span>
                 </div>
               </div>
             </div>
@@ -687,7 +687,7 @@ export function AppPage() {
                     type="button"
                     onClick={() => setHistoryFilter(filter)}
                     className={`rounded-2xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] ${
-                      historyFilter === filter ? "bg-ink text-white" : "border border-[#dfe6de] bg-[#fbfcfa] text-[#5d6d66]"
+                      historyFilter === filter ? "bg-[#111827] text-white" : "border border-[#edf0f5] bg-[#f9fafc] text-[#596172]"
                     }`}
                   >
                     {filter === "all" ? "Semua" : filter === "present" ? "Tepat waktu" : "Perlu perhatian"}
@@ -697,20 +697,20 @@ export function AppPage() {
               <div className="mt-6 space-y-4">
                 {groupedAttendance.map((group) => (
                   <div key={group.day}>
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#6a7b75]">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#667085]">
                       {formatAttendanceGroupLabel(group.day, group.items.length)}
                     </p>
                     <div className="space-y-3">
                       {group.items.map((item) => (
-                        <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#e6ece5] bg-[#fbfcfa] p-4">
+                        <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-ink">{item.time}</p>
-                              <p className="mt-1 text-sm text-[#667770]">{item.day}</p>
+                              <p className="text-sm font-semibold text-[#111827]">{item.time}</p>
+                              <p className="mt-1 text-sm text-[#667085]">{item.day}</p>
                             </div>
                             <StatusPill tone={toneForStatus(item.status)}>{item.status}</StatusPill>
                           </div>
-                          <div className="mt-4 flex items-center justify-between text-sm text-[#576863]">
+                          <div className="mt-4 flex items-center justify-between text-sm text-[#596172]">
                             <span>Metode {item.method}</span>
                             <span>Sinkron</span>
                           </div>
@@ -726,9 +726,9 @@ export function AppPage() {
 
         {tab === "requests" ? (
           <section className="grid gap-5 xl:grid-cols-[0.82fr_1fr_0.78fr]">
-            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Pengajuan dan approval</p>
-              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">
+            <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Pengajuan dan approval</p>
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#111827]">
                 {isAdmin ? "Admin bisa review pengajuan langsung dari panel ini." : "Karyawan bisa kirim izin tanpa keluar dari mobile workspace."}
               </h2>
               {isAdmin ? (
@@ -745,7 +745,7 @@ export function AppPage() {
                       <select
                         value={requestForm.category}
                         onChange={(event) => setRequestForm((current) => ({ ...current, category: event.target.value as "Izin" | "Cuti" | "Sakit" }))}
-                        className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                        className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm outline-none transition focus:border-[#1769ff]"
                       >
                         <option value="Izin">Izin</option>
                         <option value="Cuti">Cuti</option>
@@ -758,7 +758,7 @@ export function AppPage() {
                         type="date"
                         value={requestForm.startDate}
                         onChange={(event) => setRequestForm((current) => ({ ...current, startDate: event.target.value }))}
-                        className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                        className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm outline-none transition focus:border-[#1769ff]"
                       />
                     </label>
                     <label className="block">
@@ -767,7 +767,7 @@ export function AppPage() {
                         type="date"
                         value={requestForm.endDate}
                         onChange={(event) => setRequestForm((current) => ({ ...current, endDate: event.target.value }))}
-                        className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                        className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm outline-none transition focus:border-[#1769ff]"
                       />
                     </label>
                   </div>
@@ -776,7 +776,7 @@ export function AppPage() {
                     <input
                       value={requestForm.title}
                       onChange={(event) => setRequestForm((current) => ({ ...current, title: event.target.value }))}
-                      className="w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                      className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm outline-none transition focus:border-[#1769ff]"
                       placeholder="Contoh: Izin pribadi"
                     />
                   </label>
@@ -785,7 +785,7 @@ export function AppPage() {
                     <textarea
                       value={requestForm.detail}
                       onChange={(event) => setRequestForm((current) => ({ ...current, detail: event.target.value }))}
-                      className="min-h-[120px] w-full rounded-2xl border border-[#d6ddd6] bg-[#fbfcfa] px-4 py-3 text-sm outline-none transition focus:border-moss"
+                      className="min-h-[120px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm outline-none transition focus:border-[#1769ff]"
                       placeholder="Tuliskan alasan dan waktu pengajuan."
                     />
                   </label>
@@ -797,12 +797,12 @@ export function AppPage() {
             </div>
             <div className="space-y-3">
               {requests.map((item) => (
-                <article key={item.id ?? item.title} className="rounded-[28px] border border-[#dfe6de] bg-white p-5 shadow-panel">
+                <article key={item.id ?? item.title} className="rounded-[28px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)]">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-ink">{item.title}</h3>
-                      {item.requester ? <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-moss">{item.requester}</p> : null}
-                      <p className="mt-3 text-sm leading-7 text-[#62726c]">{item.detail}</p>
+                      <h3 className="text-lg font-semibold text-[#111827]">{item.title}</h3>
+                      {item.requester ? <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#1769ff]">{item.requester}</p> : null}
+                      <p className="mt-3 text-sm leading-7 text-[#596172]">{item.detail}</p>
                     </div>
                     <StatusPill tone={toneForStatus(item.status)}>{item.status}</StatusPill>
                   </div>
@@ -831,47 +831,47 @@ export function AppPage() {
                 </article>
               ))}
             </div>
-            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Detail pengajuan</p>
+            <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Detail pengajuan</p>
               {requestDetail ? (
                 <div className="mt-5 space-y-4">
-                  <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Judul</p>
-                    <p className="mt-2 text-lg font-semibold text-ink">{requestDetail.title}</p>
+                  <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Judul</p>
+                    <p className="mt-2 text-lg font-semibold text-[#111827]">{requestDetail.title}</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Tipe</p>
-                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.category ?? "-"}</p>
+                    <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Tipe</p>
+                      <p className="mt-2 text-sm font-semibold text-[#111827]">{requestDetail.category ?? "-"}</p>
                     </div>
-                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Mulai</p>
-                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.startDate ?? "-"}</p>
+                    <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Mulai</p>
+                      <p className="mt-2 text-sm font-semibold text-[#111827]">{requestDetail.startDate ?? "-"}</p>
                     </div>
-                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Selesai</p>
-                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.endDate ?? "-"}</p>
+                    <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Selesai</p>
+                      <p className="mt-2 text-sm font-semibold text-[#111827]">{requestDetail.endDate ?? "-"}</p>
                     </div>
                   </div>
                   {requestDetail.requester ? (
-                    <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Pengaju</p>
-                      <p className="mt-2 text-sm font-semibold text-ink">{requestDetail.requester}</p>
+                    <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Pengaju</p>
+                      <p className="mt-2 text-sm font-semibold text-[#111827]">{requestDetail.requester}</p>
                     </div>
                   ) : null}
-                  <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Status</p>
+                  <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Status</p>
                     <div className="mt-3">
                       <StatusPill tone={toneForStatus(requestDetail.status)}>{requestDetail.status}</StatusPill>
                     </div>
                   </div>
-                  <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Catatan</p>
-                    <p className="mt-3 text-sm leading-7 text-[#5f706a]">{requestDetail.detail}</p>
+                  <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Catatan</p>
+                    <p className="mt-3 text-sm leading-7 text-[#596172]">{requestDetail.detail}</p>
                   </div>
                 </div>
               ) : (
-                <div className="mt-5 rounded-[24px] border border-dashed border-[#d8e0d8] bg-[#fbfcfa] px-4 py-6 text-sm leading-7 text-[#60716b]">
+                <div className="mt-5 rounded-[24px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-4 py-6 text-sm leading-7 text-[#596172]">
                   Pilih salah satu pengajuan untuk melihat detailnya di panel ini.
                 </div>
               )}
@@ -881,51 +881,51 @@ export function AppPage() {
 
         {tab === "scanner" ? (
           <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-[34px] border border-[#0f2b22] bg-[#10211c] p-5 text-white shadow-panel sm:p-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#97d7be]">Mode scanner</p>
+            <div className="rounded-[34px] border border-[#111827] bg-[#111827] p-5 text-white shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8bb8ff]">Mode scanner</p>
               <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em]">Tampilan scanner dibuat lebih fokus, lebih besar, dan lebih siap dipakai di lapangan.</h2>
-              <div className="mt-6 rounded-[30px] border border-white/10 bg-[#173229] p-6">
-                <p className="text-sm text-[#a4cbbc]">Token aktif</p>
+              <div className="mt-6 rounded-[30px] border border-white/10 bg-[#0f172a] p-6">
+                <p className="text-sm text-[#cbd5e1]">Token aktif</p>
                 <p className="font-display mt-4 text-5xl font-semibold tracking-[0.14em] sm:text-6xl">{scannerToken ?? "HDR-31A-7XZ"}</p>
-                <div className="mt-6 rounded-[24px] border border-dashed border-[#2a4c41] bg-[#10261f] px-4 py-10 text-center">
-                  <p className="text-xs uppercase tracking-[0.24em] text-[#8fbcae]">Area QR fullscreen</p>
-                  <div className="mx-auto mt-5 flex h-56 w-full max-w-[320px] items-center justify-center rounded-[28px] border border-white/10 bg-[#0d1d18]">
+                <div className="mt-6 rounded-[24px] border border-dashed border-[#2a4c41] bg-[#0f172a] px-4 py-10 text-center">
+                  <p className="text-xs uppercase tracking-[0.24em] text-[#94a3b8]">Area QR fullscreen</p>
+                  <div className="mx-auto mt-5 flex h-56 w-full max-w-[320px] items-center justify-center rounded-[28px] border border-white/10 bg-[#0b1220]">
                     <div className="grid grid-cols-4 gap-2">
                       {Array.from({ length: 16 }).map((_, index) => (
-                        <div key={index} className={`h-8 w-8 rounded-[8px] ${index % 3 === 0 || index % 5 === 0 ? "bg-white" : "bg-[#2d4b41]"}`} />
+                        <div key={index} className={`h-8 w-8 rounded-[8px] ${index % 3 === 0 || index % 5 === 0 ? "bg-white" : "bg-[#334155]"}`} />
                       ))}
                     </div>
                   </div>
                 </div>
-                <p className="mt-4 text-sm text-[#bad1c8]">Auto refresh siap dipakai untuk scanner PWA fullscreen di iPad atau tablet front desk.</p>
+                <p className="mt-4 text-sm text-[#cbd5e1]">Auto refresh siap dipakai untuk scanner PWA fullscreen di iPad atau tablet front desk.</p>
                 <Button className="mt-5 w-full" disabled={busyAction === "refresh-scanner"} onClick={handleRefreshScannerToken}>
                   {busyAction === "refresh-scanner" ? "Memperbarui..." : "Refresh token scanner"}
                 </Button>
               </div>
             </div>
-            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Status scanner</p>
+            <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Status scanner</p>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#657670]">TTL</p>
-                  <p className="font-display mt-2 text-2xl text-ink">{scannerMeta?.expiresInSeconds ?? 30}s</p>
+                <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">TTL</p>
+                  <p className="font-display mt-2 text-2xl text-[#111827]">{scannerMeta?.expiresInSeconds ?? 30}s</p>
                 </div>
-                <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#657670]">Scan hari ini</p>
-                  <p className="font-display mt-2 text-2xl text-ink">{scannerMeta?.scansToday ?? 124}</p>
+                <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Scan hari ini</p>
+                  <p className="font-display mt-2 text-2xl text-[#111827]">{scannerMeta?.scansToday ?? 124}</p>
                 </div>
-                <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#657670]">Lokasi</p>
-                  <p className="mt-2 text-sm font-semibold text-ink">{scannerMeta?.locationName ?? "Gerbang Utama"}</p>
+                <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Lokasi</p>
+                  <p className="mt-2 text-sm font-semibold text-[#111827]">{scannerMeta?.locationName ?? "Gerbang Utama"}</p>
                 </div>
               </div>
               <div className="mt-5 space-y-3">
                 {attendance.map((item) => (
-                  <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#e6ece5] bg-[#fbfcfa] p-4">
+                  <article key={`${item.day}-${item.time}-${item.method}`} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-ink">{item.day}</p>
-                        <p className="mt-1 text-sm text-[#667770]">{item.time}</p>
+                        <p className="text-sm font-semibold text-[#111827]">{item.day}</p>
+                        <p className="mt-1 text-sm text-[#667085]">{item.time}</p>
                       </div>
                       <StatusPill tone={toneForStatus(item.status)}>{item.status}</StatusPill>
                     </div>
@@ -938,51 +938,51 @@ export function AppPage() {
 
         {tab === "profile" ? (
           <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Profil akun</p>
-              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">{currentSession.user.fullName}</h2>
-              <div className="mt-6 space-y-4 text-sm text-[#61726c]">
-                <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Email</p>
-                  <p className="mt-2 font-medium text-ink">{currentSession.user.email}</p>
+            <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Profil akun</p>
+              <h2 className="font-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#111827]">{currentSession.user.fullName}</h2>
+              <div className="mt-6 space-y-4 text-sm text-[#596172]">
+                <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Email</p>
+                  <p className="mt-2 font-medium text-[#111827]">{currentSession.user.email}</p>
                 </div>
-                <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Organisasi</p>
-                  <p className="mt-2 font-medium text-ink">{currentSession.user.organizationName}</p>
+                <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Organisasi</p>
+                  <p className="mt-2 font-medium text-[#111827]">{currentSession.user.organizationName}</p>
                 </div>
-                <div className="rounded-[24px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#64756e]">Role</p>
-                  <p className="mt-2 font-medium capitalize text-ink">{currentSession.user.role}</p>
+                <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Role</p>
+                  <p className="mt-2 font-medium capitalize text-[#111827]">{currentSession.user.role}</p>
                 </div>
               </div>
             </div>
-            <div className="rounded-[30px] border border-[#dae5db] bg-white p-5 shadow-panel sm:p-6">
+            <div className="rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">Ringkasan kehadiran</p>
-                <TrendingUp className="h-5 w-5 text-moss" />
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#1769ff]">Ringkasan kehadiran</p>
+                <TrendingUp className="h-5 w-5 text-[#1769ff]" />
               </div>
               {employeeSummary ? (
                 <>
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
                     {[
-                      { label: "Total Hadir", value: String(employeeSummary.totalDays), color: "text-ink" },
-                      { label: "Tepat Waktu", value: String(employeeSummary.onTimeDays), color: "text-[#2d5246]" },
+                      { label: "Total Hadir", value: String(employeeSummary.totalDays), color: "text-[#111827]" },
+                      { label: "Tepat Waktu", value: String(employeeSummary.onTimeDays), color: "text-[#1769ff]" },
                       { label: "Terlambat", value: String(employeeSummary.lateDays), color: "text-[#8a5c2e]" }
                     ].map((item) => (
-                      <div key={item.label} className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">{item.label}</p>
+                      <div key={item.label} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">{item.label}</p>
                         <p className={`font-display mt-2 text-2xl font-semibold tracking-[-0.04em] ${item.color}`}>{item.value}</p>
                       </div>
                     ))}
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">Izin pending</p>
-                      <p className="font-display mt-2 text-2xl font-semibold tracking-[-0.04em] text-ink">{employeeSummary.pendingRequests}</p>
+                    <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Izin pending</p>
+                      <p className="font-display mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#111827]">{employeeSummary.pendingRequests}</p>
                     </div>
-                    <div className="rounded-[22px] border border-[#e5ece4] bg-[#fbfcfa] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667770]">Status hari ini</p>
-                      <p className="mt-2 text-sm font-semibold capitalize text-ink">
+                    <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">Status hari ini</p>
+                      <p className="mt-2 text-sm font-semibold capitalize text-[#111827]">
                         {employeeSummary.currentAttendanceState === "idle"
                           ? "Belum check-in"
                           : employeeSummary.currentAttendanceState === "checked_in"
@@ -995,7 +995,7 @@ export function AppPage() {
               ) : (
                 <div className="mt-5 space-y-3">
                   {["Tingkat kehadiran", "Izin yang disetujui", "Riwayat check-in bulan ini"].map((item) => (
-                    <div key={item} className="h-14 animate-pulse rounded-[22px] bg-[#f2f4f2]" />
+                    <div key={item} className="h-14 animate-pulse rounded-[22px] bg-[#edf0f5]" />
                   ))}
                 </div>
               )}
