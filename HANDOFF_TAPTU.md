@@ -25,7 +25,7 @@ Taptu sudah punya baseline full-stack lokal:
   - landing page responsif dengan visual direction ChronoTask-inspired
   - Motion animation pada hero, floating cards, CTA, section reveal, dan validation progress bars
   - login page
-  - mobile-first app shell
+  - post-login app shell dengan desktop sidebar dan mobile drawer
   - tab `Beranda`, `Absensi`, `Izin`, `Scanner`, `Profil`
   - PWA manifest
   - app icon, favicon, splash SVG
@@ -66,15 +66,24 @@ Sebelum menutup batch baru:
    - tidak pakai nama lama `Hadiri` di surface web/API aktif
    - tidak pakai em dash
    - motion harus menghormati `MotionConfig reducedMotion="user"`
+   - tidak ada trace theme dashboard lama di active web source:
+     - `moss`, `mist`, `sand`, `cloud`, `steel`
+     - `shadow-panel`
+     - `green`, `emerald`, `teal`, `lime` kecuali semantic state yang memang disengaja
+     - hex lama `#2d5246`, `#10211c`, `#12261f`, `#173229`, `#97d7be`, `#11703d`, `#e9f7ef`
 
 ## Kondisi build terakhir
 
-Terakhir diverifikasi hijau:
+Terakhir diverifikasi hijau setelah Phase 1.5:
 
-- API tests pass `44/44`
-- Web tests pass `14/14`
-- `npm run typecheck --workspace @taptu/web` pass
-- `npm run build:web` pass
+- `npm run test --workspace @taptu/api` pass: `47/47`
+- `npm run test --workspace @taptu/web` pass: `55/55`
+- `npm run test --workspace @taptu/web -- designSystem` pass
+- `npm run typecheck` pass
+- `npm run build` pass
+- `npx cap sync ios` pass
+- Xcode build iPhone 15 Pro Max iOS 17.5 pass
+- Simulator install dan launch `com.taptu.attendance` pass
 
 ## Struktur state penting
 
@@ -107,6 +116,9 @@ Terakhir diverifikasi hijau:
 
 - Frontend shell:
   - `apps/web/src/pages/AppPage.tsx`
+- Post-login design system / app shell:
+  - `apps/web/src/components/app.tsx`
+  - `apps/web/src/components/StatusPill.tsx`
 - Frontend API client:
   - `apps/web/src/lib/api.ts`
 - App shell tabs/state:
@@ -121,6 +133,7 @@ Terakhir diverifikasi hijau:
   - `apps/api/src/domain.test.ts`
   - `apps/api/src/store.test.ts`
   - `apps/web/src/test/appShellState.test.ts`
+  - `apps/web/src/test/designSystem.test.tsx`
   - `apps/web/src/test/landingPage.test.tsx`
 
 ## Local persistence
@@ -147,12 +160,12 @@ Error terakhir:
 
 ### iOS / Simulator
 
-Wrapper iOS belum lanjut karena `CocoaPods` belum tersedia.
+Status terbaru: tidak lagi menjadi blocker untuk Phase 1.5.
 
-Status penting:
-
-- simulator iPhone 15 Pro Max iOS 17.5 sempat berhasil terdeteksi
-- tapi project iOS native belum digenerate karena `npx cap add ios` masih tertahan dependency environment
+- `npx cap sync ios` berhasil
+- `xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'platform=iOS Simulator,id=78A68F51-2700-457D-8D2F-A448FB40969D' build` berhasil
+- app berhasil di-install ke simulator iPhone 15 Pro Max iOS 17.5
+- bundle `com.taptu.attendance` berhasil launch di simulator
 
 ## Next pass yang paling masuk akal
 
@@ -708,3 +721,133 @@ TDD dilakukan:
 - Web tests: 43/43 hijau
 - `npm run typecheck` pass (shared + api + web)
 - Build clean
+
+## Update Phase 1.5: post-login UI cleanup dan responsive audit (2026-05-02)
+
+Phase ini hanya membersihkan design system, AppShell, responsive behavior, trace theme lama, dan layout dashboard. Tidak ada fitur produk Phase 2 yang ditambahkan.
+
+### Masalah yang ditemukan
+
+- Mobile post-login masih terasa seperti desktop sidebar yang dipaksa masuk ke layar phone.
+- Konten dashboard mobile terdorong terlalu jauh ke bawah karena navigasi dan wrapper terlalu besar.
+- Logout/profile terasa awkward di mobile karena bukan bagian dari struktur drawer/profile yang compact.
+- Active navigation state terlalu berat untuk mobile.
+- Source post-login masih menyimpan trace theme lama dari dashboard awal.
+
+### Theme trace yang dihapus
+
+Trace lama yang dibersihkan dari active web source:
+
+- token Tailwind lama: `moss`, `mist`, `sand`, `cloud`, `steel`
+- utility lama: `shadow-panel`, `text-ink`, `bg-ink`, `focus:border-moss`
+- warna hijau lama: `#2d5246`, `#10211c`, `#12261f`, `#173229`, `#97d7be`, `#11703d`, `#e9f7ef`
+- class warna lama: `green`, `emerald`, `teal`, `lime` di active post-login source
+- success state dipindahkan ke tone biru lembut: `#edf4ff` + `#174ea6`
+
+Scan terakhir:
+
+```bash
+rg -n "moss|mist|sand|cloud|steel|shadow-panel|green|emerald|teal|lime|#2d5246|#10211c|#12261f|#173229|#97d7be|#11703d|#e9f7ef|#dae5db|#dfe6de|#e4ebe4|#fbfcf8|#fbfcfa|text-ink|bg-ink|focus:border-moss" apps/web/src apps/web/tailwind.config.js
+```
+
+Result: clean, tidak ada output.
+
+### AppShell dan responsive strategy
+
+Mobile sekarang memakai:
+
+- compact top header dengan Taptu logomark, current page title, dan menu button
+- slide-out drawer untuk role-aware navigation
+- drawer profile section untuk workspace/user/logout
+- desktop sidebar disembunyikan di mobile dengan `lg:flex`
+- dashboard content dimulai dekat bagian atas layar dengan padding lebih kecil
+
+Desktop tetap memakai sidebar:
+
+- sidebar hanya muncul di `lg`
+- profile/logout ada di bagian bawah sidebar
+- layout dashboard tetap balanced setelah mobile refactor
+
+### Komponen yang diubah
+
+- `AppShell`
+- desktop sidebar
+- mobile header
+- mobile drawer navigation
+- profile/logout area
+- `StatusPill`
+- post-login dashboard style tokens di `AppPage`
+- Tailwind config custom token lama dihapus
+
+### File yang berubah
+
+- `apps/web/src/components/app.tsx`
+- `apps/web/src/components/StatusPill.tsx`
+- `apps/web/src/pages/AppPage.tsx`
+- `apps/web/src/test/designSystem.test.tsx`
+- `apps/web/tailwind.config.js`
+
+### Agent rule review
+
+Mengikuti `/Users/masjak/Downloads/KUMPULAN SKILLS/agent_rule.txt`:
+
+- TDD dilakukan sebelum implementasi:
+  - test mobile AppShell memastikan mobile header ada, desktop sidebar hidden, drawer baru muncul setelah menu dibuka
+  - test old-theme scan memastikan active post-login source tidak menyimpan token/warna lama
+- State-machine thinking diterapkan pada mobile drawer:
+  - state awal: drawer closed, main content visible
+  - event: click `Buka navigasi`
+  - state berikutnya: drawer open, navigation/profile terlihat
+  - event: pilih nav atau close
+  - state berikutnya: drawer closed
+
+### QA responsive
+
+Breakpoint yang dicek:
+
+- mobile portrait
+- mobile landscape
+- tablet
+- desktop
+
+Hal yang dicek:
+
+- tidak ada horizontal overflow terlihat
+- desktop sidebar tidak muncul di mobile/tablet
+- content dashboard tidak jatuh terlalu jauh ke bawah
+- active nav state lebih compact
+- logout tidak floating awkwardly
+- card spacing lebih konsisten
+- warna mengikuti landing/login: white, soft gray, dark navy, primary blue
+
+Screenshot QA dibuat di:
+
+- `/tmp/taptu-phase15-mobile-portrait.png`
+- `/tmp/taptu-phase15-mobile-landscape.png`
+- `/tmp/taptu-phase15-tablet.png`
+- `/tmp/taptu-phase15-desktop.png`
+
+### Kondisi build setelah Phase 1.5
+
+- `npm run test --workspace @taptu/web -- designSystem` pass
+- `npm run test --workspace @taptu/api` pass: `47/47`
+- `npm run test --workspace @taptu/web` pass: `55/55`
+- `npm run typecheck` pass
+- `npm run build` pass
+- `npx cap sync ios` pass
+- Xcode build pass untuk iPhone 15 Pro Max iOS 17.5 simulator
+- app berhasil di-install dan launch di simulator dengan bundle `com.taptu.attendance`
+
+### Routes yang perlu dicek manual sebelum Phase 2
+
+- `/app`
+- `/app?role=admin`
+- `/app?role=manager`
+- `/app?role=employee`
+- `/app?role=scanner`
+
+### Catatan untuk Phase 2
+
+- Lanjutkan build feature attendance validation setelah UI foundation ini dipertahankan.
+- Jangan mengembalikan token/theme lama yang sudah dibersihkan.
+- Untuk success state, gunakan semantic tone yang subtle dan kompatibel dengan Taptu, bukan hijau dashboard lama.
