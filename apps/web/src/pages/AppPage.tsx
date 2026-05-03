@@ -93,6 +93,12 @@ import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
 type EmployeeCheckInFlowState = "idle" | "waiting_for_selfie" | "submitting";
+type CapturedSelfie = {
+  previewUrl: string;
+  dataUrl: string;
+  fileName: string;
+  contentType: string;
+};
 type AttendanceHistorySource = Partial<AttendanceTimelineItem> & {
   date?: string;
   attendanceDate?: string;
@@ -123,6 +129,22 @@ function normalizeAttendanceStatus(value: unknown): AttendanceTimelineItem["stat
   }
 
   return "Tepat waktu";
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Selfie belum bisa diproses."));
+    };
+    reader.onerror = () => reject(new Error("Selfie belum bisa diproses."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function formatAttendanceDateLabel(value?: string) {
@@ -220,6 +242,9 @@ export function AppPage() {
     locationLat: undefined as number | undefined,
     locationLng: undefined as number | undefined,
     selfieUrl: "",
+    selfieData: undefined as string | undefined,
+    selfieFileName: undefined as string | undefined,
+    selfieContentType: undefined as string | undefined,
     requiredSelfie: true,
     deviceId: ""
   });
@@ -576,20 +601,25 @@ export function AppPage() {
     }
   }
 
-  async function submitCheckIn(selfieUrl = attendanceCapture.selfieUrl) {
+  async function submitCheckIn(capturedSelfie?: CapturedSelfie) {
     if (checkInFlowState === "submitting") {
       return;
     }
 
     setCheckInFlowState("submitting");
     setBusyAction("checkin");
+    const selfiePreviewUrl = capturedSelfie?.previewUrl ?? attendanceCapture.selfieUrl;
+    const selfieData = capturedSelfie?.dataUrl ?? attendanceCapture.selfieData;
 
     try {
       const response = await checkIn(currentSession.token, {
         method: "Manual",
         locationLat: attendanceCapture.locationLat,
         locationLng: attendanceCapture.locationLng,
-        selfieUrl: selfieUrl || undefined,
+        selfieUrl: undefined,
+        selfieData,
+        selfieFileName: capturedSelfie?.fileName ?? attendanceCapture.selfieFileName,
+        selfieContentType: capturedSelfie?.contentType ?? attendanceCapture.selfieContentType,
         deviceId: attendanceCapture.deviceId || undefined,
         requiredSelfie: attendanceCapture.requiredSelfie
       });
@@ -605,8 +635,8 @@ export function AppPage() {
         },
         response.attendanceState
       );
-      if (selfieUrl) {
-        setActionMessage(response.validationStatus === "needs_review" ? "Selfie proof captured untuk check-in ini. Status menunggu review." : "Selfie proof captured untuk check-in ini.");
+      if (selfiePreviewUrl) {
+        setActionMessage(response.validationStatus === "needs_review" ? "Check-in berhasil. Bukti selfie menunggu review." : "Check-in berhasil.");
       } else {
         setActionMessage(response.validationStatus === "needs_review" ? "Check-in tersimpan dan menunggu review." : "Check-in berhasil tersimpan.");
       }
@@ -677,7 +707,7 @@ export function AppPage() {
     }
   }
 
-  function handleSelfieUpload(event: ChangeEvent<HTMLInputElement>) {
+  async function handleSelfieUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
       setCheckInFlowState("idle");
@@ -685,13 +715,32 @@ export function AppPage() {
       return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setAttendanceCapture((current) => ({ ...current, selfieUrl: previewUrl }));
-    if (checkInFlowState === "waiting_for_selfie") {
-      void submitCheckIn(previewUrl);
-      return;
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const previewUrl = URL.createObjectURL(file);
+      const capturedSelfie = {
+        previewUrl,
+        dataUrl,
+        fileName: file.name,
+        contentType: file.type || "image/jpeg"
+      };
+
+      setAttendanceCapture((current) => ({
+        ...current,
+        selfieUrl: previewUrl,
+        selfieData: dataUrl,
+        selfieFileName: file.name,
+        selfieContentType: file.type || "image/jpeg"
+      }));
+      if (checkInFlowState === "waiting_for_selfie") {
+        void submitCheckIn(capturedSelfie);
+        return;
+      }
+      setActionMessage("Selfie siap untuk check-in ini.");
+    } catch (error) {
+      setCheckInFlowState("idle");
+      setActionMessage(error instanceof Error ? error.message : "Selfie belum bisa diproses.", "err");
     }
-    setActionMessage("Selfie proof captured untuk check-in ini.");
   }
 
   async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
@@ -1170,7 +1219,7 @@ export function AppPage() {
                     <div className="flex min-w-0 items-center gap-3 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3">
                       <img src={attendanceCapture.selfieUrl} alt="Preview selfie attendance" className="h-16 w-16 rounded-2xl object-cover" />
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-[#111827]">Selfie proof captured</p>
+                        <p className="text-sm font-black text-[#111827]">Selfie siap</p>
                         <p className="mt-1 text-xs font-semibold text-[#667085]">Bukti selfie akan ikut dipakai untuk validasi check-in ini.</p>
                       </div>
                     </div>
@@ -1194,7 +1243,7 @@ export function AppPage() {
                   {busyAction === "checkout" ? "Menyimpan..." : "Check-out sekarang"}
                 </SecondaryButton>
                 {checkInFlowState === "waiting_for_selfie" ? (
-                  <SecondaryButton disabled={busyAction === "checkin"} onClick={() => void submitCheckIn("")}>
+                  <SecondaryButton disabled={busyAction === "checkin"} onClick={() => void submitCheckIn()}>
                     <Camera className="mr-2 h-4 w-4" />
                     Simpan tanpa selfie
                   </SecondaryButton>

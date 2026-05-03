@@ -8,6 +8,7 @@ export interface SupabaseConfig {
   serviceRoleKey?: string;
   tableName: string;
   storeKey: string;
+  attendanceSelfieBucket?: string;
 }
 
 export interface ApiConfig {
@@ -62,7 +63,8 @@ export function getApiConfig(): ApiConfig {
       url: process.env.SUPABASE_URL,
       serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
       tableName: process.env.SUPABASE_STORE_TABLE ?? "taptu_app_store",
-      storeKey: process.env.SUPABASE_STORE_KEY ?? "demo"
+      storeKey: process.env.SUPABASE_STORE_KEY ?? "demo",
+      attendanceSelfieBucket: process.env.SUPABASE_ATTENDANCE_SELFIE_BUCKET
     }
   };
 }

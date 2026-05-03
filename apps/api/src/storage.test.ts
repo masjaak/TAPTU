@@ -98,4 +98,26 @@ describe("storage adapter", () => {
       )
     ).toThrow("SUPABASE_URL is required");
   });
+
+  it("returns pending selfie storage when no attendance selfie bucket is configured", async () => {
+    const result = await __test.uploadAttendanceSelfie(
+      {
+        url: "https://ajlfwivpllbcmadscmkb.supabase.co",
+        serviceRoleKey: "service-key",
+        tableName: "taptu_app_store",
+        storeKey: "demo"
+      },
+      "usr-employee-01",
+      {
+        dataUrl: "data:image/jpeg;base64,c2VsZmll",
+        fileName: "selfie.jpg",
+        contentType: "image/jpeg"
+      }
+    );
+
+    expect(result).toEqual({
+      selfieUrl: undefined,
+      reason: "Penyimpanan selfie belum tersedia."
+    });
+  });
 });

@@ -445,12 +445,15 @@ describe("AppPage", () => {
       }
     });
 
-    expect(await screen.findByText(/selfie proof captured/i)).toBeTruthy();
+    expect(await screen.findByText(/selfie siap|check-in berhasil/i)).toBeTruthy();
     expect(apiMocks.checkIn).toHaveBeenCalledWith(
       "demo:employee",
       expect.objectContaining({
         method: "Manual",
-        selfieUrl: "blob:selfie-checkin",
+        selfieUrl: undefined,
+        selfieData: expect.stringMatching(/^data:image\/jpeg;base64,/),
+        selfieFileName: "selfie.jpg",
+        selfieContentType: "image/jpeg",
         requiredSelfie: true
       })
     );

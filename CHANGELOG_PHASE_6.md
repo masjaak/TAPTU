@@ -274,3 +274,48 @@
 **Remaining employee dashboard TODOs:**
 - Selfie upload/storage remains unfinished internally; `selfie_url` can stay nullable until storage integration is completed.
 - Real-device camera permission cancel/deny behavior still needs manual QA.
+
+---
+
+## Phase 6.10 Employee Selfie Submit and Attendance Persistence (2026-05-03)
+
+**agent_rule.txt:**
+- Project-local `agent_rule.txt` was not present under `Documents/TAPTU`; read and followed `/Users/masjak/Downloads/KUMPULAN SKILLS/agent_rule.txt`.
+- Added focused regression tests before production changes and kept the employee check-in flow states explicit.
+
+**Root cause of selfie submit failure:**
+- The captured selfie was stored as a browser `blob:` object URL for local preview.
+- That preview URL was passed as `selfieUrl`, so the API persisted a non-durable browser URL instead of uploadable image proof.
+
+**Storage/upload status:**
+- Employee capture now submits selfie data URL, file name, and content type with the check-in payload.
+- API uploads the selfie to Supabase Storage when `SUPABASE_ATTENDANCE_SELFIE_BUCKET`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` are configured.
+- If selfie storage is not configured or upload fails, check-in still succeeds with `selfie_url` nullable and a user-friendly review reason.
+
+**attendance_records persistence status:**
+- Supabase check-in continues to upsert `attendance_records` with employee, shift, check-in time, status, location, validation metadata, nullable `selfie_url`, device, and timestamps.
+- Captured selfie proof no longer uses `blob:` URLs for persisted records.
+
+**HR/admin visibility status:**
+- HR/admin flows already read the same `attendance_records` source through the Supabase attendance queries, so inserted check-ins remain visible there.
+- No scanner token is required for normal employee `Manual` check-in.
+
+**Files changed:**
+- `apps/web/src/pages/AppPage.tsx`
+- `apps/web/src/lib/api.ts`
+- `apps/web/src/test/appPage.test.tsx`
+- `apps/api/src/index.ts`
+- `apps/api/src/storage.ts`
+- `apps/api/src/storage.test.ts`
+- `apps/api/src/config.ts`
+- `apps/api/.env.example`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**Validation:**
+- `npm run test --workspace @taptu/web`
+- `npm run test --workspace @taptu/api`
+- `npm run typecheck`
+
+**Remaining TODOs:**
+- Configure/create the real Supabase Storage bucket and set `SUPABASE_ATTENDANCE_SELFIE_BUCKET` in production-like environments.
+- Real-device camera permission behavior still needs manual QA.

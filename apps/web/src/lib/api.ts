@@ -67,16 +67,20 @@ export async function checkIn(
     locationLat?: number;
     locationLng?: number;
     selfieUrl?: string;
+    selfieData?: string;
+    selfieFileName?: string;
+    selfieContentType?: string;
     deviceId?: string;
     scannerToken?: string;
     requiredSelfie?: boolean;
   }
 ) {
+  const hasSelfieProof = Boolean(payload.selfieUrl || payload.selfieData);
   if (isDemoToken(token)) {
     const response: AttendanceActionResponse = {
       attendanceState: "checked_in",
-      validationStatus: payload.selfieUrl ? "verified" : "needs_review",
-      validationReasons: payload.selfieUrl ? [] : ["Selfie wajib belum dilampirkan."],
+      validationStatus: "needs_review",
+      validationReasons: hasSelfieProof ? ["Penyimpanan selfie belum tersedia."] : ["Selfie wajib belum dilampirkan."],
       record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: payload.method }
     };
     return Promise.resolve(response);

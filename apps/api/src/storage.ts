@@ -10,6 +10,17 @@ export interface StorageAdapter {
 
 type Fetcher = typeof fetch;
 
+export interface AttendanceSelfieUploadInput {
+  dataUrl: string;
+  fileName?: string;
+  contentType?: string;
+}
+
+export interface AttendanceSelfieUploadResult {
+  selfieUrl?: string;
+  reason?: string;
+}
+
 interface SupabaseStoreRow {
   id: string;
   payload: DemoStore;
@@ -25,6 +36,75 @@ function requireSupabaseValue(value: string | undefined, name: string): string {
 
 function normalizeSupabaseUrl(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+function parseDataUrl(dataUrl: string): { contentType: string; bytes: ArrayBuffer } | null {
+  const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
+
+  if (!match) {
+    return null;
+  }
+
+  const buffer = Buffer.from(match[2], "base64");
+
+  return {
+    contentType: match[1],
+    bytes: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  };
+}
+
+function buildSelfieObjectPath(userId: string, fileName?: string): string {
+  const extension = fileName?.split(".").pop()?.replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
+  return `attendance/${userId}/${new Date().toISOString().slice(0, 10)}/${Date.now()}.${extension}`;
+}
+
+export async function uploadAttendanceSelfie(
+  config: SupabaseConfig,
+  userId: string,
+  input: AttendanceSelfieUploadInput,
+  fetcher: Fetcher = fetch
+): Promise<AttendanceSelfieUploadResult> {
+  if (!config.attendanceSelfieBucket) {
+    return { selfieUrl: undefined, reason: "Penyimpanan selfie belum tersedia." };
+  }
+
+  if (!config.url || !config.serviceRoleKey) {
+    return { selfieUrl: undefined, reason: "Penyimpanan selfie belum tersedia." };
+  }
+
+  const parsed = parseDataUrl(input.dataUrl);
+
+  if (!parsed) {
+    return { selfieUrl: undefined, reason: "Selfie belum bisa diproses." };
+  }
+
+  const url = normalizeSupabaseUrl(config.url);
+  const path = buildSelfieObjectPath(userId, input.fileName);
+  const uploadUrl = `${url}/storage/v1/object/${encodeURIComponent(config.attendanceSelfieBucket)}/${path
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
+
+  try {
+    const response = await fetcher(uploadUrl, {
+      method: "POST",
+      headers: {
+        apikey: config.serviceRoleKey,
+        Authorization: `Bearer ${config.serviceRoleKey}`,
+        "Content-Type": input.contentType ?? parsed.contentType,
+        "x-upsert": "true"
+      },
+      body: parsed.bytes
+    });
+
+    if (!response.ok) {
+      return { selfieUrl: undefined, reason: "Selfie tersimpan sebagai catatan review." };
+    }
+
+    return { selfieUrl: `${config.attendanceSelfieBucket}/${path}` };
+  } catch {
+    return { selfieUrl: undefined, reason: "Selfie tersimpan sebagai catatan review." };
+  }
 }
 
 function createSupabaseStorageAdapter(config: SupabaseConfig, fetcher: Fetcher = fetch): StorageAdapter {
@@ -106,5 +186,6 @@ export function createStorageAdapter(config: ApiConfig, filePath: string): Stora
 }
 
 export const __test = {
-  createSupabaseStorageAdapter
+  createSupabaseStorageAdapter,
+  uploadAttendanceSelfie
 };

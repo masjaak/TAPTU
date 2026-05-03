@@ -53,7 +53,7 @@ import {
   type AttendanceMode
 } from "./domain";
 import { getApiConfig } from "./config";
-import { createStorageAdapter } from "./storage";
+import { createStorageAdapter, uploadAttendanceSelfie } from "./storage";
 import { createSupabaseAdmin, type SupabaseAdmin } from "./supabase";
 import {
   supabaseSignUp,
@@ -85,7 +85,7 @@ const port = Number(process.env.PORT ?? 3001);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "4mb" }));
 
 const users: Array<AuthUser & { password: string }> = [
   {
@@ -258,10 +258,56 @@ const attendanceSchema = z.object({
   locationLat: z.number().optional(),
   locationLng: z.number().optional(),
   selfieUrl: z.string().optional(),
+  selfieData: z.string().optional(),
+  selfieFileName: z.string().optional(),
+  selfieContentType: z.string().optional(),
   deviceId: z.string().min(4).optional(),
   scannerToken: z.string().optional(),
   requiredSelfie: z.boolean().optional().default(false)
 });
+
+type AttendancePayload = z.infer<typeof attendanceSchema>;
+
+function isPersistentSelfieUrl(value: string | undefined): value is string {
+  return Boolean(value && !value.startsWith("blob:") && !value.startsWith("data:"));
+}
+
+async function resolveAttendanceSelfie(userId: string, payload: AttendancePayload) {
+  if (isPersistentSelfieUrl(payload.selfieUrl)) {
+    return { selfieUrl: payload.selfieUrl, selfieCaptured: true, reason: undefined as string | undefined };
+  }
+
+  if (!payload.selfieData) {
+    return { selfieUrl: undefined, selfieCaptured: false, reason: undefined as string | undefined };
+  }
+
+  const upload = await uploadAttendanceSelfie(apiConfig.supabase, userId, {
+    dataUrl: payload.selfieData,
+    fileName: payload.selfieFileName,
+    contentType: payload.selfieContentType
+  });
+
+  return {
+    selfieUrl: upload.selfieUrl,
+    selfieCaptured: true,
+    reason: upload.reason
+  };
+}
+
+function mergeSelfieStorageReason(
+  validationStatus: AttendanceValidationStatus,
+  reasons: string[],
+  selfieStorageReason: string | undefined
+) {
+  if (!selfieStorageReason) {
+    return { validationStatus, reasons };
+  }
+
+  return {
+    validationStatus: validationStatus === "verified" ? "needs_review" as const : validationStatus,
+    reasons: reasons.includes(selfieStorageReason) ? reasons : [...reasons, selfieStorageReason]
+  };
+}
 
 const requestSchema = z.object({
   category: z.enum(["Izin", "Cuti", "Sakit", "Permission", "Attendance Correction", "Forgot Check-in/out"]),
@@ -682,10 +728,11 @@ app.post("/api/attendance/checkin", async (req, res) => {
     const current = await supabaseGetTodayAttendance(sb, user.id);
     const organizationId = await getOrganizationIdForUser(user.id);
     const location = organizationId ? await supabaseGetPrimaryWorkLocation(sb, organizationId) : store.workLocations[0];
+    const selfie = await resolveAttendanceSelfie(user.id, parsed.data);
     const validation = validateAttendanceSubmission({
       locationLat: parsed.data.locationLat,
       locationLng: parsed.data.locationLng,
-      selfieUrl: parsed.data.selfieUrl,
+      selfieUrl: selfie.selfieUrl ?? (selfie.selfieCaptured ? "pending://selfie" : undefined),
       deviceId: parsed.data.deviceId,
       scannerToken: parsed.data.scannerToken,
       requiredSelfie: parsed.data.requiredSelfie,
@@ -693,7 +740,9 @@ app.post("/api/attendance/checkin", async (req, res) => {
       location,
       now
     });
-    const reasons = [...validation.reasons];
+    const mergedValidation = mergeSelfieStorageReason(validation.status, validation.reasons, selfie.reason);
+    validation.status = mergedValidation.validationStatus;
+    const reasons = mergedValidation.reasons;
     let scannerTokenId: string | undefined;
 
     if (parsed.data.method === "QR") {
@@ -725,7 +774,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
       locationLng: parsed.data.locationLng,
       validationStatus: validation.status,
       validationReasons: reasons,
-      selfieUrl: parsed.data.selfieUrl,
+      selfieUrl: selfie.selfieUrl,
       deviceId: parsed.data.deviceId,
       scannerTokenId
     });
@@ -775,10 +824,11 @@ app.post("/api/attendance/checkin", async (req, res) => {
   }
 
   const current = store.attendance[user.id] ?? createEmptyAttendanceRecord(user.id);
+  const selfie = await resolveAttendanceSelfie(user.id, parsed.data);
   const validation = validateAttendanceSubmission({
     locationLat: parsed.data.locationLat,
     locationLng: parsed.data.locationLng,
-    selfieUrl: parsed.data.selfieUrl,
+    selfieUrl: selfie.selfieUrl ?? (selfie.selfieCaptured ? "pending://selfie" : undefined),
     deviceId: parsed.data.deviceId,
     scannerToken: parsed.data.scannerToken,
     requiredSelfie: parsed.data.requiredSelfie,
@@ -786,7 +836,9 @@ app.post("/api/attendance/checkin", async (req, res) => {
     location: store.workLocations[0],
     now
   });
-  const reasons = [...validation.reasons];
+  const mergedValidation = mergeSelfieStorageReason(validation.status, validation.reasons, selfie.reason);
+  validation.status = mergedValidation.validationStatus;
+  const reasons = mergedValidation.reasons;
 
   if (parsed.data.method === "QR") {
     const scannerValidation = validateScannerToken(store.scanner, parsed.data.scannerToken);
@@ -818,7 +870,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
     locationLng: parsed.data.locationLng,
     validationStatus: validation.status,
     validationReasons: reasons,
-    selfieUrl: parsed.data.selfieUrl,
+    selfieUrl: selfie.selfieUrl,
     deviceId: parsed.data.deviceId,
     scannerTokenId: parsed.data.method === "QR" ? store.scanner.id : undefined
   });
