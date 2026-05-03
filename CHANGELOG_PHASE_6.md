@@ -109,3 +109,49 @@
 
 **Remaining mobile TODOs:**
 - Manual screenshot QA on very narrow devices should still review dense report tables with real production-length names and notes.
+
+---
+
+## Phase 6.5 Final QA, Roadmap, and Handoff Update (2026-05-03)
+
+**Checked:**
+- `Documents/TAPTU/HANDOFF_CURRENT.md`
+- `Documents/TAPTU/HANDOFF_TAPTU.md`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**Documented Phase 6 summary:**
+- Employee check-in/check-out was simplified to one primary check-in action and one check-out action.
+- Scanner token handling was clarified as Scanner/Kiosk-only, not employee-managed.
+- Employee recent history tap/detail behavior was fixed and documented.
+- Employee self-service tabs now include Pengajuan, Jadwal, and lightweight Slip Gaji.
+- Mobile typography, spacing, wrapping, and dense table/form polish were completed.
+
+**Roadmap updated as roadmap-only:**
+- Reimbursement/klaim.
+- Secure file sharing/dokumen.
+- Organization structure.
+- Advanced notifications.
+- Full payroll processing.
+- Full HRIS employee profile management.
+- Face recognition.
+- Advanced anti-spoofing.
+- Real device fingerprinting.
+
+**Known remaining limitations:**
+- Selfie upload/storage remains unfinished and nullable.
+- Manager scoping remains broad until department/team segmentation is implemented.
+- Shift assignment is not complete end to end in post-login UI/API.
+- Employee Jadwal depends on limited schedule data.
+- Employee Slip Gaji has no real payslip source yet.
+- Some operational flows still need Supabase persistence hardening.
+- Very narrow mobile screens still need production-data manual QA.
+
+**Files changed:**
+- `Documents/TAPTU/HANDOFF_CURRENT.md`
+- `Documents/TAPTU/HANDOFF_TAPTU.md`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**No app changes:**
+- No application code modified.
+- No database/schema changes made.
+- No roadmap features built.

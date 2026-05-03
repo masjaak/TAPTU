@@ -4,7 +4,7 @@
 
 Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
 
-The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud or payroll systems. Current status: MVP is documented and QA-passed through Phase 5.5, with known limitations still remaining around persistence hardening, manager scoping, shift assignment, and selfie storage finalization.
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 6.5. Phase 6 completed employee-facing simplification, scanner token clarification, recent history repair, employee self-service tabs, and mobile typography/spacing polish. Known limitations remain around persistence hardening, manager scoping, shift assignment, selfie storage finalization, payslip data, and very narrow mobile QA with production-like data.
 
 ## B. Fixed product decisions
 
@@ -15,6 +15,8 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Payroll-ready CSV/reporting output is part of MVP.
 - Selfie capture/preview exists, but finalized storage/upload is still unfinished; `selfie_url` may remain nullable for now.
 - Department-level manager segmentation is not completed in MVP. Current manager access is broader than ideal and should be treated as a future improvement.
+- Scanner tokens are Scanner/Kiosk-only. Employee accounts should not manage or manually enter scanner tokens.
+- Slip Gaji is lightweight/read-only until a real payslip data source exists.
 
 ## C. Completed phases summary
 
@@ -27,6 +29,11 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Phase 5.3: functional QA and targeted bug fixes.
 - Phase 5.4: empty/loading/error states and accessibility polish.
 - Phase 5.5: final documentation, roadmap, and handoff refresh.
+- Phase 6.1: employee check-in/check-out simplification and scanner token separation.
+- Phase 6.2: employee recent history row/detail bug fix.
+- Phase 6.3: employee self-service tabs for Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, and Profil.
+- Phase 6.4: mobile typography, spacing, wrapping, and dense surface polish.
+- Phase 6.5: final Phase 6 QA documentation, roadmap, and handoff refresh.
 
 ## D. Routes/pages
 
@@ -34,7 +41,10 @@ Main post-login pages currently surfaced through the app shell:
 
 - Admin dashboard: summary stats, recent activity, quick actions.
 - Manager home/team view: lighter operational summary, team roster, exception review, approvals, reports.
-- Employee attendance page: check-in/check-out, current validation state, attendance history.
+- Employee attendance page: simplified check-in/check-out, current validation state, and attendance history.
+- Employee Pengajuan tab: request submit/list/detail/cancel flow using the existing approval request model.
+- Employee Jadwal tab: lightweight assigned-shift/upcoming schedule view from currently available summary/dashboard data.
+- Employee Slip Gaji tab: lightweight read-only placeholder that points to payroll-ready reporting while full payroll remains out of scope.
 - Scanner mode: token display, countdown, status, refresh, recent scan history.
 - Team list: employee roster and validation status.
 - Exception review queue: approve, reject, request correction.
@@ -53,7 +63,7 @@ Main post-login pages currently surfaced through the app shell:
 - Manager:
   limited operational approver. Can access home, team, attendance, requests, reports, and profile. Not treated as full HR admin.
 - Employee:
-  attendance, requests, and profile only.
+  Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, and Profil.
 - Scanner/Kiosk:
   scanner workspace and profile only.
 
@@ -116,25 +126,31 @@ Behavior:
 ## H. Core workflows
 
 - Employee check-in/check-out:
-  employee uses attendance desk, can provide scanner token/selfie/location, receives validation state and feedback.
+  employee uses one primary check-in and one check-out action, with validation state and feedback. Employee flow does not expose scanner token input.
 - Location/geofence validation:
   location signals are captured and compared against configured work location/radius logic; outside-radius style cases can persist then enter exception review.
 - Scanner token flow:
-  scanner token is displayed, refreshed, counted down, and used for scanner-mode attendance validation.
+  scanner token is displayed, refreshed, counted down, and used for Scanner/Kiosk-mode attendance validation only.
 - Scanner recent-scan history:
   recent success/invalid/expired attempts are surfaced in the scanner workspace.
 - Exception review:
   admin/manager can approve, reject, or request correction with notes.
 - Approval requests:
   employee submits request, reviewer approves/rejects, employee can cancel pending items.
+- Employee Pengajuan:
+  employee accesses the existing request submit/list/detail/cancel flow from a dedicated self-service tab.
 - Shift assignment:
   data model exists via `shift_assignments`, but complete post-login assignment workflow is not yet finished.
+- Employee Jadwal:
+  employee can see lightweight assigned shift/upcoming schedule information when available, but richer schedule assignment still needs backend/API completion.
 - Work location/geofence management:
   admin can create/edit lat/lng/radius work locations.
 - Reports:
   admin/manager can filter attendance data, inspect validation flags, and open audit trail.
 - Payroll-ready CSV export:
   report rows can be exported for downstream payroll preparation, but full payroll processing is intentionally out of scope.
+- Employee Slip Gaji:
+  lightweight read-only tab exists, but no full payslip list/detail or payroll calculation model exists yet.
 
 ## I. UI/UX system status
 
@@ -143,7 +159,7 @@ Behavior:
 - AppShell/navigation:
   desktop sidebar, mobile header, and mobile drawer are implemented and role-aware.
 - Responsive QA:
-  Phase 5.2 completed; known overflow issues were addressed.
+  Phase 5.2 completed; Phase 6.4 added mobile typography/spacing/wrapping polish across shared shell, employee tabs, scanner, admin, reports, and dense form/table surfaces.
 - Empty/loading/error states:
   Phase 5.4 completed with clearer role-aware empty copy and actionable error states.
 - Accessibility polish:
@@ -199,100 +215,35 @@ Concise manual checklist:
 - Department-level manager segmentation is not completed.
 - Manager team scoping is still broader than intended.
 - Shift assignment workflow is not completed in post-login UI/API.
+- Employee Jadwal is lightweight and depends on limited schedule data.
+- Employee Slip Gaji is lightweight/read-only and has no real payslip source yet.
+- Reimbursement/klaim, secure documents, organization structure, advanced notifications, full HRIS profile management, face recognition, advanced anti-spoofing, and real device fingerprinting are not built.
+- Very narrow mobile layouts should still be manually checked with production-length employee names, notes, and dense report rows.
 - Some phase 4/5 operational endpoints still rely on local/demo-store style paths rather than fully normalized Supabase relational persistence.
 - Profile workspace is lightweight and not a full account/settings system.
 
 ## M. Future roadmap
 
-- Attendance confidence score
-  what: combine validation signals into one review-friendly confidence layer.
-  why: helps ops prioritize suspicious attendance faster.
-  suggested phase: Phase 6 or 7.
-
-- Advanced device fingerprint validation
-  what: replace simple `device_id` with stronger device trust logic.
-  why: reduces repeat spoofing and device sharing abuse.
-  suggested phase: Phase 7.
-
-- Advanced anti-spoof checks
-  what: stronger GPS/time/device anomaly detection.
-  why: raises trust in attendance records.
-  suggested phase: Phase 7.
-
-- Face recognition
-  what: optional identity confirmation on attendance capture.
-  why: stronger identity assurance for higher-risk environments.
-  suggested phase: later, only if privacy/compliance are addressed.
-
-- Finalized selfie storage/upload service
-  what: persist selfie evidence to storage with retrievable URLs and retention policy.
-  why: completes the current proof flow and auditability.
-  suggested phase: Phase 6.
-
-- Offline mode with later sync
-  what: queue attendance actions locally when connection is unstable.
-  why: important for field operations and weak-network environments.
-  suggested phase: Phase 6 or 7.
-
-- Multi-location attendance map
-  what: map-based view of work locations and attendance context.
-  why: better operational visibility for multi-site organizations.
-  suggested phase: Phase 7.
-
-- Payroll bridge/export templates
-  what: richer CSV templates and payroll-system-ready mappings.
-  why: improves handoff from attendance to payroll ops without building payroll itself.
-  suggested phase: Phase 6.
-
-- Full payroll processing integration
-  what: direct payroll calculations and integrations.
-  why: removes downstream manual steps.
-  suggested phase: post-MVP expansion, not near-term.
-
-- Anti-fraud timeline
-  what: chronological fraud-risk narrative per employee/record.
-  why: improves investigation and manager review context.
-  suggested phase: Phase 7.
-
-- Advanced audit log
-  what: richer actor/object/change metadata and filtering.
-  why: improves compliance and operational traceability.
-  suggested phase: Phase 6 or 7.
-
-- WhatsApp/Slack reminders
-  what: attendance reminders, pending review nudges, exception alerts.
-  why: improves adoption and response speed.
-  suggested phase: Phase 6.
-
-- Multi-company workspace
-  what: support multiple orgs/tenants with stronger separation.
-  why: needed for scale beyond single-company deployments.
-  suggested phase: post-MVP platform expansion.
-
-- Mobile app version
-  what: dedicated mobile experience beyond web/PWA shell.
-  why: better camera, location, kiosk, and offline ergonomics.
-  suggested phase: after core persistence and trust flows are stable.
-
-- Advanced analytics for lateness, absence, and shift performance
-  what: trend reporting and operational KPIs.
-  why: moves product from record-keeping to workforce insight.
-  suggested phase: Phase 7.
-
-- Department-level manager segmentation
-  what: manager visibility and action scope narrowed to assigned department/team.
-  why: fixes one of the clearest current MVP access limitations.
-  suggested phase: Phase 6.
+- Reimbursement/klaim.
+- Secure file sharing/dokumen.
+- Organization structure.
+- Advanced notifications.
+- Full payroll processing.
+- Full HRIS employee profile management.
+- Face recognition.
+- Advanced anti-spoofing.
+- Real device fingerprinting.
 
 ## N. Recommended next step after MVP
 
-Recommended next step: Phase 6 should focus on operational hardening, not new surface area.
+Recommended next step: the next phase should focus on operational hardening, not roadmap feature expansion.
 
 Priority order:
 
-1. Finish Supabase-backed persistence for phase 4/5 data flows.
+1. Finish Supabase-backed persistence for phase 4/5/6 data flows.
 2. Implement shift assignment workflow end to end.
 3. Finalize selfie storage/upload and retention behavior.
 4. Add department/team-scoped manager access.
+5. Replace the lightweight Slip Gaji placeholder only after a real payslip source exists.
 
 This sequence closes the largest trust and handoff gaps while preserving the current MVP product shape.
