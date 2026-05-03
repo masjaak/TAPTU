@@ -92,6 +92,7 @@ import { nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow
 import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
+type EmployeeCheckInFlowState = "idle" | "waiting_for_selfie" | "submitting";
 
 const roleLabels: Record<UserRole, string> = {
   superadmin: "Superadmin",
@@ -135,7 +136,7 @@ export function AppPage() {
   const [exceptionNotes, setExceptionNotes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [checkInAwaitingSelfie, setCheckInAwaitingSelfie] = useState(false);
+  const [checkInFlowState, setCheckInFlowState] = useState<EmployeeCheckInFlowState>("idle");
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -491,6 +492,11 @@ export function AppPage() {
   }
 
   async function submitCheckIn(selfieUrl = attendanceCapture.selfieUrl) {
+    if (checkInFlowState === "submitting") {
+      return;
+    }
+
+    setCheckInFlowState("submitting");
     setBusyAction("checkin");
 
     try {
@@ -522,14 +528,30 @@ export function AppPage() {
       setActionMessage(error instanceof Error ? error.message : "Check-in gagal.", "err");
     } finally {
       setBusyAction(null);
-      setCheckInAwaitingSelfie(false);
+      setCheckInFlowState("idle");
     }
   }
 
   async function handleCheckIn() {
+    if (checkInFlowState === "submitting") {
+      return;
+    }
+
+    if (!attendanceTrust.canClock) {
+      setActionMessage(`${attendanceTrust.title}. Izinkan lokasi atau verifikasi ulang perangkat sebelum check-in.`, "err");
+      return;
+    }
+
     if (attendanceCapture.requiredSelfie && !attendanceCapture.selfieUrl) {
-      setCheckInAwaitingSelfie(true);
-      selfieInputRef.current?.click();
+      setCheckInFlowState("waiting_for_selfie");
+      const input = selfieInputRef.current;
+      if (!input) {
+        setCheckInFlowState("idle");
+        setActionMessage("Kamera belum siap. Muat ulang tab Presensi lalu coba lagi.", "err");
+        return;
+      }
+      input.click();
+      setActionMessage("Kamera terbuka. Ambil selfie untuk menyelesaikan check-in.");
       return;
     }
 
@@ -569,12 +591,14 @@ export function AppPage() {
   function handleSelfieUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
+      setCheckInFlowState("idle");
+      setActionMessage("Selfie belum diambil. Coba check-in lagi lalu izinkan kamera.", "err");
       return;
     }
 
     const previewUrl = URL.createObjectURL(file);
     setAttendanceCapture((current) => ({ ...current, selfieUrl: previewUrl }));
-    if (checkInAwaitingSelfie) {
+    if (checkInFlowState === "waiting_for_selfie") {
       void submitCheckIn(previewUrl);
       return;
     }
@@ -1067,11 +1091,11 @@ export function AppPage() {
 
               <div className="grid gap-3 [&>button]:w-full">
                 <PrimaryButton
-                  disabled={attendanceState !== "idle" || busyAction === "checkin" || !attendanceTrust.canClock}
+                  disabled={attendanceState !== "idle" || busyAction === "checkin" || checkInFlowState === "submitting"}
                   onClick={handleCheckIn}
                 >
                   <Clock3 className="mr-2 h-4 w-4" />
-                  {busyAction === "checkin" ? "Menyimpan..." : "Check-in sekarang"}
+                  {busyAction === "checkin" ? "Menyimpan..." : checkInFlowState === "waiting_for_selfie" ? "Menunggu selfie..." : "Check-in sekarang"}
                 </PrimaryButton>
                 <SecondaryButton
                   disabled={attendanceState !== "checked_in" || busyAction === "checkout" || !attendanceTrust.canClock}

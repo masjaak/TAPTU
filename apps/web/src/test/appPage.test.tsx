@@ -335,6 +335,130 @@ describe("AppPage", () => {
     createObjectUrl.mockRestore();
   });
 
+  it("keeps employee check-in clickable and explains when validation is not ready", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/attendance");
+
+    const verifyButton = await screen.findByRole("button", { name: /verifikasi ulang perangkat/i });
+    fireEvent.click(verifyButton);
+
+    const checkInButton = await screen.findByRole("button", { name: /check-in sekarang/i });
+    expect(checkInButton).not.toHaveProperty("disabled", true);
+
+    fireEvent.click(checkInButton);
+
+    expect(await screen.findByText(/izinkan lokasi atau verifikasi ulang perangkat/i)).toBeTruthy();
+    expect(apiMocks.checkIn).not.toHaveBeenCalled();
+  });
+
+  it("switches employee tabs from navigation and keeps active state synced", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([
+      { id: "hist-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Manual" }
+    ]);
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Presensi" }));
+    expect(await screen.findByText(/check-in sederhana/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Presensi" }).className).toContain("bg-[#111827]");
+
+    fireEvent.click(screen.getByRole("button", { name: "Riwayat" }));
+    expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Riwayat" }).className).toContain("bg-[#111827]");
+  });
+
   it("opens employee recent history detail from a comfortable tap target", async () => {
     localStorage.setItem(
       "taptu-session",

@@ -180,3 +180,36 @@
 
 **Remaining limitations:**
 - Selfie storage/upload is still not finalized; `selfie_url` may remain nullable internally until storage integration is completed.
+
+---
+
+## Phase 6.8 Employee Dashboard Deep Stabilization (2026-05-03)
+
+**agent_rule.txt:**
+- Read and followed `/Users/masjak/Downloads/KUMPULAN SKILLS/agent_rule.txt`.
+- Added regression tests first, then fixed production code.
+- Check-in flow now uses explicit states: `idle`, `waiting_for_selfie`, and `submitting`.
+
+**Root causes found:**
+- Check-in became non-clickable because device/location validation was enforced in the button `disabled` condition, leaving employees with an inert CTA after validation was not ready.
+- Riwayat/Presensi instability came from insufficient route/tab regression coverage around navigation clicks and active-state sync, even though direct route rendering existed.
+
+**Other employee dashboard bugs found:**
+- Camera/selfie retry state could stay unclear after starting capture.
+- Employee-facing check-in needed clearer fallback copy when validation or camera readiness blocks progress.
+
+**Fixes made:**
+- Moved validation blocking from the Check-in button disabled state into the click handler so the button remains tappable and shows actionable guidance.
+- Added explicit check-in flow state guards for capture, submit, and invalid repeat clicks.
+- Kept scanner token out of employee check-in.
+- Preserved Presensi and Riwayat history rendering with comfortable expandable rows, empty state, loading state, and error state.
+- Added regression tests for clickable guarded check-in and employee navigation active-state sync.
+
+**Files changed:**
+- `apps/web/src/pages/AppPage.tsx`
+- `apps/web/src/test/appPage.test.tsx`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**Remaining employee dashboard TODOs:**
+- Selfie storage/upload is still not finalized; `selfie_url` may remain nullable internally.
+- Real-device manual QA is still needed for browser camera permission cancel/deny behavior and very narrow mobile screens.
