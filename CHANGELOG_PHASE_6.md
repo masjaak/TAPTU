@@ -240,3 +240,37 @@
 **Remaining TODOs:**
 - Selfie storage/upload remains unfinished internally.
 - Real-device camera permission behavior still needs manual QA.
+
+---
+
+## Phase 6.9 Employee Check-in Submit and Riwayat Deep Fix (2026-05-03)
+
+**agent_rule.txt:**
+- Project-local `agent_rule.txt` was not present under `Documents/TAPTU`; read and followed `/Users/masjak/Downloads/KUMPULAN SKILLS/agent_rule.txt`.
+- Added focused regression tests first, then fixed production code.
+- Kept employee check-in states explicit: `idle`, `waiting_for_selfie`, and `submitting`.
+
+**Root cause of missing check-in submit action:**
+- Selfie capture could submit, but there was no user-visible fallback path when camera capture was unavailable or cancelled.
+- Successful check-in/check-out updated local state but did not refresh the employee history source, so Riwayat could remain stale after submit.
+
+**Root cause of Riwayat/history failure:**
+- Riwayat assumed all history rows already used the compact `AttendanceTimelineItem` shape.
+- Real/demo-like attendance rows can arrive with record-shaped fields such as `date`, `checkInTime`, `checkInMethod`, or status `Selesai`, which produced broken labels.
+- The history fetch effect could rerun on unrelated renders because the session object was recreated on every render and history loading was not guarded.
+
+**Fixes made:**
+- Added attendance history normalization before rendering dashboard, fetch, check-in, and check-out records.
+- Stabilized the session value for the app page lifecycle.
+- Guarded history fetches with `attendanceHistoryLoaded` and reset loading when the filter changes.
+- Refreshes Riwayat after successful check-in/check-out while preserving existing history if an all-history fetch returns empty.
+- Added a user-friendly `Simpan tanpa selfie` fallback that submits normal employee check-in without scanner token.
+
+**Files changed:**
+- `apps/web/src/pages/AppPage.tsx`
+- `apps/web/src/test/appPage.test.tsx`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**Remaining employee dashboard TODOs:**
+- Selfie upload/storage remains unfinished internally; `selfie_url` can stay nullable until storage integration is completed.
+- Real-device camera permission cancel/deny behavior still needs manual QA.

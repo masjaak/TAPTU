@@ -93,6 +93,17 @@ import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
 type EmployeeCheckInFlowState = "idle" | "waiting_for_selfie" | "submitting";
+type AttendanceHistorySource = Partial<AttendanceTimelineItem> & {
+  date?: string;
+  attendanceDate?: string;
+  attendance_date?: string;
+  checkInTime?: string;
+  check_in_time?: string;
+  checkOutTime?: string;
+  check_out_time?: string;
+  checkInMethod?: string;
+  check_in_method?: string;
+};
 
 const roleLabels: Record<UserRole, string> = {
   superadmin: "Superadmin",
@@ -102,8 +113,67 @@ const roleLabels: Record<UserRole, string> = {
   scanner: "Scanner Kiosk"
 };
 
+function isAttendanceMethod(value: unknown): value is AttendanceTimelineItem["method"] {
+  return value === "QR" || value === "GPS" || value === "Selfie" || value === "Manual";
+}
+
+function normalizeAttendanceStatus(value: unknown): AttendanceTimelineItem["status"] {
+  if (value === "Terlambat" || value === "Izin" || value === "Belum check-in") {
+    return value;
+  }
+
+  return "Tepat waktu";
+}
+
+function formatAttendanceDateLabel(value?: string) {
+  if (!value) {
+    return "Hari ini";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatAttendanceTime(value?: string) {
+  if (!value) {
+    return "--.--";
+  }
+
+  if (value.includes("T") && value.length >= 16) {
+    return value.slice(11, 16);
+  }
+
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return value;
+}
+
+function normalizeAttendanceHistoryItems(items: AttendanceHistorySource[]): AttendanceTimelineItem[] {
+  return items.map((item) => {
+    const date = item.date ?? item.attendanceDate ?? item.attendance_date;
+    const checkInTime = item.checkInTime ?? item.check_in_time;
+    const checkOutTime = item.checkOutTime ?? item.check_out_time;
+    const method = item.method ?? item.checkInMethod ?? item.check_in_method;
+
+    return {
+      id: item.id,
+      day: item.day ?? formatAttendanceDateLabel(date ?? checkInTime ?? checkOutTime),
+      status: normalizeAttendanceStatus(item.status),
+      time: item.time ?? formatAttendanceTime(checkInTime ?? checkOutTime),
+      method: isAttendanceMethod(method) ? method : "Manual"
+    };
+  });
+}
+
 export function AppPage() {
-  const session = readSession();
+  const [session] = useState(() => readSession());
   const navigate = useNavigate();
   const { section } = useParams<{ section?: string }>();
   const sessionRole = session?.user.role ?? "employee";
@@ -239,7 +309,7 @@ export function AppPage() {
         setGreeting(data.greeting);
         setStats(data.stats);
         setSchedule(data.schedule);
-        setAttendance(data.attendance);
+        setAttendance(normalizeAttendanceHistoryItems(data.attendance));
         setAttendanceState(data.attendanceState ?? "idle");
         setRequests(data.requests);
         setScannerToken(data.scannerToken);
@@ -258,12 +328,13 @@ export function AppPage() {
       return;
     }
 
-    if ((tab === "history" || (tab === "attendance" && isEmployee))) {
+    if ((tab === "history" || (tab === "attendance" && isEmployee)) && !attendanceHistoryLoaded) {
       setAttendanceHistoryLoaded(false);
       setAttendanceHistoryError(null);
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
         .then((items) => {
-          setAttendance((current) => (items.length > 0 || historyFilter !== "all" ? items : current));
+          const normalizedItems = normalizeAttendanceHistoryItems(items);
+          setAttendance((current) => (normalizedItems.length > 0 || historyFilter !== "all" ? normalizedItems : current));
           setAttendanceHistoryLoaded(true);
         })
         .catch((error) => {
@@ -388,7 +459,7 @@ export function AppPage() {
           setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
         });
     }
-  }, [adminOverview, adminOverviewLoaded, auditLogs.length, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
+  }, [adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -434,6 +505,20 @@ export function AppPage() {
         updatedAt: new Date().toISOString()
       }
     });
+  }
+
+  async function refreshEmployeeAttendanceHistory() {
+    setAttendanceHistoryError(null);
+
+    try {
+      const items = await fetchAttendanceHistoryByFilter(currentSession.token, historyFilter);
+      const normalizedItems = normalizeAttendanceHistoryItems(items);
+      setAttendance((current) => (normalizedItems.length > 0 || historyFilter !== "all" ? normalizedItems : current));
+      setAttendanceHistoryLoaded(true);
+    } catch (error) {
+      setAttendanceHistoryError(error instanceof Error ? error.message : "Riwayat absensi gagal dimuat.");
+      setAttendanceHistoryLoaded(true);
+    }
   }
 
   async function handleVerifyAttendanceDevice() {
@@ -508,8 +593,9 @@ export function AppPage() {
         deviceId: attendanceCapture.deviceId || undefined,
         requiredSelfie: attendanceCapture.requiredSelfie
       });
+      const [record] = normalizeAttendanceHistoryItems([response.record]);
       setAttendanceState(response.attendanceState);
-      setAttendance((current) => [response.record, ...current.filter((item) => item.day !== "Hari ini")]);
+      setAttendance((current) => [record, ...current.filter((item) => item.day !== "Hari ini")]);
       updateEmployeeRecord(
         {
           checkInTime: new Date().toISOString(),
@@ -524,6 +610,7 @@ export function AppPage() {
       } else {
         setActionMessage(response.validationStatus === "needs_review" ? "Check-in tersimpan dan menunggu review." : "Check-in berhasil tersimpan.");
       }
+      await refreshEmployeeAttendanceHistory();
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Check-in gagal.", "err");
     } finally {
@@ -569,8 +656,9 @@ export function AppPage() {
         selfieUrl: attendanceCapture.selfieUrl || undefined,
         deviceId: attendanceCapture.deviceId || undefined
       });
+      const [record] = normalizeAttendanceHistoryItems([response.record]);
       setAttendanceState(response.attendanceState);
-      setAttendance((current) => [response.record, ...current.filter((item) => item.day !== "Hari ini")]);
+      setAttendance((current) => [record, ...current.filter((item) => item.day !== "Hari ini")]);
       updateEmployeeRecord(
         {
           checkOutTime: new Date().toISOString(),
@@ -581,6 +669,7 @@ export function AppPage() {
         response.attendanceState
       );
       setActionMessage(response.validationStatus === "needs_review" ? "Check-out tersimpan dan perlu review admin." : "Check-out berhasil tersimpan.");
+      await refreshEmployeeAttendanceHistory();
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Check-out gagal.", "err");
     } finally {
@@ -1104,6 +1193,12 @@ export function AppPage() {
                   <Clock3 className="mr-2 h-4 w-4" />
                   {busyAction === "checkout" ? "Menyimpan..." : "Check-out sekarang"}
                 </SecondaryButton>
+                {checkInFlowState === "waiting_for_selfie" ? (
+                  <SecondaryButton disabled={busyAction === "checkin"} onClick={() => void submitCheckIn("")}>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Simpan tanpa selfie
+                  </SecondaryButton>
+                ) : null}
                 {!attendanceTrust.canClock ? (
                   <p role="alert" className="rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">
                     {attendanceTrust.title}. Verifikasi perangkat atau izinkan lokasi sebelum absen.
@@ -1196,6 +1291,7 @@ export function AppPage() {
                 type="button"
                 aria-pressed={historyFilter === filter}
                 onClick={() => {
+                  setAttendanceHistoryLoaded(false);
                   setHistoryFilter(filter);
                 }}
                 className={`min-h-11 rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.12em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
