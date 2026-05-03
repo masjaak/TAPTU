@@ -6,14 +6,11 @@ import {
   Camera,
   CheckCircle2,
   Clock3,
-  Crosshair,
   Download,
   FileClock,
   FolderKanban,
   LogOut,
   MapPinned,
-  QrCode,
-  Radar,
   RefreshCw,
   ScanFace,
   Search,
@@ -94,7 +91,6 @@ import {
 import { nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow";
 import { clearSession, readSession } from "../lib/session";
 
-const attendanceMethods = ["QR", "GPS", "Selfie"] as const;
 const attendanceFilters = ["all", "present", "issue"] as const;
 
 const roleLabels: Record<UserRole, string> = {
@@ -152,7 +148,6 @@ export function AppPage() {
     locationLat: undefined as number | undefined,
     locationLng: undefined as number | undefined,
     selfieUrl: "",
-    scannerToken: "",
     requiredSelfie: true,
     deviceId: ""
   });
@@ -260,7 +255,7 @@ export function AppPage() {
       return;
     }
 
-    if (tab === "attendance") {
+    if (tab === "history") {
       setAttendanceHistoryLoaded(false);
       setAttendanceHistoryError(null);
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
@@ -287,7 +282,7 @@ export function AppPage() {
         });
     }
 
-    if ((tab === "attendance" || tab === "profile") && isEmployee && !employeeSummary && !employeeSummaryLoaded) {
+    if ((tab === "home" || tab === "attendance" || tab === "schedule" || tab === "payslip" || tab === "profile") && isEmployee && !employeeSummary && !employeeSummaryLoaded) {
       fetchEmployeeSummary(session.token)
         .then((data) => {
           setEmployeeSummary(data);
@@ -493,17 +488,16 @@ export function AppPage() {
     }
   }
 
-  async function handleCheckIn(method: (typeof attendanceMethods)[number]) {
-    setBusyAction(`checkin-${method}`);
+  async function handleCheckIn() {
+    setBusyAction("checkin");
 
     try {
       const response = await checkIn(currentSession.token, {
-        method,
+        method: "Manual",
         locationLat: attendanceCapture.locationLat,
         locationLng: attendanceCapture.locationLng,
         selfieUrl: attendanceCapture.selfieUrl || undefined,
         deviceId: attendanceCapture.deviceId || undefined,
-        scannerToken: method === "QR" ? attendanceCapture.scannerToken || undefined : undefined,
         requiredSelfie: attendanceCapture.requiredSelfie
       });
       setAttendanceState(response.attendanceState);
@@ -525,17 +519,16 @@ export function AppPage() {
     }
   }
 
-  async function handleCheckOut(method: (typeof attendanceMethods)[number]) {
-    setBusyAction(`checkout-${method}`);
+  async function handleCheckOut() {
+    setBusyAction("checkout");
 
     try {
       const response = await checkOut(currentSession.token, {
-        method,
+        method: "Manual",
         locationLat: attendanceCapture.locationLat,
         locationLng: attendanceCapture.locationLng,
         selfieUrl: attendanceCapture.selfieUrl || undefined,
-        deviceId: attendanceCapture.deviceId || undefined,
-        scannerToken: method === "QR" ? attendanceCapture.scannerToken || undefined : undefined
+        deviceId: attendanceCapture.deviceId || undefined
       });
       setAttendanceState(response.attendanceState);
       setAttendance((current) => [response.record, ...current.filter((item) => item.day !== "Hari ini")]);
@@ -564,7 +557,7 @@ export function AppPage() {
 
     const previewUrl = URL.createObjectURL(file);
     setAttendanceCapture((current) => ({ ...current, selfieUrl: previewUrl }));
-    setActionMessage("Selfie proof siap dikirim bersama attendance.");
+    setActionMessage("Selfie siap dikirim bersama check-in.");
   }
 
   async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
@@ -914,13 +907,13 @@ export function AppPage() {
                       navigate(next.path);
                     }
                   }}
-                  className="flex items-center justify-between rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] px-4 py-4 text-left transition hover:border-[#d6def0] hover:bg-white"
+                  className="flex min-w-0 flex-col gap-3 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] px-4 py-4 text-left transition hover:border-[#d6def0] hover:bg-white sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#1769ff] shadow-sm">
                       <item.icon className="h-5 w-5" />
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-black text-[#111827]">{item.label}</p>
                       <p className="mt-1 text-xs font-semibold text-[#667085]">Lanjutkan dari shell yang sama.</p>
                     </div>
@@ -953,6 +946,42 @@ export function AppPage() {
     );
   }
 
+  function renderEmployeeHome() {
+    if (employeeSummaryError) {
+      return <ErrorState title="Ringkasan hari ini belum tersedia" description={`${employeeSummaryError} Coba buka ulang Beranda setelah koneksi stabil.`} />;
+    }
+
+    if (!employeeSummary) {
+      return <LoadingState label="Memuat ringkasan hari ini" />;
+    }
+
+    return (
+      <>
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Status hari ini" value={attendanceState === "checked_out" ? "Selesai" : attendanceState === "checked_in" ? "Sudah check-in" : "Belum check-in"} detail={employeeSummary.assignedShift.name} />
+          <StatCard label="Shift hari ini" value={`${employeeSummary.assignedShift.startTime} - ${employeeSummary.assignedShift.endTime}`} detail={employeeSummary.assignedShift.locationName} />
+          <StatCard label="Tepat waktu" value={String(employeeSummary.onTimeDays)} detail={`${employeeSummary.totalDays} hari hadir tercatat`} />
+          <StatCard label="Pending pengajuan" value={String(employeeSummary.pendingRequests)} detail="Menunggu keputusan admin atau manager" />
+        </section>
+        <Panel eyebrow="Today" title="Aktivitas kerja hari ini">
+          {schedule.length === 0 ? (
+            <EmptyState title="Belum ada agenda tambahan" description="Shift utama tetap mengikuti jadwal yang ditampilkan di tab Jadwal." />
+          ) : (
+            <div className="grid gap-3">
+              {schedule.map((item) => (
+                <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">{item.time}</p>
+                  <p className="mt-2 text-sm font-black text-[#111827]">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#596172]">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </>
+    );
+  }
+
   function renderEmployeeAttendance() {
     if (employeeSummaryError) {
       return <ErrorState title="Status absensi belum tersedia" description={`${employeeSummaryError} Coba buka ulang tab absensi setelah koneksi stabil.`} />;
@@ -969,18 +998,10 @@ export function AppPage() {
           ? "warning"
           : "danger";
 
-    const historyRows = attendance.map((item) => ({
-      id: item.id ?? `${item.day}-${item.time}`,
-      day: item.day,
-      method: item.method,
-      time: item.time,
-      status: <StatusBadge tone={item.status === "Belum check-in" ? "neutral" : item.status === "Terlambat" ? "warning" : "success"}>{item.status}</StatusBadge>
-    }));
-
     return (
       <>
         <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-          <Panel eyebrow="Attendance desk" title="Clock-in cepat, guard tetap ketat">
+          <Panel eyebrow="Absensi karyawan" title="Check-in sederhana, validasi tetap berjalan">
             <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
               <div>
                 <p className="text-sm font-bold text-[#596172]">
@@ -991,7 +1012,7 @@ export function AppPage() {
                     year: "numeric"
                   })}
                 </p>
-                <p className="mt-2 text-4xl font-black tracking-[-0.04em] text-[#111827]">{now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
+                <p className="mt-2 break-words text-3xl font-black tracking-[-0.02em] text-[#111827] sm:text-4xl sm:tracking-[-0.04em]">{now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <StatusBadge tone="info">{employeeSummary.assignedShift.name}</StatusBadge>
                   <StatusBadge tone={attendanceState === "checked_out" ? "success" : attendanceState === "checked_in" ? "info" : "neutral"}>
@@ -999,18 +1020,11 @@ export function AppPage() {
                   </StatusBadge>
                 </div>
                 <p className="mt-4 text-sm leading-7 text-[#596172]">
-                  Shift {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}. Timestamp final memakai server, bukan jam di perangkat.
+                  Shift {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}. Tekan check-in; lokasi, selfie jika diperlukan, dan sinyal perangkat ikut divalidasi otomatis.
                 </p>
                 <div className="mt-5 grid gap-3">
-                  <FormInput
-                    label="Scanner token"
-                    value={attendanceCapture.scannerToken}
-                    onChange={(event) => setAttendanceCapture((current) => ({ ...current, scannerToken: event.target.value }))}
-                    placeholder="Masukkan token QR gate"
-                    hint="Isi hanya jika check-in melalui kiosk scanner."
-                  />
                   <label className="block">
-                    <span id="selfie-proof-label" className="mb-2 block text-sm font-bold text-[#111827]">Selfie proof</span>
+                    <span id="selfie-proof-label" className="mb-2 block text-sm font-bold text-[#111827]">Selfie check-in</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1020,12 +1034,12 @@ export function AppPage() {
                       aria-describedby="selfie-proof-hint"
                       className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
                     />
-                    <p id="selfie-proof-hint" className="mt-2 text-sm leading-6 text-[#667085]">Preview tersedia di perangkat. Upload server masih nullable sampai integrasi storage final selesai.</p>
+                    <p id="selfie-proof-hint" className="mt-2 text-sm leading-6 text-[#667085]">Lampirkan jika kebijakan kantor meminta bukti selfie. Preview tersedia di perangkat; storage server masih nullable.</p>
                   </label>
                   {attendanceCapture.selfieUrl ? (
-                    <div className="flex items-center gap-3 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3">
+                    <div className="flex min-w-0 items-center gap-3 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3">
                       <img src={attendanceCapture.selfieUrl} alt="Preview selfie attendance" className="h-16 w-16 rounded-2xl object-cover" />
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-black text-[#111827]">Selfie proof siap</p>
                         <p className="mt-1 text-xs font-semibold text-[#667085]">Disimpan sementara di perangkat. Storage server tetap nullable sampai integrasi upload final.</p>
                       </div>
@@ -1035,23 +1049,25 @@ export function AppPage() {
               </div>
 
               <div className="grid gap-3 [&>button]:w-full">
-                {attendanceMethods.map((method) => (
-                  <PrimaryButton
-                    key={`checkin-${method}`}
-                    disabled={attendanceState !== "idle" || busyAction === `checkin-${method}`}
-                    onClick={() => handleCheckIn(method)}
-                  >
-                    <QrCode className="mr-2 h-4 w-4" />
-                    {busyAction === `checkin-${method}` ? "Menyimpan..." : `Check-in ${method}`}
-                  </PrimaryButton>
-                ))}
-                <SecondaryButton
-                  disabled={attendanceState !== "checked_in" || busyAction === "checkout-QR"}
-                  onClick={() => handleCheckOut("QR")}
+                <PrimaryButton
+                  disabled={attendanceState !== "idle" || busyAction === "checkin" || !attendanceTrust.canClock}
+                  onClick={handleCheckIn}
                 >
                   <Clock3 className="mr-2 h-4 w-4" />
-                  {busyAction === "checkout-QR" ? "Menyimpan..." : "Check-out sekarang"}
+                  {busyAction === "checkin" ? "Menyimpan..." : "Check-in sekarang"}
+                </PrimaryButton>
+                <SecondaryButton
+                  disabled={attendanceState !== "checked_in" || busyAction === "checkout" || !attendanceTrust.canClock}
+                  onClick={handleCheckOut}
+                >
+                  <Clock3 className="mr-2 h-4 w-4" />
+                  {busyAction === "checkout" ? "Menyimpan..." : "Check-out sekarang"}
                 </SecondaryButton>
+                {!attendanceTrust.canClock ? (
+                  <p role="alert" className="rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">
+                    {attendanceTrust.title}. Verifikasi perangkat atau izinkan lokasi sebelum absen.
+                  </p>
+                ) : null}
               </div>
             </div>
           </Panel>
@@ -1059,8 +1075,8 @@ export function AppPage() {
           <Panel eyebrow="Validation" title="Status lokasi dan perangkat">
             <div className="space-y-4">
               <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="text-sm font-black text-[#111827]">Current attendance status</p>
                     <p className="mt-2 text-sm leading-6 text-[#667085]">
                       {employeeSummary.todayRecord.checkInTime
@@ -1085,7 +1101,7 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-1 h-5 w-5 text-[#1769ff]" />
                   <div>
-                    <p className="text-sm font-black text-[#111827]">Location validation status</p>
+                    <p className="text-sm font-black text-[#111827]">Validasi lokasi dan perangkat</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">{attendanceTrust.detail}</p>
                     <div className="mt-4 grid gap-2 text-xs font-semibold text-[#667085]">
                       <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} meter</p>
@@ -1105,9 +1121,9 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <Camera className="mt-1 h-5 w-5 text-[#1769ff]" />
                   <div>
-                    <p className="text-sm font-black text-[#111827]">Selfie / proof flow</p>
+                    <p className="text-sm font-black text-[#111827]">Selfie menyatu dengan check-in</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">
-                      Capture dan preview selfie sudah aktif. Upload ke storage backend tetap nullable dan akan disambungkan penuh pada fase lanjutan.
+                      Tidak ada aksi scan terpisah untuk karyawan. Jika selfie dibutuhkan, bukti ini dikirim bersama check-in dan status validasi tetap bisa verified, need review, blocked, atau rejected.
                     </p>
                   </div>
                 </div>
@@ -1116,14 +1132,31 @@ export function AppPage() {
           </Panel>
         </section>
 
-        <Panel eyebrow="Recent history" title="Riwayat absensi terbaru">
+      </>
+    );
+  }
+
+  function renderEmployeeHistoryWorkspace() {
+    const historyRows = attendance.map((item) => ({
+      id: item.id ?? `${item.day}-${item.time}`,
+      day: item.day,
+      method: item.method,
+      time: item.time,
+      status: item.status
+    }));
+
+    return (
+      <Panel eyebrow="Recent history" title="Riwayat absensi terbaru">
           <div className="mb-5 flex flex-wrap gap-2">
             {attendanceFilters.map((filter) => (
               <button
                 key={filter}
                 type="button"
-                onClick={() => setHistoryFilter(filter)}
-                className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.12em] ${
+                aria-pressed={historyFilter === filter}
+                onClick={() => {
+                  setHistoryFilter(filter);
+                }}
+                className={`min-h-11 rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.12em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
                   historyFilter === filter ? "bg-[#111827] text-white" : "bg-[#f1f5ff] text-[#1769ff]"
                 }`}
               >
@@ -1138,19 +1171,89 @@ export function AppPage() {
           ) : historyRows.length === 0 ? (
             <EmptyState title="Belum ada histori absensi" description="Riwayat check-in dan check-out pribadi akan muncul setelah Anda melakukan absensi atau approval terkait sudah diproses." />
           ) : (
-            <DataTable
-              caption="Riwayat absensi employee"
-              columns={[
-                { key: "day", header: "Hari" },
-                { key: "time", header: "Time" },
-                { key: "method", header: "Method" },
-                { key: "status", header: "Status" }
-              ]}
-              rows={historyRows}
-            />
+            <div className="grid gap-3">
+              <div className="grid gap-3" aria-label="Riwayat absensi employee">
+                {historyRows.map((item) => (
+                  <details
+                    key={item.id}
+                    className="group rounded-[22px] border border-[#edf0f5] bg-white transition open:border-[#1769ff] open:bg-[#f1f5ff]"
+                  >
+                    <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] [&::-webkit-details-marker]:hidden">
+                      <span>
+                        <span className="block text-sm font-black text-[#111827]">{item.day}</span>
+                        <span className="mt-1 block text-xs font-semibold text-[#667085]">{item.time} · {item.method}</span>
+                      </span>
+                      <StatusBadge tone={item.status === "Belum check-in" ? "neutral" : item.status === "Terlambat" ? "warning" : "success"}>{item.status}</StatusBadge>
+                    </summary>
+                    <div className="border-t border-[#dce7fb] px-4 py-4" role="status">
+                      <p className="text-sm font-black text-[#111827]">Detail absensi</p>
+                      <div className="mt-3 grid gap-2 text-sm font-semibold text-[#596172] sm:grid-cols-2">
+                        <p>Hari: {item.day}</p>
+                        <p>Jam: {item.time}</p>
+                        <p>Metode: {item.method}</p>
+                        <p>Status: {item.status}</p>
+                      </div>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </div>
+          )}
+      </Panel>
+    );
+  }
+
+  function renderEmployeeScheduleWorkspace() {
+    if (employeeSummaryError) {
+      return <ErrorState title="Jadwal belum tersedia" description={`${employeeSummaryError} Coba buka ulang tab Jadwal setelah koneksi stabil.`} />;
+    }
+
+    if (!employeeSummary) {
+      return <LoadingState label="Memuat jadwal shift" />;
+    }
+
+    return (
+      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <Panel eyebrow="Jadwal / Shift" title="Shift yang sedang ditugaskan">
+          <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-[#111827]">{employeeSummary.assignedShift.name}</p>
+                <p className="mt-2 break-words text-2xl font-black text-[#111827] sm:text-3xl">{employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime}</p>
+                <p className="mt-2 text-sm font-semibold text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
+              </div>
+              <StatusBadge tone="info">Hari ini</StatusBadge>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel eyebrow="Upcoming" title="Jadwal berikutnya">
+          {schedule.length === 0 ? (
+            <EmptyState title="Belum ada jadwal mendatang" description="Data assignment lanjutan belum tersedia; saat ini Taptu menampilkan shift aktif dari ringkasan karyawan." />
+          ) : (
+            <div className="grid gap-3">
+              {schedule.map((item) => (
+                <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">{item.time}</p>
+                  <p className="mt-2 text-sm font-black text-[#111827]">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#596172]">{item.detail}</p>
+                </div>
+              ))}
+            </div>
           )}
         </Panel>
-      </>
+      </section>
+    );
+  }
+
+  function renderEmployeePayslipWorkspace() {
+    return (
+      <Panel eyebrow="Slip Gaji" title="Slip gaji pribadi">
+        <EmptyState
+          title="Slip gaji belum tersedia"
+          description="Taptu saat ini menyediakan laporan attendance payroll-ready dan export CSV untuk admin. Slip gaji read-only akan aktif setelah model payroll disambungkan."
+        />
+      </Panel>
     );
   }
 
@@ -1202,6 +1305,7 @@ export function AppPage() {
               <option value="Attendance Correction">Attendance Correction</option>
               <option value="Forgot Check-in/out">Forgot Check-in/out</option>
             </SelectInput>
+            <p className="text-xs font-semibold leading-5 text-[#667085]">Lembur belum aktif di approval flow saat ini dan tetap masuk roadmap.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormInput label="Tanggal mulai" type="date" value={requestForm.startDate} onChange={(event) => setRequestForm((current) => ({ ...current, startDate: event.target.value }))} />
               <FormInput label="Tanggal selesai" type="date" value={requestForm.endDate} onChange={(event) => setRequestForm((current) => ({ ...current, endDate: event.target.value }))} />
@@ -1212,7 +1316,7 @@ export function AppPage() {
               <textarea
                 value={requestForm.detail}
                 onChange={(event) => setRequestForm((current) => ({ ...current, detail: event.target.value }))}
-                className="min-h-[140px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
+                className="min-h-[140px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base"
               />
             </label>
             {requestFormError ? <ErrorState title="Form pengajuan belum lengkap" description={requestFormError} /> : null}
@@ -1223,7 +1327,7 @@ export function AppPage() {
         </Panel>
 
         <Panel eyebrow="Approval queue" title="Request yang sedang aktif">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm leading-6 text-[#596172]">Admin melihat seluruh antrean, employee hanya melihat request miliknya.</p>
             <SecondaryButton onClick={reloadRequests} disabled={busyAction === "reload-requests"}>
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -1332,7 +1436,7 @@ export function AppPage() {
                 className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] py-3 pl-10 pr-4 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               {(["present", "late", "absent", "leave"] as const).map((filter) => {
                 const countMap = {
                   present: employeeList.filter((e) => e.todayStatus === "present").length,
@@ -1407,10 +1511,10 @@ export function AppPage() {
                 {exceptionQueue.map((item) => (
                   <article key={item.id} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-black text-[#111827]">{item.employeeName}</p>
                         <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.exceptionType}</p>
-                        <p className="mt-2 text-sm leading-6 text-[#596172]">{item.reason}</p>
+                        <p className="mt-2 break-words text-sm leading-6 text-[#596172]">{item.reason}</p>
                       </div>
                       <StatusBadge tone={item.status === "Need Review" ? "warning" : item.status === "Rejected" ? "danger" : "success"}>{item.status}</StatusBadge>
                     </div>
@@ -1471,11 +1575,11 @@ export function AppPage() {
     return (
       <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <Panel eyebrow="Scanner mode" title="Gate kiosk aktif">
-          <div className="rounded-[26px] border border-[#111827] bg-[#111827] p-6 text-white">
-            <div className="flex items-start justify-between gap-4">
-              <div>
+          <div className="rounded-[24px] border border-[#111827] bg-[#111827] p-4 text-white sm:rounded-[26px] sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8bb8ff]">Token aktif</p>
-                <p className="mt-3 text-4xl font-black tracking-[-0.04em]">{scannerToken ?? "HDR-000-000"}</p>
+                <p className="mt-3 break-all text-2xl font-black tracking-[-0.02em] sm:text-4xl sm:tracking-[-0.04em]">{scannerToken ?? "HDR-000-000"}</p>
                 <p className="mt-3 text-sm leading-7 text-[#cbd5e1]">
                   Token dinamis ini dipakai scanner gate. Attempt invalid atau expired akan masuk audit dan exception flow.
                 </p>
@@ -1485,7 +1589,7 @@ export function AppPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8bb8ff]">Countdown</p>
-                <p className="mt-2 text-3xl font-black tracking-[-0.04em]" aria-live="polite">{scannerMeta?.expiresInSeconds ?? 30}s</p>
+                <p className="mt-2 text-2xl font-black tracking-[-0.02em] sm:text-3xl sm:tracking-[-0.04em]" aria-live="polite">{scannerMeta?.expiresInSeconds ?? 30}s</p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8bb8ff]">Status</p>
@@ -1535,7 +1639,7 @@ export function AppPage() {
       <div className="grid gap-5">
         <section className="grid gap-5 xl:grid-cols-2">
           <Panel eyebrow="Work locations" title="Geofence dan radius validasi">
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm leading-6 text-[#596172]">Lokasi kerja dipakai sebagai titik validasi GPS saat karyawan absen.</p>
               {isAdmin && (
                 <PrimaryButton onClick={() => { setEditingLocation(null); setLocationForm({ name: "", address: "", latitude: "", longitude: "", radiusMeters: "150" }); setLocationFormOpen(true); }}>
@@ -1554,7 +1658,7 @@ export function AppPage() {
               <div className="space-y-3">
                 {workLocations.map((loc) => (
                   <div key={loc.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="font-black text-[#111827]">{loc.name}</p>
                         {loc.address && <p className="mt-1 text-xs font-semibold text-[#667085]">{loc.address}</p>}
@@ -1564,7 +1668,7 @@ export function AppPage() {
                           <span>Lng: {loc.longitude.toFixed(4)}</span>
                         </div>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-2">
+                      <div className="flex shrink-0 flex-row flex-wrap gap-2 sm:flex-col sm:items-end">
                         <StatusBadge tone={loc.status === "active" ? "success" : "neutral"}>{loc.status === "active" ? "Aktif" : "Nonaktif"}</StatusBadge>
                         {isAdmin && (
                           <SecondaryButton
@@ -1596,7 +1700,7 @@ export function AppPage() {
                   </div>
                   <FormInput label="Radius (meter)" type="number" value={locationForm.radiusMeters} onChange={(e) => setLocationForm((c) => ({ ...c, radiusMeters: e.target.value }))} placeholder="150" required />
                   {locationFormError ? <ErrorState title="Form lokasi belum valid" description={locationFormError} /> : null}
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <PrimaryButton type="submit" disabled={busyAction === "save-location"}>{busyAction === "save-location" ? "Menyimpan..." : "Simpan lokasi"}</PrimaryButton>
                     <SecondaryButton type="button" onClick={() => { setLocationFormOpen(false); setEditingLocation(null); }}>Batal</SecondaryButton>
                   </div>
@@ -1606,7 +1710,7 @@ export function AppPage() {
           </Panel>
 
           <Panel eyebrow="Shift management" title="Konfigurasi waktu dan lokasi kerja">
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm leading-6 text-[#596172]">Shift menentukan jam masuk, toleransi keterlambatan, dan lokasi validasi.</p>
               {isAdmin && (
                 <PrimaryButton onClick={() => { setEditingShift(null); setShiftForm({ name: "", startTime: "", endTime: "", gracePeriodMinutes: "10", workLocationId: "", breakStartTime: "", breakEndTime: "" }); setShiftFormOpen(true); }}>
@@ -1625,8 +1729,8 @@ export function AppPage() {
               <div className="space-y-3">
                 {shifts.map((shift) => (
                   <div key={shift.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
                         <p className="font-black text-[#111827]">{shift.name}</p>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-[#7a8495]">
                           <span>{shift.startTime} - {shift.endTime}</span>
@@ -1635,7 +1739,7 @@ export function AppPage() {
                           {shift.breakStartTime && <span>Istirahat: {shift.breakStartTime} - {shift.breakEndTime}</span>}
                         </div>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-2">
+                      <div className="flex shrink-0 flex-row flex-wrap gap-2 sm:flex-col sm:items-end">
                         <StatusBadge tone={shift.status === "active" ? "success" : "neutral"}>{shift.status === "active" ? "Aktif" : "Arsip"}</StatusBadge>
                         {isAdmin && (
                           <SecondaryButton
@@ -1676,7 +1780,7 @@ export function AppPage() {
                     <FormInput label="Istirahat selesai (opsional)" type="time" value={shiftForm.breakEndTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakEndTime: e.target.value }))} />
                   </div>
                   {shiftFormError ? <ErrorState title="Form shift belum valid" description={shiftFormError} /> : null}
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <PrimaryButton type="submit" disabled={busyAction === "save-shift"}>{busyAction === "save-shift" ? "Menyimpan..." : "Simpan shift"}</PrimaryButton>
                     <SecondaryButton type="button" onClick={() => { setShiftFormOpen(false); setEditingShift(null); }}>Batal</SecondaryButton>
                   </div>
@@ -1731,7 +1835,7 @@ export function AppPage() {
               {reportRows.length} baris data{reportFilters.status || reportFilters.dateFrom ? " (filter aktif)" : ""}.
               Laporan mencakup status validasi, lokasi, perangkat, dan selfie proof.
             </p>
-            <div className="flex gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               <SecondaryButton onClick={() => setShowAuditTrail(!showAuditTrail)}>
                 {showAuditTrail ? "Sembunyikan audit" : "Lihat audit trail"}
               </SecondaryButton>
@@ -1841,6 +1945,9 @@ export function AppPage() {
     }
 
     if (tab === "home") {
+      if (isEmployee) {
+        return renderEmployeeHome();
+      }
       if (isAdmin) {
         return renderAdminDashboard();
       }
@@ -1853,8 +1960,20 @@ export function AppPage() {
       return renderAttendanceWorkspace();
     }
 
+    if (tab === "history" && isEmployee) {
+      return renderEmployeeHistoryWorkspace();
+    }
+
     if (tab === "requests") {
       return renderRequestsWorkspace();
+    }
+
+    if (tab === "schedule" && isEmployee) {
+      return renderEmployeeScheduleWorkspace();
+    }
+
+    if (tab === "payslip" && isEmployee) {
+      return renderEmployeePayslipWorkspace();
     }
 
     if (tab === "profile") {

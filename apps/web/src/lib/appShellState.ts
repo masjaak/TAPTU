@@ -1,14 +1,17 @@
 import type { UserRole } from "@taptu/shared";
 import {
   BarChart3,
+  CalendarDays,
+  Clock3,
+  History,
   Home,
   MapPinned,
-  QrCode,
   ScanFace,
   Settings,
   TimerReset,
   UserRound,
-  Users
+  Users,
+  WalletCards
 } from "lucide-react";
 
 export type NavigationRole = UserRole;
@@ -17,7 +20,10 @@ export type AppSectionKey =
   | "home"
   | "team"
   | "attendance"
+  | "history"
   | "requests"
+  | "schedule"
+  | "payslip"
   | "locations"
   | "reports"
   | "scanner"
@@ -30,7 +36,10 @@ export type AppShellEvent =
   | { type: "OPEN_HOME" }
   | { type: "OPEN_TEAM" }
   | { type: "OPEN_ATTENDANCE" }
+  | { type: "OPEN_HISTORY" }
   | { type: "OPEN_REQUESTS" }
+  | { type: "OPEN_SCHEDULE" }
+  | { type: "OPEN_PAYSLIP" }
   | { type: "OPEN_LOCATIONS" }
   | { type: "OPEN_REPORTS" }
   | { type: "OPEN_SCANNER" }
@@ -48,8 +57,11 @@ export type AppTabDefinition = {
 const sections: Record<AppSectionKey, AppTabDefinition> = {
   home: { key: "home", label: "Beranda", icon: Home, path: "/app", description: "Ringkasan workspace" },
   team: { key: "team", label: "Tim", icon: Users, path: "/app/team", description: "Karyawan dan supervisor" },
-  attendance: { key: "attendance", label: "Absensi", icon: QrCode, path: "/app/attendance", description: "Clock dan validasi" },
-  requests: { key: "requests", label: "Izin", icon: TimerReset, path: "/app/requests", description: "Pengajuan dan approval" },
+  attendance: { key: "attendance", label: "Presensi", icon: Clock3, path: "/app/attendance", description: "Check-in dan validasi" },
+  history: { key: "history", label: "Riwayat", icon: History, path: "/app/history", description: "Histori absensi pribadi" },
+  requests: { key: "requests", label: "Pengajuan", icon: TimerReset, path: "/app/requests", description: "Pengajuan dan approval" },
+  schedule: { key: "schedule", label: "Jadwal", icon: CalendarDays, path: "/app/schedule", description: "Shift kerja pribadi" },
+  payslip: { key: "payslip", label: "Slip Gaji", icon: WalletCards, path: "/app/payslip", description: "Ringkasan payroll pribadi" },
   locations: { key: "locations", label: "Lokasi", icon: MapPinned, path: "/app/locations", description: "Geofence kerja" },
   reports: { key: "reports", label: "Laporan", icon: BarChart3, path: "/app/reports", description: "Rekap HR" },
   scanner: { key: "scanner", label: "Scanner", icon: ScanFace, path: "/app/scanner", description: "Mode kiosk" },
@@ -61,7 +73,7 @@ const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
   superadmin: ["home", "team", "attendance", "requests", "locations", "reports", "settings", "profile"],
   admin: ["home", "team", "attendance", "requests", "locations", "reports", "profile"],
   manager: ["home", "team", "attendance", "requests", "reports", "profile"],
-  employee: ["attendance", "requests", "profile"],
+  employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
 };
 
@@ -69,7 +81,7 @@ const compactNavigation: Record<UserRole, AppSectionKey[]> = {
   superadmin: ["home", "attendance", "requests", "profile"],
   admin: ["home", "attendance", "requests", "profile"],
   manager: ["home", "attendance", "requests", "profile"],
-  employee: ["attendance", "requests", "profile"],
+  employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
 };
 
@@ -77,7 +89,7 @@ const defaultSection: Record<NavigationRole, AppSectionKey> = {
   superadmin: "home",
   admin: "home",
   manager: "home",
-  employee: "attendance",
+  employee: "home",
   scanner: "scanner"
 };
 
@@ -85,7 +97,10 @@ const eventMap: Record<AppShellEvent["type"], AppSectionKey> = {
   OPEN_HOME: "home",
   OPEN_TEAM: "team",
   OPEN_ATTENDANCE: "attendance",
+  OPEN_HISTORY: "history",
   OPEN_REQUESTS: "requests",
+  OPEN_SCHEDULE: "schedule",
+  OPEN_PAYSLIP: "payslip",
   OPEN_LOCATIONS: "locations",
   OPEN_REPORTS: "reports",
   OPEN_SCANNER: "scanner",

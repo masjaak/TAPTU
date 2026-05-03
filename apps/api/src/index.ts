@@ -820,7 +820,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
     validationReasons: reasons,
     selfieUrl: parsed.data.selfieUrl,
     deviceId: parsed.data.deviceId,
-    scannerTokenId: store.scanner.id
+    scannerTokenId: parsed.data.method === "QR" ? store.scanner.id : undefined
   });
 
   if (next.state === current.state) {
@@ -843,14 +843,16 @@ app.post("/api/attendance/checkin", async (req, res) => {
     store.auditLogs.unshift(createAuditLog("device_mismatch_exception", user.fullName, user.role, next.id ?? user.id, reasons.join(" | ")));
   }
 
-  store.scanner = appendScannerAttempt(store.scanner, {
-    id: `scan-${Date.now()}-ok`,
-    employeeId: user.id,
-    employeeName: user.fullName,
-    status: "success",
-    detail: `${parsed.data.method} check-in tercatat.`,
-    createdAt: now
-  });
+  if (parsed.data.method === "QR") {
+    store.scanner = appendScannerAttempt(store.scanner, {
+      id: `scan-${Date.now()}-ok`,
+      employeeId: user.id,
+      employeeName: user.fullName,
+      status: "success",
+      detail: "QR check-in tercatat.",
+      createdAt: now
+    });
+  }
   await storage.save(store);
 
   const response: AttendanceActionResponse = {
@@ -950,7 +952,7 @@ app.post("/api/attendance/checkout", async (req, res) => {
     validationReasons: validation.reasons,
     selfieUrl: parsed.data.selfieUrl,
     deviceId: parsed.data.deviceId,
-    scannerTokenId: store.scanner.id
+    scannerTokenId: parsed.data.method === "QR" ? store.scanner.id : undefined
   });
 
   if (next.state === current.state) {

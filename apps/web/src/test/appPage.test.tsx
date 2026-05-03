@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
@@ -74,11 +74,11 @@ describe("AppPage", () => {
     });
     apiMocks.checkIn.mockResolvedValue({
       attendanceState: "checked_in",
-      record: { day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" }
+      record: { day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Manual" }
     });
     apiMocks.checkOut.mockResolvedValue({
       attendanceState: "checked_out",
-      record: { day: "Hari ini", status: "Tepat waktu", time: "17:05", method: "QR" }
+      record: { day: "Hari ini", status: "Tepat waktu", time: "17:05", method: "Manual" }
     });
     apiMocks.exportReportCsv.mockImplementation(() => undefined);
   });
@@ -140,7 +140,7 @@ describe("AppPage", () => {
     expect(screen.getByText("Quick actions")).toBeTruthy();
   });
 
-  it("routes employee users into the attendance-first workspace", async () => {
+  it("routes employee users into the self-service home workspace", async () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
@@ -191,9 +191,194 @@ describe("AppPage", () => {
 
     renderRoute("/app");
 
-    expect(await screen.findByText(/clock-in cepat, guard tetap ketat/i)).toBeTruthy();
-    expect(screen.getByText(/location validation status/i)).toBeTruthy();
-    expect(screen.getByText(/recent history/i)).toBeTruthy();
+    expect(await screen.findByText(/aktivitas kerja hari ini/i)).toBeTruthy();
+    expect(screen.getAllByText("Presensi").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Riwayat").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Pengajuan").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Jadwal").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Slip Gaji").length).toBeGreaterThan(0);
+  });
+
+  it("renders employee attendance without the history list", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [{ id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Manual" }],
+      attendanceState: "checked_in",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "checked_in",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        checkInTime: "2026-05-02T08:03:00.000Z",
+        status: "Tepat waktu",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/attendance");
+
+    expect(await screen.findByText(/check-in sederhana, validasi tetap berjalan/i)).toBeTruthy();
+    expect(screen.getByText(/validasi lokasi dan perangkat/i)).toBeTruthy();
+    expect(screen.queryByText(/recent history/i)).toBeNull();
+  });
+
+  it("opens employee recent history detail from a comfortable tap target", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([
+      { id: "hist-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Manual" }
+    ]);
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/history");
+
+    const historySummary = await screen.findByText(/08:03 · Manual/i);
+    const historyDetails = historySummary.closest("details");
+
+    expect(historyDetails).toBeTruthy();
+    expect(historySummary.closest("summary")?.className).toContain("min-h-14");
+
+    fireEvent.click(historySummary);
+
+    expect(await screen.findByText("Detail absensi")).toBeTruthy();
+    expect(historyDetails?.hasAttribute("open")).toBe(true);
+  });
+
+  it("renders employee schedule and payslip self-service placeholders", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/schedule");
+
+    expect(await screen.findByText(/shift yang sedang ditugaskan/i)).toBeTruthy();
+    expect(screen.getByText(/belum ada jadwal mendatang/i)).toBeTruthy();
+
+    cleanup();
+    renderRoute("/app/payslip");
+
+    expect(await screen.findByText(/slip gaji pribadi/i)).toBeTruthy();
+    expect(screen.getByText(/slip gaji belum tersedia/i)).toBeTruthy();
+    expect(screen.getByText(/payroll-ready/i)).toBeTruthy();
   });
 });
 

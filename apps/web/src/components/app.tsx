@@ -48,16 +48,16 @@ export function AppShell({
 
   const navButtonClass = (key: string) =>
     clsx(
-      "flex items-center gap-3 rounded-[18px] px-3 py-3 text-left text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+      "flex min-w-0 items-center gap-3 rounded-[18px] px-3 py-3 text-left text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
       activeKey === key
         ? "bg-[#111827] text-white shadow-[0_14px_30px_rgba(20,24,31,0.16)]"
         : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
     );
 
   return (
-    <div className="min-h-screen bg-[#e9eaec] px-3 py-3 text-[#101217] sm:px-6 sm:py-4 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
-      <main className="mx-auto flex max-w-7xl flex-col gap-3 overflow-hidden rounded-[28px] border border-white/70 bg-[#f9fafc] p-3 shadow-[0_24px_70px_rgba(20,24,31,0.14)] sm:rounded-[34px] sm:p-4 lg:grid lg:min-h-[calc(100vh-32px)] lg:grid-cols-[260px_1fr] lg:gap-4 lg:p-6">
-        <header data-testid="mobile-app-header" className="flex items-center justify-between rounded-[24px] border border-[#edf0f5] bg-white px-4 py-3 shadow-[0_12px_28px_rgba(20,24,31,0.07)] lg:hidden">
+    <div className="min-h-screen bg-[#e9eaec] px-2 py-2 text-[#101217] sm:px-6 sm:py-4 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
+      <main className="mx-auto flex max-w-7xl flex-col gap-3 overflow-hidden rounded-[22px] border border-white/70 bg-[#f9fafc] p-2 shadow-[0_24px_70px_rgba(20,24,31,0.14)] sm:rounded-[34px] sm:p-4 lg:grid lg:min-h-[calc(100vh-32px)] lg:grid-cols-[260px_1fr] lg:gap-4 lg:p-6">
+        <header data-testid="mobile-app-header" className="flex items-center justify-between rounded-[20px] border border-[#edf0f5] bg-white px-3 py-3 shadow-[0_12px_28px_rgba(20,24,31,0.07)] sm:px-4 lg:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
             <div className="min-w-0">
@@ -93,7 +93,7 @@ export function AppShell({
                 className={navButtonClass(item.key)}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
+                <span className="min-w-0 break-words">{item.label}</span>
               </button>
             ))}
           </nav>
@@ -115,7 +115,7 @@ export function AppShell({
         <div className="fixed inset-0 z-50 bg-[#101217]/45 p-3 lg:hidden" role="presentation">
           <div
             data-testid="mobile-nav-drawer"
-            className="ml-auto flex h-full w-full max-w-sm flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)]"
+            className="ml-auto flex h-full w-full max-w-sm flex-col overflow-y-auto rounded-[24px] border border-[#edf0f5] bg-white p-3 shadow-[0_34px_90px_rgba(20,24,31,0.24)] sm:p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Navigasi workspace"
@@ -142,7 +142,7 @@ export function AppShell({
               {navigation.map((item) => (
                 <button key={item.key} type="button" onClick={() => handleNavigate(item)} className={navButtonClass(item.key)}>
                   <item.icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
+                  <span className="min-w-0 break-words">{item.label}</span>
                 </button>
               ))}
             </nav>
@@ -162,12 +162,12 @@ export function AppShell({
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: ReactNode }) {
   return (
-    <header className="rounded-[28px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6">
+    <header className="rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[28px] sm:p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">{eyebrow}</p>
-          <h1 className="mt-3 text-2xl font-black leading-tight tracking-[-0.03em] text-[#101217] sm:text-4xl">{title}</h1>
-          {description ? <p className="mt-3 max-w-2xl text-base leading-7 text-[#596172]">{description}</p> : null}
+        <div className="min-w-0">
+          <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p>
+          <h1 className="mt-2 break-words text-xl font-black leading-tight tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-4xl sm:tracking-[-0.03em]">{title}</h1>
+          {description ? <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[#596172] sm:mt-3 sm:text-base sm:leading-7">{description}</p> : null}
         </div>
         {action}
       </div>
@@ -177,20 +177,20 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow: s
 
 export function Panel({ eyebrow, title, children, className }: { eyebrow?: string; title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={clsx("rounded-[30px] border border-[#edf0f5] bg-white p-5 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:p-6", className)}>
-      {eyebrow ? <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769ff]">{eyebrow}</p> : null}
-      {title ? <h2 className="mt-3 text-2xl font-black tracking-[-0.03em] text-[#101217]">{title}</h2> : null}
-      <div className={title || eyebrow ? "mt-5" : undefined}>{children}</div>
+    <section className={clsx("min-w-0 rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[30px] sm:p-6", className)}>
+      {eyebrow ? <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p> : null}
+      {title ? <h2 className="mt-2 break-words text-xl font-black tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-2xl sm:tracking-[-0.03em]">{title}</h2> : null}
+      <div className={title || eyebrow ? "mt-4 min-w-0 sm:mt-5" : "min-w-0"}>{children}</div>
     </section>
   );
 }
 
 export function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <article className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-5">
-      <p className="text-sm font-bold text-[#596172]">{label}</p>
-      <p className="mt-4 text-3xl font-black tracking-[-0.04em] text-[#111827]">{value}</p>
-      {detail ? <p className="mt-2 text-sm leading-6 text-[#667085]">{detail}</p> : null}
+    <article className="min-w-0 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:rounded-[26px] sm:p-5">
+      <p className="break-words text-sm font-bold text-[#596172]">{label}</p>
+      <p className="mt-3 break-words text-2xl font-black tracking-[-0.02em] text-[#111827] sm:mt-4 sm:text-3xl sm:tracking-[-0.04em]">{value}</p>
+      {detail ? <p className="mt-2 break-words text-sm leading-6 text-[#667085]">{detail}</p> : null}
     </article>
   );
 }
@@ -198,7 +198,7 @@ export function StatCard({ label, value, detail }: { label: string; value: strin
 export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "success" | "warning" | "danger" | "neutral" | "info" }) {
   return (
     <span
-      className={clsx("inline-flex items-center rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em]", {
+      className={clsx("inline-flex max-w-full items-center rounded-full px-3 py-1 text-left text-[11px] font-black uppercase tracking-[0.08em] sm:text-xs sm:tracking-[0.12em]", {
         "bg-[#edf4ff] text-[#174ea6]": tone === "success",
         "bg-[#fff3dc] text-[#92600a]": tone === "warning",
         "bg-[#fff2ee] text-[#a54c2f]": tone === "danger",
@@ -215,7 +215,7 @@ export function PrimaryButton({ className, ...props }: ButtonHTMLAttributes<HTML
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center rounded-2xl bg-[#1769ff] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_34px_rgba(23,105,255,0.22)] transition hover:bg-[#0d5be8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+        "inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1769ff] px-4 py-3 text-center text-sm font-bold text-white shadow-[0_16px_34px_rgba(23,105,255,0.22)] transition hover:bg-[#0d5be8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] sm:px-5",
         className
       )}
       {...props}
@@ -227,7 +227,7 @@ export function SecondaryButton({ className, ...props }: ButtonHTMLAttributes<HT
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center rounded-2xl border border-[#d8dde7] bg-white px-5 py-3 text-sm font-bold text-[#111827] transition hover:border-[#b9c2d3] hover:bg-[#f8faff] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+        "inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d8dde7] bg-white px-4 py-3 text-center text-sm font-bold text-[#111827] transition hover:border-[#b9c2d3] hover:bg-[#f8faff] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] sm:px-5",
         className
       )}
       {...props}
@@ -254,7 +254,7 @@ export function FormInput({
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
         className={clsx(
-          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
+          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base",
           error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
@@ -286,7 +286,7 @@ export function SelectInput({
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
         className={clsx(
-          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
+          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base",
           error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
@@ -310,9 +310,9 @@ export function DataTable({
   rows: Array<Record<string, ReactNode> & { id: string | number }>;
 }) {
   return (
-    <div className="overflow-hidden rounded-[24px] border border-[#edf0f5]">
+    <div className="min-w-0 overflow-hidden rounded-[20px] border border-[#edf0f5] sm:rounded-[24px]">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-[#edf0f5] bg-white">
+        <table className="min-w-[680px] divide-y divide-[#edf0f5] bg-white sm:min-w-full">
           <caption className="sr-only">{caption}</caption>
           <thead className="bg-[#f9fafc]">
             <tr>
@@ -327,7 +327,7 @@ export function DataTable({
             {rows.map((row) => (
               <tr key={row.id}>
                 {columns.map((column) => (
-                  <td key={column.key} className="px-4 py-4 text-sm font-semibold text-[#111827]">
+                  <td key={column.key} className="max-w-[240px] break-words px-3 py-3 text-sm font-semibold text-[#111827] sm:px-4 sm:py-4">
                     {row[column.key]}
                   </td>
                 ))}
@@ -342,8 +342,8 @@ export function DataTable({
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-5 py-8 text-center" role="status">
-      <p className="text-base font-black text-[#111827]">{title}</p>
+    <div className="rounded-[22px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-4 py-7 text-center sm:px-5 sm:py-8" role="status">
+      <p className="break-words text-base font-black text-[#111827]">{title}</p>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#596172]">{description}</p>
     </div>
   );
@@ -386,9 +386,9 @@ export function Dialog({ title, open, children, onClose }: { title: string; open
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#101217]/45 px-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="w-full max-w-lg rounded-[30px] border border-[#edf0f5] bg-white p-6 shadow-[0_34px_90px_rgba(20,24,31,0.24)]">
+      <div className="w-full max-w-lg rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)] sm:rounded-[30px] sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <h2 id={titleId} className="text-2xl font-black tracking-[-0.03em] text-[#111827]">{title}</h2>
+          <h2 id={titleId} className="break-words text-xl font-black tracking-[-0.02em] text-[#111827] sm:text-2xl sm:tracking-[-0.03em]">{title}</h2>
           <SecondaryButton onClick={onClose} aria-label={`Tutup dialog ${title}`}>Tutup</SecondaryButton>
         </div>
         <div className="mt-5">{children}</div>

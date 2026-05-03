@@ -15,7 +15,16 @@ describe("app shell state", () => {
   });
 
   it("moves to allowed tabs for employee role", () => {
-    expect(transitionTab("employee", "home", { type: "OPEN_ATTENDANCE" })).toBe("attendance");
+    expect(getDefaultAppSection("employee")).toBe("home");
+    expect(getNavigationForRole("employee").map((item) => item.key)).toEqual([
+      "home",
+      "attendance",
+      "history",
+      "requests",
+      "schedule",
+      "payslip",
+      "profile"
+    ]);
     expect(transitionTab("employee", "attendance", { type: "OPEN_PROFILE" })).toBe("profile");
   });
 
@@ -52,7 +61,7 @@ describe("app shell state", () => {
   });
 
   it("falls back to the default section for unknown route segments", () => {
-    expect(toAppSection("not-a-section", "employee")).toBe("attendance");
+    expect(toAppSection("not-a-section", "employee")).toBe("home");
     expect(toAppSection(undefined, "scanner")).toBe("scanner");
   });
 });
