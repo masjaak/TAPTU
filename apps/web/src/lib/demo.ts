@@ -42,8 +42,7 @@ const TODAY_RECORD: AttendanceRecord = {
   id: "att-demo-01",
   employeeId: "usr-employee-01",
   shiftId: SHIFT.id,
-  checkInTime: "2026-05-02T08:03:00.000Z",
-  status: "Tepat waktu",
+  status: "Belum check-in",
   locationLat: -6.2,
   locationLng: 106.8166,
   validationStatus: "verified",
@@ -149,8 +148,8 @@ const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
     { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07:58", method: "Selfie" }
   ],
   employee: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" },
-    { id: "a-02", day: "Kemarin", status: "Tepat waktu", time: "07:55", method: "Selfie" },
+    { id: "a-01", day: "Kemarin", status: "Tepat waktu", time: "07:55", method: "Selfie" },
+    { id: "a-02", day: "Selasa", status: "Tepat waktu", time: "08:02", method: "Manual" },
     { id: "a-03", day: "Senin", status: "Izin", time: "08:00", method: "Manual" }
   ],
   scanner: [
@@ -214,7 +213,7 @@ export function getDemoDashboard(token: string): DashboardPayload {
     stats: STATS[user.role] ?? STATS.employee,
     schedule: SCHEDULE,
     attendance: ATTENDANCE[user.role] ?? ATTENDANCE.employee,
-    attendanceState: user.role === "employee" ? "checked_in" : "idle",
+    attendanceState: "idle",
     requests: REQUESTS[user.role] ?? REQUESTS.employee,
     scannerToken: user.role === "scanner" ? "HDR-31A-7XZ" : undefined
   };
@@ -249,7 +248,7 @@ export function getDemoEmployeeSummary(): EmployeeSummary {
     onTimeDays: 20,
     lateDays: 2,
     pendingRequests: 1,
-    currentAttendanceState: "checked_in",
+    currentAttendanceState: "idle",
     assignedShift: SHIFT,
     todayRecord: TODAY_RECORD
   };

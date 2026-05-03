@@ -259,6 +259,62 @@ describe("AppPage", () => {
     expect(await screen.findByText(/08:03 · Manual/i)).toBeTruthy();
   });
 
+  it("keeps existing employee history when an all-history refresh returns empty", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "employee-api-token",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [{ id: "existing-01", day: "Kemarin", status: "Tepat waktu", time: "07:55", method: "Selfie" }],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/history");
+
+    expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
+    expect(await screen.findByText(/07:55 · Selfie/i)).toBeTruthy();
+    expect(screen.queryByText(/belum ada histori absensi/i)).toBeNull();
+  });
+
   it("starts selfie capture from the primary employee check-in button and submits after capture", async () => {
     localStorage.setItem(
       "taptu-session",

@@ -263,7 +263,7 @@ export function AppPage() {
       setAttendanceHistoryError(null);
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
         .then((items) => {
-          setAttendance(items);
+          setAttendance((current) => (items.length > 0 || historyFilter !== "all" ? items : current));
           setAttendanceHistoryLoaded(true);
         })
         .catch((error) => {

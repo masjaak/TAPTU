@@ -213,3 +213,30 @@
 **Remaining employee dashboard TODOs:**
 - Selfie storage/upload is still not finalized; `selfie_url` may remain nullable internally.
 - Real-device manual QA is still needed for browser camera permission cancel/deny behavior and very narrow mobile screens.
+
+---
+
+## Employee Dashboard Root Cause Patch (2026-05-03)
+
+**Root causes fixed:**
+- Demo employee dashboard/summary initialized as already `checked_in`, which kept the Check-in button disabled.
+- Empty all-history refreshes replaced existing employee history with `[]`, so Riwayat could show empty even when dashboard/demo history already existed.
+
+**Files changed:**
+- `apps/web/src/lib/demo.ts`
+- `apps/web/src/pages/AppPage.tsx`
+- `apps/web/src/test/api.test.ts`
+- `apps/web/src/test/appPage.test.tsx`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**Check-in behavior after fix:**
+- Demo employee starts in `idle` attendance state with no `checkInTime`, so Check-in is clickable.
+- Normal employee check-in still uses `Manual`, does not require scanner token, and keeps the camera/selfie flow.
+
+**Riwayat behavior after fix:**
+- Presensi/Riwayat keep the existing employee history when an all-history refresh returns empty.
+- Empty state appears only when there is no existing history and no fetched history.
+
+**Remaining TODOs:**
+- Selfie storage/upload remains unfinished internally.
+- Real-device camera permission behavior still needs manual QA.

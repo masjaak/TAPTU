@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getDashboard, login } from "../lib/api";
+import { fetchEmployeeSummary, getDashboard, login } from "../lib/api";
 
 describe("api client", () => {
   afterEach(() => {
@@ -94,6 +94,17 @@ describe("demo mode dashboard", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const result = await getDashboard("demo:employee");
     expect(result.greeting).toContain("Fikri");
+    expect(result.attendanceState).toBe("idle");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns employee demo summary as ready for first check-in", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = await fetchEmployeeSummary("demo:employee");
+    expect(result.currentAttendanceState).toBe("idle");
+    expect(result.todayRecord.checkInTime).toBeUndefined();
+    expect(result.todayRecord.status).toBe("Belum check-in");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
