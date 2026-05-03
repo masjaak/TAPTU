@@ -155,3 +155,28 @@
 - No application code modified.
 - No database/schema changes made.
 - No roadmap features built.
+
+---
+
+## Employee Check-in and Attendance History Hotfix (2026-05-03)
+
+**Checked:**
+- Employee attendance/check-in page.
+- Employee navigation/tab state.
+- Employee attendance history rendering and filter loading.
+- Employee check-in API action wiring.
+
+**Fixed:**
+- Primary employee Check-in now opens the camera/selfie file capture directly.
+- Capturing a selfie auto-submits the check-in instead of requiring a separate selfie frame and second check-in step.
+- Removed employee-facing technical storage/nullable copy from the check-in UI.
+- Presensi now loads and renders the employee attendance history with the same clean list/detail states as Riwayat.
+- History empty, loading, and error states remain user-friendly, and detail rows keep comfortable mobile tap targets.
+
+**Files changed:**
+- `apps/web/src/pages/AppPage.tsx`
+- `apps/web/src/test/appPage.test.tsx`
+- `Documents/TAPTU/CHANGELOG_PHASE_6.md`
+
+**Remaining limitations:**
+- Selfie storage/upload is still not finalized; `selfie_url` may remain nullable internally until storage integration is completed.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Building2,
@@ -135,6 +135,7 @@ export function AppPage() {
   const [exceptionNotes, setExceptionNotes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [checkInAwaitingSelfie, setCheckInAwaitingSelfie] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -194,6 +195,7 @@ export function AppPage() {
   const [locationFormError, setLocationFormError] = useState<string | null>(null);
   const [shiftFormError, setShiftFormError] = useState<string | null>(null);
   const [reportFilterError, setReportFilterError] = useState<string | null>(null);
+  const selfieInputRef = useRef<HTMLInputElement | null>(null);
 
   const appNavigation = useMemo(() => getNavigationForRole(sessionRole), [sessionRole]);
   const attendanceTrust = useMemo(
@@ -255,7 +257,7 @@ export function AppPage() {
       return;
     }
 
-    if (tab === "history") {
+    if ((tab === "history" || (tab === "attendance" && isEmployee))) {
       setAttendanceHistoryLoaded(false);
       setAttendanceHistoryError(null);
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
@@ -488,7 +490,7 @@ export function AppPage() {
     }
   }
 
-  async function handleCheckIn() {
+  async function submitCheckIn(selfieUrl = attendanceCapture.selfieUrl) {
     setBusyAction("checkin");
 
     try {
@@ -496,7 +498,7 @@ export function AppPage() {
         method: "Manual",
         locationLat: attendanceCapture.locationLat,
         locationLng: attendanceCapture.locationLng,
-        selfieUrl: attendanceCapture.selfieUrl || undefined,
+        selfieUrl: selfieUrl || undefined,
         deviceId: attendanceCapture.deviceId || undefined,
         requiredSelfie: attendanceCapture.requiredSelfie
       });
@@ -511,12 +513,27 @@ export function AppPage() {
         },
         response.attendanceState
       );
-      setActionMessage(response.validationStatus === "needs_review" ? "Check-in tersimpan dan masuk exception queue untuk review." : "Check-in berhasil tersimpan.");
+      if (selfieUrl) {
+        setActionMessage(response.validationStatus === "needs_review" ? "Selfie proof captured untuk check-in ini. Status menunggu review." : "Selfie proof captured untuk check-in ini.");
+      } else {
+        setActionMessage(response.validationStatus === "needs_review" ? "Check-in tersimpan dan menunggu review." : "Check-in berhasil tersimpan.");
+      }
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Check-in gagal.", "err");
     } finally {
       setBusyAction(null);
+      setCheckInAwaitingSelfie(false);
     }
+  }
+
+  async function handleCheckIn() {
+    if (attendanceCapture.requiredSelfie && !attendanceCapture.selfieUrl) {
+      setCheckInAwaitingSelfie(true);
+      selfieInputRef.current?.click();
+      return;
+    }
+
+    await submitCheckIn();
   }
 
   async function handleCheckOut() {
@@ -557,7 +574,11 @@ export function AppPage() {
 
     const previewUrl = URL.createObjectURL(file);
     setAttendanceCapture((current) => ({ ...current, selfieUrl: previewUrl }));
-    setActionMessage("Selfie siap dikirim bersama check-in.");
+    if (checkInAwaitingSelfie) {
+      void submitCheckIn(previewUrl);
+      return;
+    }
+    setActionMessage("Selfie proof captured untuk check-in ini.");
   }
 
   async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
@@ -1020,28 +1041,24 @@ export function AppPage() {
                   </StatusBadge>
                 </div>
                 <p className="mt-4 text-sm leading-7 text-[#596172]">
-                  Shift {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}. Tekan check-in; lokasi, selfie jika diperlukan, dan sinyal perangkat ikut divalidasi otomatis.
+                  Shift {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}. Tekan check-in; kamera akan terbuka untuk selfie, lalu lokasi dan sinyal perangkat ikut divalidasi otomatis.
                 </p>
-                <div className="mt-5 grid gap-3">
-                  <label className="block">
-                    <span id="selfie-proof-label" className="mb-2 block text-sm font-bold text-[#111827]">Selfie check-in</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="user"
-                      onChange={handleSelfieUpload}
-                      aria-labelledby="selfie-proof-label"
-                      aria-describedby="selfie-proof-hint"
-                      className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
-                    />
-                    <p id="selfie-proof-hint" className="mt-2 text-sm leading-6 text-[#667085]">Lampirkan jika kebijakan kantor meminta bukti selfie. Preview tersedia di perangkat; storage server masih nullable.</p>
-                  </label>
+                <input
+                  ref={selfieInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  onChange={handleSelfieUpload}
+                  className="sr-only"
+                  aria-label="Ambil selfie check-in"
+                />
+                <div className="mt-5 grid gap-3" aria-live="polite">
                   {attendanceCapture.selfieUrl ? (
                     <div className="flex min-w-0 items-center gap-3 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3">
                       <img src={attendanceCapture.selfieUrl} alt="Preview selfie attendance" className="h-16 w-16 rounded-2xl object-cover" />
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-[#111827]">Selfie proof siap</p>
-                        <p className="mt-1 text-xs font-semibold text-[#667085]">Disimpan sementara di perangkat. Storage server tetap nullable sampai integrasi upload final.</p>
+                        <p className="text-sm font-black text-[#111827]">Selfie proof captured</p>
+                        <p className="mt-1 text-xs font-semibold text-[#667085]">Bukti selfie akan ikut dipakai untuk validasi check-in ini.</p>
                       </div>
                     </div>
                   ) : null}
@@ -1131,6 +1148,7 @@ export function AppPage() {
             </div>
           </Panel>
         </section>
+        {renderEmployeeHistoryWorkspace()}
 
       </>
     );

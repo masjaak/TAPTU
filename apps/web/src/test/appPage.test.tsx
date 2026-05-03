@@ -199,7 +199,7 @@ describe("AppPage", () => {
     expect(screen.getAllByText("Slip Gaji").length).toBeGreaterThan(0);
   });
 
-  it("renders employee attendance without the history list", async () => {
+  it("renders employee attendance with history on Presensi", async () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
@@ -222,6 +222,9 @@ describe("AppPage", () => {
       attendanceState: "checked_in",
       requests: []
     });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([
+      { id: "hist-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Manual" }
+    ]);
     apiMocks.fetchEmployeeSummary.mockResolvedValue({
       totalDays: 22,
       onTimeDays: 20,
@@ -252,7 +255,84 @@ describe("AppPage", () => {
 
     expect(await screen.findByText(/check-in sederhana, validasi tetap berjalan/i)).toBeTruthy();
     expect(screen.getByText(/validasi lokasi dan perangkat/i)).toBeTruthy();
-    expect(screen.queryByText(/recent history/i)).toBeNull();
+    expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
+    expect(await screen.findByText(/08:03 · Manual/i)).toBeTruthy();
+  });
+
+  it("starts selfie capture from the primary employee check-in button and submits after capture", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:selfie-checkin");
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/attendance");
+
+    const checkInButton = await screen.findByRole("button", { name: /check-in sekarang/i });
+    fireEvent.click(checkInButton);
+    expect(apiMocks.checkIn).not.toHaveBeenCalled();
+
+    const selfieInput = screen.getByLabelText(/ambil selfie check-in/i);
+    fireEvent.change(selfieInput, {
+      target: {
+        files: [new File(["selfie"], "selfie.jpg", { type: "image/jpeg" })]
+      }
+    });
+
+    expect(await screen.findByText(/selfie proof captured/i)).toBeTruthy();
+    expect(apiMocks.checkIn).toHaveBeenCalledWith(
+      "demo:employee",
+      expect.objectContaining({
+        method: "Manual",
+        selfieUrl: "blob:selfie-checkin",
+        requiredSelfie: true
+      })
+    );
+
+    createObjectUrl.mockRestore();
   });
 
   it("opens employee recent history detail from a comfortable tap target", async () => {
