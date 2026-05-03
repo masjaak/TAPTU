@@ -46,6 +46,7 @@ import {
   reduceRequests,
   refreshScannerToken,
   toExceptionItem,
+  toWorkLocationModel,
   updateShiftRecord,
   validateAttendanceSubmission,
   validateScannerToken,
@@ -1368,13 +1369,7 @@ app.post("/api/admin/work-locations", async (req, res) => {
 
   const location = createWorkLocationItem(parsed.data);
   store.workLocationItems = [...store.workLocationItems, location];
-  store.workLocations = [...store.workLocations, {
-    id: location.id,
-    name: location.name,
-    latitude: location.latitude,
-    longitude: location.longitude,
-    radiusMeters: location.radiusMeters
-  }];
+  store.workLocations = [...store.workLocations, toWorkLocationModel(location)];
   await storage.save(store);
   return res.status(201).json(location);
 });
@@ -1395,6 +1390,9 @@ app.patch("/api/admin/work-locations/:id", async (req, res) => {
 
   const updated = { ...existing, ...parsed.data };
   store.workLocationItems = store.workLocationItems.map((l) => l.id === req.params.id ? updated : l);
+  store.workLocations = store.workLocations.map((location) =>
+    location.id === req.params.id ? toWorkLocationModel(updated) : location
+  );
   await storage.save(store);
   return res.json(updated);
 });

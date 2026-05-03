@@ -113,7 +113,13 @@ export function AppShell({
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-50 bg-[#101217]/45 p-3 lg:hidden" role="presentation">
-          <div data-testid="mobile-nav-drawer" className="ml-auto flex h-full w-full max-w-sm flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)]">
+          <div
+            data-testid="mobile-nav-drawer"
+            className="ml-auto flex h-full w-full max-w-sm flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigasi workspace"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
@@ -229,40 +235,67 @@ export function SecondaryButton({ className, ...props }: ButtonHTMLAttributes<HT
   );
 }
 
-export function FormInput({ label, id, className, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+export function FormInput({
+  label,
+  id,
+  className,
+  error,
+  hint,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, "-");
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
 
   return (
     <label htmlFor={inputId} className="block">
       <span className="mb-2 block text-sm font-bold text-[#111827]">{label}</span>
       <input
         id={inputId}
+        aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
         className={clsx(
           "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
+          error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
         {...props}
       />
+      {error ? <p id={`${inputId}-error`} className="mt-2 text-sm font-semibold text-[#a54c2f]">{error}</p> : null}
+      {!error && hint ? <p id={`${inputId}-hint`} className="mt-2 text-sm leading-6 text-[#667085]">{hint}</p> : null}
     </label>
   );
 }
 
-export function SelectInput({ label, id, className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode }) {
+export function SelectInput({
+  label,
+  id,
+  className,
+  children,
+  error,
+  hint,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode; error?: string; hint?: string }) {
   const selectId = id ?? label.toLowerCase().replace(/\s+/g, "-");
+  const describedBy = error ? `${selectId}-error` : hint ? `${selectId}-hint` : undefined;
 
   return (
     <label htmlFor={selectId} className="block">
       <span className="mb-2 block text-sm font-bold text-[#111827]">{label}</span>
       <select
         id={selectId}
+        aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
         className={clsx(
           "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
+          error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
         {...props}
       >
         {children}
       </select>
+      {error ? <p id={`${selectId}-error`} className="mt-2 text-sm font-semibold text-[#a54c2f]">{error}</p> : null}
+      {!error && hint ? <p id={`${selectId}-hint`} className="mt-2 text-sm leading-6 text-[#667085]">{hint}</p> : null}
     </label>
   );
 }
@@ -309,7 +342,7 @@ export function DataTable({
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-5 py-8 text-center">
+    <div className="rounded-[24px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-5 py-8 text-center" role="status">
       <p className="text-base font-black text-[#111827]">{title}</p>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#596172]">{description}</p>
     </div>
@@ -318,16 +351,23 @@ export function EmptyState({ title, description }: { title: string; description:
 
 export function LoadingState({ label = "Memuat data" }: { label?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-[24px] border border-[#edf0f5] bg-white p-4 text-sm font-bold text-[#596172]">
-      <Loader2 className="h-4 w-4 animate-spin text-[#1769ff]" />
-      {label}
+    <div className="rounded-[24px] border border-[#edf0f5] bg-white p-4" role="status" aria-live="polite" aria-busy="true">
+      <div className="flex items-center gap-3 text-sm font-bold text-[#596172]">
+        <Loader2 className="h-4 w-4 animate-spin text-[#1769ff]" />
+        {label}
+      </div>
+      <div className="mt-4 grid gap-3">
+        <div className="h-3 w-2/5 animate-pulse rounded-full bg-[#edf0f5]" />
+        <div className="h-3 w-full animate-pulse rounded-full bg-[#f1f5ff]" />
+        <div className="h-3 w-4/5 animate-pulse rounded-full bg-[#edf0f5]" />
+      </div>
     </div>
   );
 }
 
 export function ErrorState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-[24px] border border-[#f2caca] bg-[#fff5f5] p-4">
+    <div className="flex items-start gap-3 rounded-[24px] border border-[#f2caca] bg-[#fff5f5] p-4" role="alert">
       <AlertCircle className="mt-0.5 h-5 w-5 text-[#a54c2f]" />
       <div>
         <p className="text-sm font-black text-[#8a2f2f]">{title}</p>
@@ -342,12 +382,14 @@ export function Dialog({ title, open, children, onClose }: { title: string; open
     return null;
   }
 
+  const titleId = `dialog-${title.toLowerCase().replace(/\s+/g, "-")}`;
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#101217]/45 px-4" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#101217]/45 px-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="w-full max-w-lg rounded-[30px] border border-[#edf0f5] bg-white p-6 shadow-[0_34px_90px_rgba(20,24,31,0.24)]">
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-2xl font-black tracking-[-0.03em] text-[#111827]">{title}</h2>
-          <SecondaryButton onClick={onClose}>Tutup</SecondaryButton>
+          <h2 id={titleId} className="text-2xl font-black tracking-[-0.03em] text-[#111827]">{title}</h2>
+          <SecondaryButton onClick={onClose} aria-label={`Tutup dialog ${title}`}>Tutup</SecondaryButton>
         </div>
         <div className="mt-5">{children}</div>
       </div>

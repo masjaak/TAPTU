@@ -21,6 +21,7 @@ import {
   reduceExceptionReview,
   reduceRequests,
   refreshScannerToken,
+  toWorkLocationModel,
   updateCheckOutRecord,
   updateShiftRecord,
   validateAttendanceSubmission,
@@ -357,6 +358,26 @@ describe("createShiftRecord", () => {
     expect(shift.gracePeriodMinutes).toBe(10);
     expect(shift.status).toBe("active");
     expect(shift.id).toMatch(/^shift-/);
+  });
+});
+
+describe("toWorkLocationModel", () => {
+  it("keeps geofence coordinates and radius in sync with editable location items", () => {
+    const item = createWorkLocationItem({
+      name: "Cabang Barat",
+      address: "Jl. Example 1",
+      latitude: -6.19,
+      longitude: 106.81,
+      radiusMeters: 220
+    });
+
+    expect(toWorkLocationModel(item)).toEqual({
+      id: item.id,
+      name: "Cabang Barat",
+      latitude: -6.19,
+      longitude: 106.81,
+      radiusMeters: 220
+    });
   });
 });
 

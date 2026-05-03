@@ -1,1060 +1,298 @@
-# TAPTU Handoff
+# Taptu MVP Handoff
 
-## Repo dan Lokasi
+## A. Project summary
 
-- Local path: `/Users/masjak/Documents/TAPTU`
-- Remote target: `https://github.com/masjaak/TAPTU.git`
-- Branch lokal aktif: `main`
+Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
 
-## Acuan yang dipakai
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud or payroll systems. Current status: MVP is documented and QA-passed through Phase 5.5, with known limitations still remaining around persistence hardening, manager scoping, shift assignment, and selfie storage finalization.
 
-- Dokumen produk dan sistem di folder TAPTU, terutama:
-  - `hadiri_system_design.md`
-  - PDF dan DOCX fase 1 dan fase 2 sebagai referensi tambahan
-- UI direction:
-  - `https://www.ui-skills.com/skills/`
-  - skill lokal `premium-web-outreach-ultimate`
-- Review gate:
-  - `/Users/masjak/Downloads/KUMPULAN SKILLS/agent_rule.txt`
+## B. Fixed product decisions
 
-## Status saat ini
+- Manager remains a limited operational approver, not a full HR admin.
+- Advanced anti-spoofing and real device fingerprinting are out of MVP scope.
+- Face recognition is out of MVP scope.
+- Full payroll processing is out of MVP scope.
+- Payroll-ready CSV/reporting output is part of MVP.
+- Selfie capture/preview exists, but finalized storage/upload is still unfinished; `selfie_url` may remain nullable for now.
+- Department-level manager segmentation is not completed in MVP. Current manager access is broader than ideal and should be treated as a future improvement.
 
-Taptu sudah punya baseline full-stack lokal:
+## C. Completed phases summary
 
-- `apps/web`
-  - landing page responsif dengan visual direction ChronoTask-inspired
-  - Motion animation pada hero, floating cards, CTA, section reveal, dan validation progress bars
-  - login page
-  - post-login app shell dengan desktop sidebar dan mobile drawer
-  - tab `Beranda`, `Absensi`, `Izin`, `Scanner`, `Profil`
-  - PWA manifest
-  - app icon, favicon, splash SVG
-- `apps/api`
-  - login demo
-  - dashboard demo
-  - endpoint check-in
-  - endpoint check-out
-  - endpoint request create
-  - endpoint admin approve/reject
-  - endpoint scanner token refresh
-  - endpoint attendance history
-  - local file-backed demo persistence
-- `packages/shared`
-  - shared types frontend/backend
+- Phase 1.5: UI cleanup, mobile layout fixes, design consistency tightening, old theme trace removal direction established.
+- Phase 2: dashboard foundation, employee attendance flow, role-based routing, attendance workspace baseline.
+- Phase 3: validation layer, scanner flow, geofence model, exception handling, approvals, basic audit support.
+- Phase 4: team list, work location/geofence management, shift management, reports, CSV export, dashboard wiring.
+- Phase 5.1: Supabase/database verification and shift schema migration addition.
+- Phase 5.2: UI consistency and responsive QA pass.
+- Phase 5.3: functional QA and targeted bug fixes.
+- Phase 5.4: empty/loading/error states and accessibility polish.
+- Phase 5.5: final documentation, roadmap, and handoff refresh.
 
-## Akun demo
+## D. Routes/pages
 
-- Admin: `admin@taptu.app / Taptu123!`
-- Employee: `employee@taptu.app / Taptu123!`
-- Scanner: `scanner@taptu.app / Taptu123!`
+Main post-login pages currently surfaced through the app shell:
 
-## Commit lokal penting
+- Admin dashboard: summary stats, recent activity, quick actions.
+- Manager home/team view: lighter operational summary, team roster, exception review, approvals, reports.
+- Employee attendance page: check-in/check-out, current validation state, attendance history.
+- Scanner mode: token display, countdown, status, refresh, recent scan history.
+- Team list: employee roster and validation status.
+- Exception review queue: approve, reject, request correction.
+- Approval flow: request create/view/cancel and reviewer approve/reject actions.
+- Shift management: create/edit shifts, tolerance, optional break windows, linked location.
+- Work location/geofence management: create/edit locations with lat/lng/radius.
+- Attendance reports: filters, report table, audit trail toggle.
+- CSV/export flow: export report rows to CSV when data exists.
+- Profile page: present but still lightweight/stub-like compared with core workspaces.
+- Settings route exists in navigation definitions for elevated roles, but no dedicated completed workspace is documented in Phase 5.
 
-- `132ce96` `Refine TAPTU visual system and review gates`
-- `82b6e6f` `Build core attendance and request flows`
-- `b58f614` `Add local persistence and scanner workflow`
+## E. Roles and access
 
-## Review gate yang harus dipertahankan
-
-Sebelum menutup batch baru:
-
-1. `npm run test --workspace @taptu/api`
-2. `npm run test --workspace @taptu/web`
-3. `npm run typecheck`
-4. `npm run build`
-5. scan cepat untuk larangan visual/copy:
-   - tidak pakai nama lama `Hadiri` di surface web/API aktif
-   - tidak pakai em dash
-   - motion harus menghormati `MotionConfig reducedMotion="user"`
-   - tidak ada trace theme dashboard lama di active web source:
-     - `moss`, `mist`, `sand`, `cloud`, `steel`
-     - `shadow-panel`
-     - `green`, `emerald`, `teal`, `lime` kecuali semantic state yang memang disengaja
-     - hex lama `#2d5246`, `#10211c`, `#12261f`, `#173229`, `#97d7be`, `#11703d`, `#e9f7ef`
-
-## Kondisi build terakhir
-
-Terakhir diverifikasi hijau setelah Phase 3 pada `2026-05-02 22:46:08 WIB`:
-
-- `npm run test --workspace @taptu/api` pass: `53/53`
-- `npm run test --workspace @taptu/web` pass: `59/59`
-- `npm run typecheck` pass
-- `npm run build` pass
-- `npx cap sync ios` pass
-- `xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'platform=iOS Simulator,id=78A68F51-2700-457D-8D2F-A448FB40969D' build` pass
-- simulator install pass
-- simulator launch `com.taptu.attendance` pass
-
-## Struktur state penting
-
-### Attendance
-
-- State:
-  - `idle`
-  - `checked_in`
-  - `checked_out`
-- Guard:
-  - tidak bisa checkout sebelum checkin
-  - tidak bisa checkin ulang saat sudah checked_in / checked_out
-
-### Request
-
-- State:
-  - `Menunggu`
-  - `Disetujui`
-  - `Ditolak`
-- Guard:
-  - hanya `admin` atau `superadmin` yang bisa approve/reject
-  - approval hanya berlaku untuk request `Menunggu`
-
-### Scanner
-
-- Token refresh menghasilkan token baru
-- TTL direset ke `30` detik
-
-### Attendance validation
-
-- Validation status:
-  - `verified`
-  - `needs_review`
-  - `blocked`
-  - `rejected`
-  - `corrected`
-- Exception status:
-  - `Need Review`
-  - `Approved`
-  - `Rejected`
-  - `Request Correction`
-- Guard dan side effect yang aktif:
-  - geofence di luar radius tidak langsung menolak attendance, tapi membuat exception
-  - QR invalid / expired masuk ke validation reason dan audit flow
-  - device mismatch masuk ke validation reason dan audit flow
-  - missing selfie bisa masuk ke validation reason / exception bila required
-  - approve/reject exception dapat mengubah `attendance_records.validation_status`
-
-## File penting
-
-- Frontend shell:
-  - `apps/web/src/pages/AppPage.tsx`
-- Post-login design system / app shell:
-  - `apps/web/src/components/app.tsx`
-  - `apps/web/src/components/StatusPill.tsx`
-- Frontend API client:
-  - `apps/web/src/lib/api.ts`
-- App shell tabs/state:
-  - `apps/web/src/lib/appShellState.ts`
-- Backend routes:
-  - `apps/api/src/index.ts`
-- Backend state machine:
-  - `apps/api/src/domain.ts`
-- Backend Supabase adapter:
-  - `apps/api/src/supabaseQueries.ts`
-- Tests:
-  - `apps/api/src/domain.test.ts`
-  - `apps/api/src/store.test.ts`
-  - `apps/web/src/test/appShellState.test.ts`
-  - `apps/web/src/test/designSystem.test.tsx`
-  - `apps/web/src/test/landingPage.test.tsx`
-  - `apps/web/src/test/appPage.test.tsx`
-  - `apps/web/src/test/api.test.ts`
-- Shared types:
-  - `packages/shared/src/index.ts`
-- Supabase migration:
-  - `supabase/migrations/202605020002_attendance_validation_phase3.sql`
-
-## Local persistence
-
-Demo store disimpan di:
-
-- `apps/api/data/demo-store.json`
-
-Catatan:
-
-- File ini akan dibuat otomatis saat API jalan dan store belum ada.
-- Demo data sekarang tidak hilang saat restart server.
-
-## Blocker yang belum selesai
-
-### Push ke GitHub
-
-Push ke `masjaak/TAPTU` masih gagal dari environment ini karena credential aktif tidak punya izin push ke repo target.
-
-Error terakhir:
-
-- `Permission to masjaak/TAPTU.git denied to rejakpalepi-dotcom`
-- HTTP `403`
-
-### iOS / Simulator
-
-Status terbaru: tidak lagi menjadi blocker untuk Phase 1.5.
-
-- `npx cap sync ios` berhasil
-- `xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'platform=iOS Simulator,id=78A68F51-2700-457D-8D2F-A448FB40969D' build` berhasil
-- app berhasil di-install ke simulator iPhone 15 Pro Max iOS 17.5
-- bundle `com.taptu.attendance` berhasil launch di simulator
-
-## Phase 3 update (2026-05-02)
-
-Batch ini menyelesaikan lapisan validasi attendance dan workflow operasional yang sebelumnya masih placeholder.
-
-### Yang ditambahkan
-
-- Supabase migration baru untuk persistence Phase 3:
-  - `attendance_records`
-  - `attendance_exceptions`
-  - `scanner_tokens`
-  - `work_locations`
-  - `approval_requests`
-  - `audit_logs`
-  - support role `manager` di `profiles`
-- Domain/state-machine backend diperluas untuk:
-  - geofence validation
-  - scanner token validation
-  - attendance exception creation
-  - audit log creation
-  - manager approval guard
-  - scanner scan history append
-- API backend diperluas:
-  - `GET /api/admin/exceptions`
-  - `PATCH /api/admin/exceptions/:id`
-  - `GET /api/admin/audit-logs`
-  - `GET /api/scanner/state`
-  - `GET /api/scanner/token`
-  - attendance check-in / check-out kini membawa:
-    - `locationLat`
-    - `locationLng`
-    - `selfieUrl`
-    - `deviceId`
-    - `scannerToken`
-    - `requiredSelfie`
-- Supabase adapter kini memakai tabel relasional Phase 3, bukan flow lama
-- Post-login web UI diperluas:
-  - employee attendance page punya capture selfie, token QR input, device id, validation status/reasons
-  - scanner kiosk page punya dynamic token, countdown, recent scan list, expired/invalid states
-  - admin/manager team workspace punya exception queue dengan action approve/reject/request correction
-  - reports workspace kini menampilkan audit trail
-  - approval queue kini mendukung catatan approval
-
-### Behavior penting yang sekarang aktif
-
-- Di luar radius lokasi kerja:
-  - attendance tetap tersimpan
-  - `validation_status = needs_review`
-  - exception dibuat ke queue admin
-- QR invalid / expired:
-  - validation reason ditambahkan
-  - scanner attempt masuk audit / queue
-- Device mismatch:
-  - validation reason ditambahkan
-  - audit log dibuat
-- Selfie:
-  - UI capture/upload sudah aktif
-  - field backend nullable tetap dipertahankan bila storage belum final
+- Admin/HR:
+  full MVP operations surface including dashboard, team, attendance, requests, locations, reports, and profile.
 - Manager:
-  - tetap role operasional terbatas
-  - hanya boleh review request kategori operasional
-
-### Review gate batch ini
-
-- TDD tetap dipakai sesuai `agent_rule.txt`
-- tests baru ditambahkan di domain dan web
-- state-machine tetap eksplisit di attendance / request / exception flow
-
-## Migration notes
-
-- File migration sudah dibuat:
-  - `supabase/migrations/202605020002_attendance_validation_phase3.sql`
-- Dari environment ini migration belum di-apply ke project Supabase remote
-- API dan query layer sudah disesuaikan ke schema baru, jadi deploy DB migration harus dilakukan sebelum mengandalkan persistence live sepenuhnya
-
-## Next pass yang paling masuk akal
-
-1. Apply migration Phase 3 ke project Supabase remote
-2. Sambungkan upload selfie ke storage bucket Supabase atau storage backend final
-3. Tambahkan team scoping yang lebih granular untuk role `manager`
-4. Tambahkan admin employee list / live roster di dashboard
-5. Tambahkan attendance reset harian / scheduled job untuk flow operasional nyata
-6. Tambahkan reporting dan payroll-ready export di atas `attendance_records` + `audit_logs`
-
-## Update batch terbaru (2026-04-30)
-
-Batch ini menambahkan:
-
-- shared types: `AdminOverview` + `EmployeeSummary`
-- domain: `computeAdminOverview` + `computeEmployeeSummary` (8 test baru, TDD Red-Green)
-- api: `GET /api/admin/overview` - real stats dari store (checkedInToday, onTimeToday, lateToday, pendingRequests)
-- api: `GET /api/employee/summary` - ringkasan kehadiran per user dari store
-- web: admin home tab sekarang menampilkan 4 stat live + progress bar check-in rate + breakdown on-time/terlambat/belum hadir
-- web: profile tab employee sekarang menampilkan total hadir, tepat waktu, terlambat, izin pending, status hari ini — semua dari store
-- web: feedback toast sekarang punya dua tone: ok (hijau) dan err (merah)
-- visual: tidak ada gradient, tidak ada em-dash
-
-Commit: `2def225`
-
-## Update terbaru setelah handoff awal
-
-Batch terbaru sudah menambahkan:
-
-- filter attendance history:
-  - `all`
-  - `present`
-  - `issue`
-- request detail panel di tab `Izin`
-- cancel request untuk request `Menunggu`
-- scanner screen yang lebih fullscreen-like dan lebih cocok untuk perangkat operasional
-- request form yang lebih dekat ke kebutuhan nyata:
-  - tipe `Izin / Cuti / Sakit`
-  - tanggal mulai
-  - tanggal selesai
-- helper mobile workflow yang sudah punya test:
-  - grouping attendance history
-  - validasi request form
-- scanner countdown helper
-- config-aware storage adapter stub:
-  - `local-demo`
-  - `production-adapter`
-
-## Update landing page dan Motion (2026-05-01)
-
-Batch terbaru mengubah landing page menjadi visual direction yang terinspirasi dari Dribbble ChronoTask, tanpa copy/pixel clone:
-
-- hero berada di canvas putih besar dengan outer background abu-abu
-- headline centered: `Kelola absensi tim dalam satu alur kerja`
-- floating cards:
-  - catatan shift
-  - reminder approval izin
-  - validasi hari ini
-  - integrasi operasional
-- CTA utama biru: `Coba demo Taptu`
-- section lanjutan:
-  - `Attendance desk yang siap dipakai`
-  - `Dari scan sampai laporan`
-  - `Dibuat untuk tiga mode kerja`
-  - `Sinyal yang membuat admin percaya`
-  - FAQ
-
-Motion implementation:
-
-- import dari `motion/react`
-- wrapper `MotionConfig reducedMotion="user"`
-- `fadeUp` + `stagger` variants untuk hero dan section reveal
-- floating hero cards memakai loop motion ringan
-- `Catatan shift` memakai sticky-note motion:
-  - enter dari `opacity: 0`, `y: 30`, `rotate: -11`
-  - loop sway pada `y` dan `rotate`
-  - hover lift + rotate correction
-- `Reminder` bell memakai bell-ring motion:
-  - rotate keyframes `[0, -13, 11, -8, 5, 0]`
-  - scale keyframes untuk efek notif
-  - `repeatDelay` supaya tidak terasa terlalu ramai
-- `Integrasi operasional` memakai staggered icon motion:
-  - parent card float ringan
-  - tiga icon bounce + rotate dengan delay per index
-  - hover icon lift
-- validation bars sekarang data-driven dan animated:
-  - `QR Gate Timur` target `82`
-  - `GPS Kantor Pusat` target `64`
-- validation progress bars punya accessible label dan `role="progressbar"`
-- test regression menandai motion state progress bar:
-  - `data-motion-state="visible"`
-  - `data-motion-target`
-- test regression juga menandai hero motion style:
-  - `data-motion-style="sticky-note"`
-  - `data-motion-style="bell-ring"`
-  - `data-motion-style="staggered-icons"`
-
-Agent rule review:
-
-- TDD dilakukan: test landing motion state dan hero motion style dibuat merah dulu, lalu production code dibuat hijau
-- state-machine thinking diterapkan pada UI motion state:
-  - initial progress `0%`
-  - visible target sesuai nilai validasi
-  - reduced-motion dikontrol via `MotionConfig`
-- tests deterministic dengan `IntersectionObserver` mock di `apps/web/src/test/setup.ts`
-
-File utama batch ini:
-
-- `apps/web/src/pages/LandingPage.tsx`
-- `apps/web/src/test/landingPage.test.tsx`
-- `apps/web/src/test/setup.ts`
-
-## Update UI/UX review + landing page polish (2026-05-01)
-
-Batch ini menerapkan review 7 prinsip UI/UX dan memperbaiki layout floating-card landing page.
-
-### Perubahan trust signal section
-
-- Layout lama: dua kolom `[0.8fr_1.2fr]` — heading kecil vs empat stat card (lopsided)
-- Layout baru: centered header + full-width 4-col stat grid di bawah (konsisten dengan pola Roles section)
-- Tambah paragraf deskripsi di bawah h2 (`data-testid="trust-signals-copy"`)
-- Stat cards sekarang punya `border border-[#edf0f5]` + `shadow` — kontras terhadap background `#f9fafc`
-- Divider tipis (`h-px w-8`) antara nilai dan label untuk menjembatani ukuran font
-- Tracking stat value diperbaiki: `-0.06em` → `-0.03em`
-- Setiap card punya `aria-label` untuk screen reader: `"30s — QR token refresh"` dst
-- `whileHover={{ y: -4 }}` ditambahkan pada setiap stat card
-
-### Perubahan CTA section
-
-- `PrimaryLink` (blue button) di dalam section `bg-[#1769ff]` = kontras 1:1, button tidak terlihat
-- Diganti dengan komponen baru `CTAWhiteLink`: `bg-white text-[#1769ff]`, `data-testid="cta-demo-action"`
-- Section CTA kini punya visible action yang kontras terhadap latar biru
-
-### Perubahan Desk section copy
-
-- Copy lama: meta-commentary tentang proses desain ("Desain baru mengikuti pola hero…")
-- Copy baru: deskripsi produk yang nyata tentang fungsi attendance desk
-
-### Perubahan floating-card layout gap (Option A)
-
-Masalah: outer background `#d9d9d9` terlalu gelap dan kontras, gap `mt-8` (32px) terlalu besar sehingga section terasa terputus-putus, bukan modul yang stacked.
-
-- Outer background: `#d9d9d9` → `#e9eaec` (lebih terang, kurang obstruktif)
-- Outer padding: `py-6` → `py-4` (lebih rapat secara vertikal)
-- Semua 6 section gaps: `mt-8` → `mt-4 sm:mt-6` (16px mobile, 24px sm+)
-- Outer div kini punya `data-testid="landing-stage"` dan `data-variant="card-tight"`
-
-### Hero text fix (batch ini juga)
-
-- Icon di atas hero: grid 2×2 dot → Taptu logomark (`bg-[#111827]` dengan "T")
-- Headline uppercase: `tracking` diperlonggar dari `-0.065em` → `-0.03em`, `leading` dari `1.02` → `1.08`
-- Gap ikon ke headline: `mt-9` → `mt-12`
-- Gap headline ke paragraf: `mt-6` → `mt-8`
-- Roles section SectionLabel: duplikat teks h2 → diganti `"Roles"`
-
-### Agent rule review
-
-- TDD dilakukan: satu test RED per perubahan structural, lalu production code GREEN
-- Tests baru yang ditambahkan:
-  - `trust signals section has a supporting description paragraph`
-  - `trust signals cards are individually labeled for screen readers`
-  - `CTA section uses a visually distinct action link`
-  - `landing stage uses the tight floating-card layout variant`
-- Semua 19 tests hijau pasca implementasi
-- Typecheck dan build clean
-
-### Kondisi build setelah batch ini
-
-- Web tests pass `19/19`
-- `npm run typecheck --workspace @taptu/web` pass
-- `npm run build:web` pass
-
-## Fix: login demo account + auth page text spacing (2026-05-01)
-
-### Root causes ditemukan
-
-1. **API tidak berjalan** — web memanggil `http://localhost:3001/api` secara langsung tanpa proxy. Ketika API offline, `fetch()` melempar `TypeError: Failed to fetch` — user melihat error generik, bukan petunjuk yang membantu.
-2. **Tidak ada Vite proxy** — cross-origin request dari port 5173 ke 3001 rawan CORS di beberapa konfigurasi browser/network.
-3. **Error message tidak deskriptif** — catch block hanya meneruskan error mentah dari fetch.
-4. **Text spacing terlalu rapat** — heading di LoginPage dan RegisterPage memakai `tracking-[-0.045em]` dan `leading-tight`, tidak konsisten dengan ritme landing page.
-
-### Fix 1 — Vite proxy
-
-`apps/web/vite.config.ts` sekarang punya:
-```ts
-proxy: {
-  "/api": {
-    target: "http://localhost:3001",
-    changeOrigin: true
-  }
-}
-```
-
-Web app memanggil `/api/...` secara relatif → Vite meneruskan ke port 3001 tanpa cross-origin. Tidak ada CORS issue di local dev.
-
-### Fix 2 — API base URL
-
-`apps/web/src/lib/api.ts`:
-```ts
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-```
-
-- Local dev: gunakan `/api` relatif → lewat Vite proxy
-- Production: set `VITE_API_BASE_URL` ke URL backend production
-
-### Fix 3 — Descriptive error message
-
-`requestJson` sekarang wrap `fetch()` dalam try/catch:
-```ts
-try {
-  response = await fetch(...);
-} catch {
-  throw new Error("Tidak dapat terhubung ke server. Jalankan npm run dev:api terlebih dahulu.");
-}
-```
-
-User sekarang mendapat pesan yang jelas ketika API tidak berjalan, bukan raw "Failed to fetch".
-
-### Fix 4 — Text spacing LoginPage + RegisterPage
-
-| Element | Sebelum | Sesudah |
-|---------|---------|---------|
-| h1/h2 tracking | `tracking-[-0.045em]` | `tracking-[-0.03em]` |
-| h1/h2 leading | `leading-tight` (1.25) | `leading-snug` (1.375) |
-| Section label → h1/h2 gap | `mt-4` | `mt-5` |
-| h1/h2 → paragraph gap | `mt-4` / `mt-5` | `mt-5` / `mt-6` |
-| Dark panel top margin | `mt-14` | `mt-12` |
-| Register form top margin | `mt-8` | `mt-10` |
-| Register form field spacing | `space-y-5` | `space-y-6` |
-
-### Cara menjalankan
-
-```bash
-# Terminal 1
-npm run dev:api
-
-# Terminal 2
-npm run dev:web
-```
-
-Web: `http://localhost:5173` → `/api` di-proxy ke `http://localhost:3001`
-
-### Agent rule review
-
-- TDD: 2 test merah ditulis sebelum kode produksi:
-  - `throws a descriptive error when the server is unreachable` → RED sebelum fix, GREEN setelah
-  - `throws the API error message when the server responds with an error` → sudah GREEN (existing behavior dipertahankan)
-- 36 tests hijau pasca implementasi
-- Typecheck web + api clean, build clean
-
-## Update auth revamp + superadmin register (2026-05-01)
-
-### DB recommendation: Supabase
-
-Dipilih Supabase (PostgreSQL) dibanding Firebase (Firestore) karena:
-- Data Taptu bersifat relasional: users → attendance → requests → organizations
-- Row Level Security (RLS) cocok untuk role-based access (superadmin/admin/employee/scanner)
-- Auto-generate TypeScript types dari schema, menggantikan manual types di `@taptu/shared`
-- Real-time WebSocket subscription untuk scanner token refresh
-- Open source, bisa self-host di kemudian hari
-
-### LoginPage — full revamp
-
-Desain lama memakai token warna berbeda (`bg-ink`, `bg-sand`, `text-moss`, `font-display`) yang tidak konsisten dengan landing page.
-
-Desain baru sepenuhnya konsisten dengan design system landing page:
-- Outer: `bg-[#e9eaec]` — sama dengan landing page
-- Layout: dua kolom `lg:grid-cols-2` dengan `min-h-[calc(100vh-32px)]`
-- Panel kiri (`bg-[#111827]`): logo Taptu putih, heading "Satu login untuk semua peran.", deskripsi, demo accounts panel
-- Panel kanan (`bg-white`): form login — email, password, submit button
-- Demo accounts panel (`data-testid="demo-accounts-panel"`): 4 akun demo dengan role badge berwarna, **dapat diklik** untuk mengisi form otomatis
-- Role badge colors:
-  - superadmin: amber warm
-  - admin: blue
-  - employee: green
-  - scanner: orange
-- Input style: `rounded-2xl border border-[#e2e7f0] bg-[#f9fafc]` dengan `focus:border-[#1769ff]`
-- Submit button: `bg-[#1769ff]` konsisten dengan landing page primary CTA
-- Link ke `/register` untuk daftarkan akun superadmin
-- Link "Kembali ke beranda" → `/`
-- Tidak memakai `<Shell>` — layout berdiri sendiri
-
-### RegisterPage — new page (`/register`)
-
-Page baru untuk registrasi akun superadmin:
-- Outer: sama `bg-[#e9eaec]`
-- Layout: single column `max-w-lg` centered
-- Taptu logomark di header
-- Card putih `rounded-[32px]`
-- Role badge `data-testid="role-badge-superadmin"` — amber warm, read-only (role selalu superadmin)
-- Fields:
-  - `id="organizationName"` — Nama organisasi
-  - `id="fullName"` — Nama lengkap
-  - `id="email"` — Email
-  - `id="password"` — Password (min 8 karakter)
-  - `id="confirmPassword"` — Konfirmasi password
-- Client-side validation: password match + min length sebelum hit API
-- Error state: rounded pill merah `bg-[#fff2ee]`
-- Submit: `POST /api/auth/register` → langsung navigate ke `/app` dengan session tersimpan
-- Link kembali ke login dan ke beranda
-
-### API — endpoint baru
-
-`POST /api/auth/register`:
-- Validasi via `registerSchema` (zod): fullName min 2, email valid, password min 8, organizationName min 2
-- Reject 409 jika email sudah dipakai
-- Role selalu `"superadmin"` — tidak bisa didelegasi dari client
-- Menambah user ke runtime `users` array
-- Return `{ token, user }` sama seperti login — session langsung aktif
-
-Demo user `superadmin@taptu.app / Taptu123!` ditambahkan ke hardcoded users list.
-
-### Shared types
-
-`RegisterRequest` ditambahkan ke `packages/shared/src/index.ts`:
-```ts
-export interface RegisterRequest {
-  fullName: string;
-  email: string;
-  password: string;
-  organizationName: string;
-}
-```
-
-### Router
-
-`/register` → `RegisterPage` ditambahkan ke `apps/web/src/pages/router.tsx`.
-
-### Web API client
-
-`register(payload: RegisterRequest): Promise<LoginResponse>` ditambahkan ke `apps/web/src/lib/api.ts`.
-
-### Agent rule review
-
-TDD — 11 test merah ditulis sebelum kode produksi:
-- 6 test login page (brand, inputs, demo panel, register link, back link, submit button)
-- 5 test register page (role badge, 5 fields, submit button, login link, back link)
-
-Seluruh test suite:
-- Web tests: `34/34` hijau
-- API tests: `44/44` hijau
-- Typecheck: web + api clean
-- Build: `npm run build:web` clean
-
-### Akun demo sekarang
-
-| Role | Email | Password |
-|------|-------|----------|
-| superadmin | superadmin@taptu.app | Taptu123! |
-| admin | admin@taptu.app | Taptu123! |
-| employee | employee@taptu.app | Taptu123! |
-| scanner | scanner@taptu.app | Taptu123! |
-
-## Update CTA + footer redesign (2026-05-01)
-
-### CTA section
-
-- Padding: `py-12` → `py-16 lg:py-24` — memberi ruang napas sebagai conversion moment terakhir
-- Sub-copy ditambahkan di bawah h2 (`data-testid="cta-sub-copy"`):
-  - "Masuk sebagai admin, karyawan, atau scanner. Tidak perlu install, tidak perlu setup."
-- `max-w-3xl` dihapus dari h2 — diganti `max-w-2xl` pada parent div agar heading tidak terpotong di lg
-- Mobile layout: `flex-col items-start` — button tidak lagi stretch full-width
-- Button dibungkus `<div class="shrink-0">` agar tidak menyusut di lg flex-row
-
-### Footer
-
-- Padding: `px-2` → `px-5 md:px-8` — konsisten dengan semua elemen lain
-- Separator: `border-t border-[#c8cacd]` dengan `pt-8` sebagai visual grounding antara CTA dan footer
-- Struktur tiga kolom:
-  - Kiri: Taptu logomark (hitam) + nama + "Attendance OS" tagline
-  - Tengah: `nav aria-label="Footer navigation"` dengan link Platform, Workflow, Roles, FAQ
-  - Kanan: copyright `© 2026 Taptu. All rights reserved.`
-- `pb-10` untuk bottom padding — halaman tidak berakhir terlalu terpotong
-
-### Agent rule review
-
-- TDD: 3 test merah ditulis sebelum kode produksi:
-  - `CTA section has supporting sub-copy to reduce hesitation`
-  - `footer has nav links matching the primary navigation`
-  - `footer shows copyright year`
-- 23 tests hijau pasca implementasi
-- Typecheck dan build clean
-
-### Kondisi build setelah batch ini
-
-- Web tests pass `23/23`
-- `npm run typecheck --workspace @taptu/web` pass
-- `npm run build:web` pass
-
-## Update hero text 2-line fix (2026-05-01)
-
-### Masalah
-
-Di lg breakpoint, hero headline "KELOLA ABSENSI TIM" sendiri butuh ~990px untuk render satu baris, sedangkan container `max-w-4xl` hanya 896px. Akibatnya phrase pertama wrap ke 2 baris, lalu "DALAM SATU ALUR KERJA" tambah 1 baris lagi — total 3 baris.
-
-### Fix
-
-- `motion.div` container: `max-w-4xl` → `max-w-5xl` (896px → 1024px)
-- `h1` max-w: `max-w-4xl` → `max-w-5xl`
-- Font size dikalibrasi:
-  - `md:text-7xl` (72px) → `md:text-5xl` (48px) — aman untuk 704px container di md breakpoint
-  - `lg:text-[82px]` → `lg:text-[72px]` — "DALAM SATU ALUR KERJA" pada 72px ≈ 831px, muat di 984px container
-- Kedua phrase dibuat explicit `block` span dengan `data-line="1"` dan `data-line="2"` — menjamin break selalu terjadi di antara dua phrase, tidak di tengah
-- `h1` kini punya `data-lines="2"` sebagai dokumentasi intent
-
-### Agent rule review
-
-- TDD dilakukan: test `data-lines="2"` dan `span[data-line]` length ditulis merah dulu
-- 20 tests hijau pasca implementasi
-- Typecheck dan build clean
-
-## Catatan deploy Vercel
-
-Error deploy sebelumnya:
-
-- `Cannot find module '@taptu/shared'`
-
-Perbaikan yang sudah diterapkan:
-
-- `packages/shared/package.json` sekarang punya `exports`
-- `apps/api` dan `apps/web` build script sekarang build `@taptu/shared` dulu bila dibuild terpisah
-- `tsconfig.base.json` sekarang punya path alias untuk `@taptu/shared`
-- root sudah punya `vercel.json` untuk deploy frontend web-only:
-  - build command: `npm run build --workspace @taptu/web`
-  - output directory: `apps/web/dist`
-
-Catatan penting:
-
-- konfigurasi ini memperbaiki build path untuk deploy frontend di Vercel
-- backend Express belum otomatis ikut ter-deploy sebagai server runtime Vercel
-- untuk login dan flow API di production, frontend tetap butuh `VITE_API_BASE_URL` yang mengarah ke backend yang benar
-
-Review terakhir tetap hijau:
-
-- Web tests pass `15/15`
-- `npm run typecheck --workspace @taptu/web` pass
-- `npm run build:web` pass
-
-## Menjalankan project
-
-```bash
-npm install
-npm run dev        # menjalankan API + web sekaligus
-```
-
-Atau terpisah:
-
-```bash
-npm run dev:api    # Terminal 1 — API di localhost:3001
-npm run dev:web    # Terminal 2 — Web di localhost:5173
-```
-
-- Web: `http://localhost:5173`
-- API: `http://localhost:3001`
-
-## Update: fix login demo + 404 on refresh + remove demo panel (2026-05-01)
-
-### Task 1 — Fix login demo (client-side demo mode)
-
-Root cause sebelumnya: login demo hanya bisa berjalan saat API aktif. Kalau API mati, semua demo account gagal.
-
-Fix: implementasi client-side demo mode di `apps/web/src/lib/demo.ts`.
-
-- `tryDemoLogin(email, password)` — intercept login sebelum hit API. Jika cocok dengan kredensial demo, langsung return `LoginResponse` lokal dengan token `demo:<role>`
-- `isDemoToken(token)` — deteksi token demo
-- Semua fungsi API (`getDashboard`, `fetchAttendanceHistoryByFilter`, `fetchAdminOverview`, `fetchEmployeeSummary`, `fetchRequests`, `refreshScannerToken`, `checkIn`, `checkOut`, `createRequest`, `approveRequest`, `cancelRequest`, `fetchRequestDetail`) sekarang intercept token demo dan return data mock langsung tanpa hit server
-- Demo data konsisten dengan data yang ada di API (STATS, ATTENDANCE, REQUESTS, SCHEDULE)
-- Demo login tidak memerlukan API berjalan sama sekali
-
-Akun demo (semua bisa login tanpa API running):
-
-| Role | Email | Password |
-|------|-------|----------|
-| superadmin | superadmin@taptu.app | Taptu123! |
-| admin | admin@taptu.app | Taptu123! |
-| karyawan | employee@taptu.app | Taptu123! |
-| scanner | scanner@taptu.app | Taptu123! |
-
-### Task 2 — Fix 404 on refresh
-
-Root cause: `vercel.json` tidak punya rewrites rule. SPA di Vercel/production selalu 404 saat halaman di-refresh karena server tidak tahu route `/login`, `/register`, `/app`.
-
-Fix: tambahkan ke `vercel.json`:
-```json
-"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-```
-
-Sekarang semua route SPA (/, /login, /register, /app) fallback ke `index.html` dan React Router yang menangani routing.
-
-### Task 3 — Remove demo panel "klik untuk pakai"
-
-Panel interaktif `data-testid="demo-accounts-panel"` dihapus dari LoginPage.
-
-Gantinya: info panel statis di kolom kiri menampilkan 4 akun demo + password dalam format teks yang clean. User mengetik sendiri — tidak ada magic fill lagi.
-
-Juga:
-- State pre-fill default (`admin@taptu.app / Taptu123!`) dihapus — form sekarang kosong saat load
-- `fillDemo()` function dan `demoAccounts` array dihapus
-- `DemoRole` type dihapus
-
-### Task 1 lanjutan — Multi-role registration
-
-RegisterPage sekarang punya role dropdown:
-- Superadmin (default)
-- Admin HR
-- Karyawan
-
-Badge di pojok kiri atas berubah warna sesuai role yang dipilih:
-- superadmin: amber `bg-[#fff3dc] text-[#92600a]`
-- admin: blue `bg-[#f1f5ff] text-[#1769ff]`
-- employee: green `bg-[#f0fdf4] text-[#16a34a]`
-
-`data-testid` badge sekarang dinamis: `role-badge-${role}` (default `role-badge-superadmin`).
-
-API endpoint `POST /api/auth/register` sekarang menerima field `role` (opsional, default `"superadmin"`). Zod schema memvalidasi `["superadmin", "admin", "employee"]`.
-
-`RegisterRequest` di `packages/shared/src/index.ts` sekarang:
-```ts
-export interface RegisterRequest {
-  fullName: string;
-  email: string;
-  password: string;
-  organizationName: string;
-  role?: UserRole;
-}
-```
-
-### `dev` script sekarang jalankan keduanya sekaligus
-
-Root `package.json`:
-```json
-"dev": "npm run dev:all",
-"dev:all": "npm run dev:api & npm run dev:web",
-```
-
-User cukup `npm run dev` — API dan web jalan bersamaan.
-
-### Agent rule review
-
-TDD dilakukan:
-- 7 test merah ditulis sebelum kode produksi:
-  - 3 test demo login bypass (superadmin, admin, employee)
-  - 2 test demo dashboard bypass (admin, employee)
-  - 1 test role dropdown register page
-  - 1 test "does not show demo accounts panel" di login page
-- Semua 43 web tests hijau pasca implementasi
-- Typecheck full clean (shared + api + web)
-
-### Kondisi build setelah batch ini
-
-- Web tests: 43/43 hijau
-- `npm run typecheck` pass (shared + api + web)
-- Build clean
-
-## Update Phase 1.5: post-login UI cleanup dan responsive audit (2026-05-02)
-
-Phase ini hanya membersihkan design system, AppShell, responsive behavior, trace theme lama, dan layout dashboard. Tidak ada fitur produk Phase 2 yang ditambahkan.
-
-### Masalah yang ditemukan
-
-- Mobile post-login masih terasa seperti desktop sidebar yang dipaksa masuk ke layar phone.
-- Konten dashboard mobile terdorong terlalu jauh ke bawah karena navigasi dan wrapper terlalu besar.
-- Logout/profile terasa awkward di mobile karena bukan bagian dari struktur drawer/profile yang compact.
-- Active navigation state terlalu berat untuk mobile.
-- Source post-login masih menyimpan trace theme lama dari dashboard awal.
-
-### Theme trace yang dihapus
-
-Trace lama yang dibersihkan dari active web source:
-
-- token Tailwind lama: `moss`, `mist`, `sand`, `cloud`, `steel`
-- utility lama: `shadow-panel`, `text-ink`, `bg-ink`, `focus:border-moss`
-- warna hijau lama: `#2d5246`, `#10211c`, `#12261f`, `#173229`, `#97d7be`, `#11703d`, `#e9f7ef`
-- class warna lama: `green`, `emerald`, `teal`, `lime` di active post-login source
-- success state dipindahkan ke tone biru lembut: `#edf4ff` + `#174ea6`
-
-Scan terakhir:
-
-```bash
-rg -n "moss|mist|sand|cloud|steel|shadow-panel|green|emerald|teal|lime|#2d5246|#10211c|#12261f|#173229|#97d7be|#11703d|#e9f7ef|#dae5db|#dfe6de|#e4ebe4|#fbfcf8|#fbfcfa|text-ink|bg-ink|focus:border-moss" apps/web/src apps/web/tailwind.config.js
-```
-
-Result: clean, tidak ada output.
-
-### AppShell dan responsive strategy
-
-Mobile sekarang memakai:
-
-- compact top header dengan Taptu logomark, current page title, dan menu button
-- slide-out drawer untuk role-aware navigation
-- drawer profile section untuk workspace/user/logout
-- desktop sidebar disembunyikan di mobile dengan `lg:flex`
-- dashboard content dimulai dekat bagian atas layar dengan padding lebih kecil
-
-Desktop tetap memakai sidebar:
-
-- sidebar hanya muncul di `lg`
-- profile/logout ada di bagian bawah sidebar
-- layout dashboard tetap balanced setelah mobile refactor
-
-### Komponen yang diubah
-
-- `AppShell`
-- desktop sidebar
-- mobile header
-- mobile drawer navigation
-- profile/logout area
-- `StatusPill`
-- post-login dashboard style tokens di `AppPage`
-- Tailwind config custom token lama dihapus
-
-### File yang berubah
-
-- `apps/web/src/components/app.tsx`
-- `apps/web/src/components/StatusPill.tsx`
-- `apps/web/src/pages/AppPage.tsx`
-- `apps/web/src/test/designSystem.test.tsx`
-- `apps/web/tailwind.config.js`
-
-### Agent rule review
-
-Mengikuti `/Users/masjak/Downloads/KUMPULAN SKILLS/agent_rule.txt`:
-
-- TDD dilakukan sebelum implementasi:
-  - test mobile AppShell memastikan mobile header ada, desktop sidebar hidden, drawer baru muncul setelah menu dibuka
-  - test old-theme scan memastikan active post-login source tidak menyimpan token/warna lama
-- State-machine thinking diterapkan pada mobile drawer:
-  - state awal: drawer closed, main content visible
-  - event: click `Buka navigasi`
-  - state berikutnya: drawer open, navigation/profile terlihat
-  - event: pilih nav atau close
-  - state berikutnya: drawer closed
-
-### QA responsive
-
-Breakpoint yang dicek:
-
-- mobile portrait
-- mobile landscape
-- tablet
-- desktop
-
-Hal yang dicek:
-
-- tidak ada horizontal overflow terlihat
-- desktop sidebar tidak muncul di mobile/tablet
-- content dashboard tidak jatuh terlalu jauh ke bawah
-- active nav state lebih compact
-- logout tidak floating awkwardly
-- card spacing lebih konsisten
-- warna mengikuti landing/login: white, soft gray, dark navy, primary blue
-
-Screenshot QA dibuat di:
-
-- `/tmp/taptu-phase15-mobile-portrait.png`
-- `/tmp/taptu-phase15-mobile-landscape.png`
-- `/tmp/taptu-phase15-tablet.png`
-- `/tmp/taptu-phase15-desktop.png`
-
-### Kondisi build setelah Phase 1.5
-
-- `npm run test --workspace @taptu/web -- designSystem` pass
-- `npm run test --workspace @taptu/api` pass: `47/47`
-- `npm run test --workspace @taptu/web` pass: `55/55`
-- `npm run typecheck` pass
-- `npm run build` pass
-- `npx cap sync ios` pass
-- Xcode build pass untuk iPhone 15 Pro Max iOS 17.5 simulator
-- app berhasil di-install dan launch di simulator dengan bundle `com.taptu.attendance`
-
-### Routes yang perlu dicek manual sebelum Phase 2
-
-- `/app`
-- `/app?role=admin`
-- `/app?role=manager`
-- `/app?role=employee`
-- `/app?role=scanner`
-
-### Catatan untuk Phase 2
-
-- Lanjutkan build feature attendance validation setelah UI foundation ini dipertahankan.
-- Jangan mengembalikan token/theme lama yang sudah dibersihkan.
-- Untuk success state, gunakan semantic tone yang subtle dan kompatibel dengan Taptu, bukan hijau dashboard lama.
-
-## Phase 4 Operational Layer Handoff (2026-05-02)
-
-### Yang dibangun di Phase 4
-
-1. **Employee roster** (Tim tab)
-   - Tabel karyawan aktif dengan search dan status summary badge
-   - Filter otomatis: Hadir, Terlambat, Belum hadir, Izin
-   - Kolom: nama, email, role, shift, check-in, status, validasi
-   - Manager hanya melihat employee dan manager di bawah scope yang ada
-
-2. **Work location management** (Lokasi tab)
-   - Daftar work locations aktif dengan radius
-   - Create form: nama, alamat, latitude, longitude, radius
-   - Edit form (admin-only): inline form yang muncul per card
-   - Status aktif/nonaktif ditampilkan per lokasi
-   - Lokasi baru otomatis masuk ke workLocations di store
-
-3. **Shift management** (Lokasi tab, panel kanan)
-   - Daftar shift aktif
-   - Create/edit form: nama, jam mulai, jam selesai, toleransi, lokasi kerja, jam istirahat
-   - Shift dihubungkan ke work location
-   - Status aktif/arsip per shift
-
-4. **Attendance report** (Laporan tab)
-   - Filter panel: dari tanggal, sampai tanggal, status absensi
-   - Tabel rekap: karyawan, tanggal, shift, check-in, check-out, status, validasi, flags
-   - Flag badges: Late, Exception, Selfie, Device
-   - Tombol "Lihat audit trail" untuk toggle audit log
-
-5. **Payroll-ready CSV export** (Laporan tab)
-   - Tombol "Export CSV" yang generate CSV dari data report yang sedang tampil
-   - CSV berisi semua kolom payroll-ready termasuk validasi, lokasi, perangkat
-   - Nama file: `taptu-attendance-report-YYYY-MM.csv`
-   - Export berjalan di browser (Blob API, no backend round-trip)
-   - Filter aktif dihormati: export hanya baris yang tampil
-
-### File yang berubah
-
-- `packages/shared/src/index.ts` - tambah: EmployeeListItem, WorkLocationItem, ShiftRecord, AttendanceReportRow, AttendanceReportFilters
-- `apps/api/src/domain.ts` - tambah: computeEmployeeList, createShiftRecord, updateShiftRecord, createWorkLocationItem, buildAttendanceReportRows, generateCsvFromRows; update DemoStore + createInitialStore
-- `apps/api/src/domain.test.ts` - tambah tests untuk semua domain function baru
-- `apps/api/src/index.ts` - tambah endpoints: /api/admin/employees, /api/admin/work-locations, /api/admin/shifts, /api/admin/reports
-- `apps/web/src/lib/demo.ts` - tambah demo data: DEMO_EMPLOYEES, DEMO_WORK_LOCATIONS, DEMO_SHIFTS, DEMO_REPORT_ROWS + getter functions
-- `apps/web/src/lib/api.ts` - tambah: fetchEmployeeList, fetchWorkLocations, createWorkLocation, updateWorkLocation, fetchShifts, createShift, updateShift, fetchReportRows, exportReportCsv
-- `apps/web/src/pages/AppPage.tsx` - update: renderTeamWorkspace, renderLocationsWorkspace, renderReportsWorkspace + new state + new handlers
-- `apps/web/src/test/appPage.test.tsx` - tambah Phase 4 tests
-
-### Supabase migration status
-
-- Phase 3 migration masih belum di-apply ke Supabase remote (constraint dari Phase 3 tetap berlaku)
-- Phase 4 domain functions memakai local demo store
-- Untuk production: perlu menambahkan tabel `shifts` dan kolom `status`/`address` ke `work_locations`
-- Supabase adapter (supabaseQueries.ts) belum diupdate untuk employee list, shift, dan report endpoints
-
-### Manager role limitation confirmation
-
-- Manager tidak bisa access location/shift management (admin-only POST/PATCH)
-- Manager bisa view: employee list, work locations read, shifts read, reports
-- Manager tidak bisa deactivate/archive shifts atau locations
-- Default scope tetap org-level untuk MVP
-
-### Selfie upload/storage status
-
-- selfie_url tetap nullable
-- Preview capture masih UI-only, storage backend belum dikoneksikan
-- Kolom `selfieProof` di report CSV diambil dari boolean `record.selfieUrl !== ""`
-
-### How to test
-
-#### Test employee list
-1. Login sebagai admin@taptu.app atau manager@taptu.app
-2. Buka tab Tim
-3. Cek roster karyawan muncul dengan status badges
-4. Ketik di kolom search untuk filter
-
-#### Test location management
-1. Login sebagai admin@taptu.app
-2. Buka tab Lokasi
-3. Klik "Tambah lokasi", isi form, klik Simpan
-4. Verifikasi lokasi muncul di daftar
-5. Klik Edit pada lokasi yang ada, ubah radius, simpan
-
-#### Test shift management
-1. Login sebagai admin@taptu.app
-2. Buka tab Lokasi (panel kanan)
-3. Klik "Tambah shift", isi form (nama, jam mulai/selesai, lokasi)
-4. Verifikasi shift muncul di daftar
-
-#### Test reports
-1. Login sebagai admin@taptu.app
-2. Buka tab Laporan
-3. Verifikasi tabel rekap muncul
-4. Coba filter status "Terlambat" dan klik Terapkan filter
-5. Klik "Export CSV" dan verifikasi file didownload
-6. Klik "Lihat audit trail" untuk toggle audit log
-
-### Remaining TODOs before Phase 5
-
-1. Apply Phase 3 migration ke Supabase remote
-2. Update supabaseQueries.ts untuk employee list, shifts, work locations, reports
-3. Tambahkan kolom `address` dan `status` ke `work_locations` tabel di Supabase
-4. Buat tabel `shifts` di Supabase
-5. Koneksikan selfie upload ke storage bucket
-6. Tambahkan pagination ke employee list dan report table (saat data besar)
-7. Tambahkan shift assignment per employee
-8. Team scoping untuk manager (department-level, bukan org-level)
-9. Laporan bulanan dan agregasi (sekarang hanya daily view)
-10. Export template payroll untuk sistem eksternal (misalnya HRIS tertentu)
+  limited operational approver. Can access home, team, attendance, requests, reports, and profile. Not treated as full HR admin.
+- Employee:
+  attendance, requests, and profile only.
+- Scanner/Kiosk:
+  scanner workspace and profile only.
+
+Manager scoping behavior:
+
+- Current limitation: manager visibility is still too broad and behaves closer to org-wide operational access than true department/team segmentation.
+- Department-level manager segmentation should be implemented later if the data model is extended cleanly.
+
+Known role/access limitation:
+
+- `settings` appears in role navigation definitions for superadmin/admin, but the handoff should treat it as non-core/not fully built unless explicitly completed later.
+
+## F. Database/schema overview
+
+Verified MVP tables from Phase 5.1:
+
+- `work_locations`: geofence validation points and radius settings.
+- `scanner_tokens`: short-lived scanner/kiosk tokens.
+- `attendance_records`: attendance facts plus validation metadata.
+- `attendance_exceptions`: review queue for suspicious or incomplete attendance.
+- `approval_requests`: leave/permission/correction style requests.
+- `audit_logs`: operational decision history.
+- `shifts`: org-scoped work shifts with start/end time and late threshold.
+- `shift_assignments`: per-employee, per-date assignment table added in Phase 5.1.
+
+Model/status notes:
+
+- `attendance_records.shift_id` remains `text` for backward compatibility.
+- New assignment flow uses `shifts` UUID-backed records.
+- `users` / `employees` / `roles` are present at the application/session level, but standalone table verification was not the focus of Phase 5.1 and should be revalidated before deep auth or org-model work.
+- `teams` is not confirmed here as a completed dedicated MVP table. Team behavior is surfaced in UI, but department/team segmentation should be treated as incomplete.
+
+Supabase migration status:
+
+- Phase 5.1 verified required attendance tables.
+- Added migration: `supabase/migrations/202605030001_shifts_schema.sql`.
+- Some Phase 4/5 operational routes are still not fully backed by Supabase relational reads/writes and may still use local/demo-store style API paths.
+
+## G. Attendance validation model
+
+`attendance_records` currently documents or verifies these MVP validation fields:
+
+- `validation_status`
+- `validation_reasons`
+- `location_lat`
+- `location_lng`
+- `selfie_url` (nullable / unfinished storage path)
+- `device_id` (nullable; practical device identifier, not advanced fingerprinting)
+- `scanner_token_id` (optional)
+- `check_in_time`
+- `check_out_time`
+- `status`
+
+Behavior:
+
+- Exception records are created when attendance cannot be treated as fully trusted, such as missing selfie, invalid/expired scanner token, radius mismatch, or related validation concerns.
+- Exceptions are reviewed in the operational queue and can be approved, rejected, or sent for correction.
+- Advanced device signature/fingerprint validation is not part of MVP and should not be implied by current `device_id` support.
+
+## H. Core workflows
+
+- Employee check-in/check-out:
+  employee uses attendance desk, can provide scanner token/selfie/location, receives validation state and feedback.
+- Location/geofence validation:
+  location signals are captured and compared against configured work location/radius logic; outside-radius style cases can persist then enter exception review.
+- Scanner token flow:
+  scanner token is displayed, refreshed, counted down, and used for scanner-mode attendance validation.
+- Scanner recent-scan history:
+  recent success/invalid/expired attempts are surfaced in the scanner workspace.
+- Exception review:
+  admin/manager can approve, reject, or request correction with notes.
+- Approval requests:
+  employee submits request, reviewer approves/rejects, employee can cancel pending items.
+- Shift assignment:
+  data model exists via `shift_assignments`, but complete post-login assignment workflow is not yet finished.
+- Work location/geofence management:
+  admin can create/edit lat/lng/radius work locations.
+- Reports:
+  admin/manager can filter attendance data, inspect validation flags, and open audit trail.
+- Payroll-ready CSV export:
+  report rows can be exported for downstream payroll preparation, but full payroll processing is intentionally out of scope.
+
+## I. UI/UX system status
+
+- Visual style:
+  aligned to landing/login direction with white and soft gray surfaces, strong blue accent, dark text, rounded cards, soft borders, and restrained shadows.
+- AppShell/navigation:
+  desktop sidebar, mobile header, and mobile drawer are implemented and role-aware.
+- Responsive QA:
+  Phase 5.2 completed; known overflow issues were addressed.
+- Empty/loading/error states:
+  Phase 5.4 completed with clearer role-aware empty copy and actionable error states.
+- Accessibility polish:
+  Phase 5.4 added improved live regions, dialog semantics, form errors, labels, and better status readability.
+- Old green theme traces:
+  removed from the checked MVP surfaces; success/info states now use Taptu blue language instead of legacy green traces.
+
+## J. How to run
+
+From repo root:
+
+- Install: `npm install`
+- Full dev: `npm run dev`
+- Web only: `npm run dev:web`
+- API only: `npm run dev:api`
+- Build web: `npm run build:web`
+- Build all: `npm run build:all`
+- Typecheck: `npm run typecheck`
+
+Important env/config notes:
+
+- Web can use `VITE_API_BASE_URL` for API routing.
+- Web can optionally use `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; if absent, frontend falls back to the Express API path.
+- API supports `TAPTU_STORAGE_MODE` with `local-demo` default and `supabase` optional mode.
+- When `TAPTU_STORAGE_MODE=supabase`, API requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+- Optional API Supabase store config: `SUPABASE_STORE_TABLE`, `SUPABASE_STORE_KEY`.
+- API also uses `PORT` and `JWT_SECRET` for local runtime.
+
+## K. How to test core flows
+
+Concise manual checklist:
+
+- Login and confirm role lands on the correct default route.
+- Verify role navigation for admin, manager, employee, scanner.
+- Employee check-in/check-out with visible validation feedback.
+- Scanner mode token refresh, countdown, and recent scan state.
+- Geofence validation surface and location re-check flow.
+- Exception queue approve/reject/request correction actions.
+- Approval request create/detail/cancel and reviewer actions.
+- Team list rendering and search/filter behavior.
+- Work location create/edit.
+- Shift create/edit.
+- Reports filter application and audit trail visibility.
+- CSV export enabled only when report data exists.
+
+## L. Known limitations
+
+- Selfie storage/upload is not finalized; current flow is preview/input oriented and `selfie_url` remains nullable.
+- Advanced anti-spoofing is out of MVP scope.
+- Real device fingerprinting is out of MVP scope.
+- Face recognition is out of MVP scope.
+- Full payroll processing is out of MVP scope.
+- Department-level manager segmentation is not completed.
+- Manager team scoping is still broader than intended.
+- Shift assignment workflow is not completed in post-login UI/API.
+- Some phase 4/5 operational endpoints still rely on local/demo-store style paths rather than fully normalized Supabase relational persistence.
+- Profile workspace is lightweight and not a full account/settings system.
+
+## M. Future roadmap
+
+- Attendance confidence score
+  what: combine validation signals into one review-friendly confidence layer.
+  why: helps ops prioritize suspicious attendance faster.
+  suggested phase: Phase 6 or 7.
+
+- Advanced device fingerprint validation
+  what: replace simple `device_id` with stronger device trust logic.
+  why: reduces repeat spoofing and device sharing abuse.
+  suggested phase: Phase 7.
+
+- Advanced anti-spoof checks
+  what: stronger GPS/time/device anomaly detection.
+  why: raises trust in attendance records.
+  suggested phase: Phase 7.
+
+- Face recognition
+  what: optional identity confirmation on attendance capture.
+  why: stronger identity assurance for higher-risk environments.
+  suggested phase: later, only if privacy/compliance are addressed.
+
+- Finalized selfie storage/upload service
+  what: persist selfie evidence to storage with retrievable URLs and retention policy.
+  why: completes the current proof flow and auditability.
+  suggested phase: Phase 6.
+
+- Offline mode with later sync
+  what: queue attendance actions locally when connection is unstable.
+  why: important for field operations and weak-network environments.
+  suggested phase: Phase 6 or 7.
+
+- Multi-location attendance map
+  what: map-based view of work locations and attendance context.
+  why: better operational visibility for multi-site organizations.
+  suggested phase: Phase 7.
+
+- Payroll bridge/export templates
+  what: richer CSV templates and payroll-system-ready mappings.
+  why: improves handoff from attendance to payroll ops without building payroll itself.
+  suggested phase: Phase 6.
+
+- Full payroll processing integration
+  what: direct payroll calculations and integrations.
+  why: removes downstream manual steps.
+  suggested phase: post-MVP expansion, not near-term.
+
+- Anti-fraud timeline
+  what: chronological fraud-risk narrative per employee/record.
+  why: improves investigation and manager review context.
+  suggested phase: Phase 7.
+
+- Advanced audit log
+  what: richer actor/object/change metadata and filtering.
+  why: improves compliance and operational traceability.
+  suggested phase: Phase 6 or 7.
+
+- WhatsApp/Slack reminders
+  what: attendance reminders, pending review nudges, exception alerts.
+  why: improves adoption and response speed.
+  suggested phase: Phase 6.
+
+- Multi-company workspace
+  what: support multiple orgs/tenants with stronger separation.
+  why: needed for scale beyond single-company deployments.
+  suggested phase: post-MVP platform expansion.
+
+- Mobile app version
+  what: dedicated mobile experience beyond web/PWA shell.
+  why: better camera, location, kiosk, and offline ergonomics.
+  suggested phase: after core persistence and trust flows are stable.
+
+- Advanced analytics for lateness, absence, and shift performance
+  what: trend reporting and operational KPIs.
+  why: moves product from record-keeping to workforce insight.
+  suggested phase: Phase 7.
+
+- Department-level manager segmentation
+  what: manager visibility and action scope narrowed to assigned department/team.
+  why: fixes one of the clearest current MVP access limitations.
+  suggested phase: Phase 6.
+
+## N. Recommended next step after MVP
+
+Recommended next step: Phase 6 should focus on operational hardening, not new surface area.
+
+Priority order:
+
+1. Finish Supabase-backed persistence for phase 4/5 data flows.
+2. Implement shift assignment workflow end to end.
+3. Finalize selfie storage/upload and retention behavior.
+4. Add department/team-scoped manager access.
+
+This sequence closes the largest trust and handoff gaps while preserving the current MVP product shape.

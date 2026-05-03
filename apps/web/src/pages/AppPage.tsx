@@ -176,6 +176,29 @@ export function AppPage() {
   const [shiftForm, setShiftForm] = useState({ name: "", startTime: "", endTime: "", gracePeriodMinutes: "10", workLocationId: "", breakStartTime: "", breakEndTime: "" });
   const [shiftFormOpen, setShiftFormOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
+  const [adminOverviewLoaded, setAdminOverviewLoaded] = useState(false);
+  const [adminOverviewError, setAdminOverviewError] = useState<string | null>(null);
+  const [attendanceHistoryLoaded, setAttendanceHistoryLoaded] = useState(false);
+  const [attendanceHistoryError, setAttendanceHistoryError] = useState<string | null>(null);
+  const [employeeSummaryLoaded, setEmployeeSummaryLoaded] = useState(false);
+  const [employeeSummaryError, setEmployeeSummaryError] = useState<string | null>(null);
+  const [scannerLoaded, setScannerLoaded] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [exceptionQueueLoaded, setExceptionQueueLoaded] = useState(false);
+  const [exceptionQueueError, setExceptionQueueError] = useState<string | null>(null);
+  const [employeeListLoaded, setEmployeeListLoaded] = useState(false);
+  const [employeeListError, setEmployeeListError] = useState<string | null>(null);
+  const [workLocationsLoaded, setWorkLocationsLoaded] = useState(false);
+  const [workLocationsError, setWorkLocationsError] = useState<string | null>(null);
+  const [shiftsLoaded, setShiftsLoaded] = useState(false);
+  const [shiftsError, setShiftsError] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [requestFormError, setRequestFormError] = useState<string | null>(null);
+  const [approvalErrors, setApprovalErrors] = useState<Record<string, string>>({});
+  const [exceptionErrors, setExceptionErrors] = useState<Record<string, string>>({});
+  const [locationFormError, setLocationFormError] = useState<string | null>(null);
+  const [shiftFormError, setShiftFormError] = useState<string | null>(null);
+  const [reportFilterError, setReportFilterError] = useState<string | null>(null);
 
   const appNavigation = useMemo(() => getNavigationForRole(sessionRole), [sessionRole]);
   const attendanceTrust = useMemo(
@@ -238,24 +261,47 @@ export function AppPage() {
     }
 
     if (tab === "attendance") {
+      setAttendanceHistoryLoaded(false);
+      setAttendanceHistoryError(null);
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
-        .then((items) => setAttendance(items))
-        .catch(() => undefined);
+        .then((items) => {
+          setAttendance(items);
+          setAttendanceHistoryLoaded(true);
+        })
+        .catch((error) => {
+          setAttendanceHistoryError(error instanceof Error ? error.message : "Riwayat absensi gagal dimuat.");
+          setAttendanceHistoryLoaded(true);
+        });
     }
 
-    if (tab === "home" && isAdmin && !adminOverview) {
+    if (tab === "home" && isAdmin && !adminOverview && !adminOverviewLoaded) {
       fetchAdminOverview(session.token)
-        .then((data) => setAdminOverview(data))
-        .catch(() => undefined);
+        .then((data) => {
+          setAdminOverview(data);
+          setAdminOverviewLoaded(true);
+          setAdminOverviewError(null);
+        })
+        .catch((error) => {
+          setAdminOverviewLoaded(true);
+          setAdminOverviewError(error instanceof Error ? error.message : "Ringkasan admin gagal dimuat.");
+        });
     }
 
-    if ((tab === "attendance" || tab === "profile") && isEmployee && !employeeSummary) {
+    if ((tab === "attendance" || tab === "profile") && isEmployee && !employeeSummary && !employeeSummaryLoaded) {
       fetchEmployeeSummary(session.token)
-        .then((data) => setEmployeeSummary(data))
-        .catch(() => undefined);
+        .then((data) => {
+          setEmployeeSummary(data);
+          setEmployeeSummaryLoaded(true);
+          setEmployeeSummaryError(null);
+        })
+        .catch((error) => {
+          setEmployeeSummaryLoaded(true);
+          setEmployeeSummaryError(error instanceof Error ? error.message : "Status absensi pribadi gagal dimuat.");
+        });
     }
 
-    if (tab === "scanner" && !scannerMeta && (isScanner || isAdmin)) {
+    if (tab === "scanner" && !scannerLoaded && (isScanner || isAdmin)) {
+      setScannerError(null);
       fetchScannerState(session.token)
         .then((response) => {
           setScannerToken(response.token);
@@ -265,29 +311,64 @@ export function AppPage() {
             locationName: response.locationName
           });
           setScannerScans(response.recentScans);
+          setScannerLoaded(true);
         })
-        .catch(() => undefined);
+        .catch((error) => {
+          setScannerLoaded(true);
+          setScannerError(error instanceof Error ? error.message : "Status scanner gagal dimuat.");
+        });
     }
 
-    if (tab === "team" && (isAdmin || isManager) && exceptionQueue.length === 0) {
+    if (tab === "team" && (isAdmin || isManager) && !exceptionQueueLoaded) {
+      setExceptionQueueError(null);
       fetchExceptionQueue(session.token)
-        .then((items) => setExceptionQueue(items))
-        .catch(() => undefined);
+        .then((items) => {
+          setExceptionQueue(items);
+          setExceptionQueueLoaded(true);
+        })
+        .catch((error) => {
+          setExceptionQueueLoaded(true);
+          setExceptionQueueError(error instanceof Error ? error.message : "Exception queue gagal dimuat.");
+        });
     }
 
-    if (tab === "team" && (isAdmin || isManager) && employeeList.length === 0) {
+    if (tab === "team" && (isAdmin || isManager) && !employeeListLoaded) {
+      setEmployeeListError(null);
       fetchEmployeeList(session.token)
-        .then((items) => setEmployeeList(items))
-        .catch(() => undefined);
+        .then((items) => {
+          setEmployeeList(items);
+          setEmployeeListLoaded(true);
+        })
+        .catch((error) => {
+          setEmployeeListLoaded(true);
+          setEmployeeListError(error instanceof Error ? error.message : "Daftar karyawan gagal dimuat.");
+        });
     }
 
-    if (tab === "locations" && (isAdmin || isManager) && workLocations.length === 0) {
+    if (tab === "locations" && (isAdmin || isManager) && !workLocationsLoaded) {
+      setWorkLocationsError(null);
       fetchWorkLocations(session.token)
-        .then((items) => setWorkLocations(items))
-        .catch(() => undefined);
+        .then((items) => {
+          setWorkLocations(items);
+          setWorkLocationsLoaded(true);
+        })
+        .catch((error) => {
+          setWorkLocationsLoaded(true);
+          setWorkLocationsError(error instanceof Error ? error.message : "Daftar lokasi kerja gagal dimuat.");
+        });
+    }
+
+    if (tab === "locations" && (isAdmin || isManager) && !shiftsLoaded) {
+      setShiftsError(null);
       fetchShifts(session.token)
-        .then((items) => setShifts(items))
-        .catch(() => undefined);
+        .then((items) => {
+          setShifts(items);
+          setShiftsLoaded(true);
+        })
+        .catch((error) => {
+          setShiftsLoaded(true);
+          setShiftsError(error instanceof Error ? error.message : "Daftar shift gagal dimuat.");
+        });
     }
 
     if (tab === "reports" && (isAdmin || isManager) && auditLogs.length === 0) {
@@ -297,14 +378,19 @@ export function AppPage() {
     }
 
     if (tab === "reports" && (isAdmin || isManager) && !reportLoaded) {
+      setReportError(null);
       fetchReportRows(session.token)
         .then((rows) => {
           setReportRows(rows);
           setReportLoaded(true);
+          setReportError(null);
         })
-        .catch(() => undefined);
+        .catch((error) => {
+          setReportLoaded(true);
+          setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
+        });
     }
-  }, [adminOverview, auditLogs.length, employeeList.length, employeeSummary, exceptionQueue.length, historyFilter, isAdmin, isEmployee, isManager, isScanner, reportLoaded, scannerMeta, session, shifts.length, tab, workLocations.length]);
+  }, [adminOverview, adminOverviewLoaded, auditLogs.length, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -486,10 +572,12 @@ export function AppPage() {
     const validationError = validateRequestForm(requestForm);
 
     if (validationError) {
+      setRequestFormError(validationError);
       setActionMessage(validationError, "err");
       return;
     }
 
+    setRequestFormError(null);
     setBusyAction("create-request");
 
     try {
@@ -505,6 +593,16 @@ export function AppPage() {
   }
 
   async function handleApproval(id: string, status: "Disetujui" | "Ditolak") {
+    if (status === "Ditolak" && !(approvalNotes[id] ?? "").trim()) {
+      setApprovalErrors((current) => ({ ...current, [id]: "Tambahkan catatan agar alasan penolakan jelas untuk karyawan." }));
+      return;
+    }
+
+    setApprovalErrors((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
     setBusyAction(`${status}-${id}`);
 
     try {
@@ -572,6 +670,8 @@ export function AppPage() {
         scansToday: response.scansToday,
         locationName: response.locationName
       });
+      setScannerLoaded(true);
+      setScannerError(null);
       setActionMessage("Token scanner berhasil diperbarui.");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Token scanner gagal diperbarui.", "err");
@@ -581,6 +681,16 @@ export function AppPage() {
   }
 
   async function handleExceptionDecision(id: string, status: "Approved" | "Rejected" | "Request Correction") {
+    if (status !== "Approved" && !(exceptionNotes[id] ?? "").trim()) {
+      setExceptionErrors((current) => ({ ...current, [id]: "Tambahkan catatan agar keputusan review bisa ditindaklanjuti." }));
+      return;
+    }
+
+    setExceptionErrors((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
     setBusyAction(`exception-${status}-${id}`);
 
     try {
@@ -600,6 +710,14 @@ export function AppPage() {
   }
 
   async function handleApplyReportFilters() {
+    if (reportFilters.dateFrom && reportFilters.dateTo && reportFilters.dateFrom > reportFilters.dateTo) {
+      const message = "Tanggal akhir harus sama atau setelah tanggal mulai.";
+      setReportFilterError(message);
+      setActionMessage(message, "err");
+      return;
+    }
+
+    setReportFilterError(null);
     setBusyAction("report-filter");
     try {
       const rows = await fetchReportRows(currentSession.token, {
@@ -609,7 +727,10 @@ export function AppPage() {
         status: reportFilters.status || undefined
       });
       setReportRows(rows);
+      setReportLoaded(true);
+      setReportError(null);
     } catch (error) {
+      setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
       setActionMessage(error instanceof Error ? error.message : "Laporan gagal dimuat.", "err");
     } finally {
       setBusyAction(null);
@@ -628,14 +749,32 @@ export function AppPage() {
 
   async function handleSaveLocation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const latitude = Number(locationForm.latitude);
+    const longitude = Number(locationForm.longitude);
+    const radiusMeters = Number(locationForm.radiusMeters);
+
+    if (!locationForm.name.trim()) {
+      setLocationFormError("Nama lokasi wajib diisi.");
+      return;
+    }
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setLocationFormError("Latitude dan longitude harus berupa angka yang valid.");
+      return;
+    }
+    if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+      setLocationFormError("Radius lokasi harus lebih dari 0 meter.");
+      return;
+    }
+
+    setLocationFormError(null);
     setBusyAction("save-location");
     try {
       const payload = {
         name: locationForm.name,
         address: locationForm.address || undefined,
-        latitude: parseFloat(locationForm.latitude),
-        longitude: parseFloat(locationForm.longitude),
-        radiusMeters: parseInt(locationForm.radiusMeters, 10)
+        latitude,
+        longitude,
+        radiusMeters
       };
       if (editingLocation) {
         const updated = await updateWorkLocation(currentSession.token, editingLocation.id, payload);
@@ -658,6 +797,22 @@ export function AppPage() {
 
   async function handleSaveShift(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const gracePeriodMinutes = Number(shiftForm.gracePeriodMinutes);
+
+    if (!shiftForm.name.trim() || !shiftForm.startTime || !shiftForm.endTime) {
+      setShiftFormError("Nama shift, jam mulai, dan jam selesai wajib diisi.");
+      return;
+    }
+    if (!Number.isFinite(gracePeriodMinutes) || gracePeriodMinutes < 0) {
+      setShiftFormError("Toleransi terlambat harus 0 menit atau lebih.");
+      return;
+    }
+    if (shiftForm.breakStartTime && shiftForm.breakEndTime && shiftForm.breakStartTime >= shiftForm.breakEndTime) {
+      setShiftFormError("Jam istirahat selesai harus setelah jam istirahat mulai.");
+      return;
+    }
+
+    setShiftFormError(null);
     setBusyAction("save-shift");
     try {
       const location = workLocations.find((l) => l.id === shiftForm.workLocationId);
@@ -665,7 +820,7 @@ export function AppPage() {
         name: shiftForm.name,
         startTime: shiftForm.startTime,
         endTime: shiftForm.endTime,
-        gracePeriodMinutes: parseInt(shiftForm.gracePeriodMinutes, 10),
+        gracePeriodMinutes,
         workLocationId: shiftForm.workLocationId || undefined,
         workLocationName: location?.name,
         breakStartTime: shiftForm.breakStartTime || undefined,
@@ -691,6 +846,10 @@ export function AppPage() {
   }
 
   function renderAdminDashboard() {
+    if (adminOverviewError) {
+      return <ErrorState title="Ringkasan admin belum tersedia" description={`${adminOverviewError} Coba buka ulang workspace atau muat ulang halaman.`} />;
+    }
+
     if (!adminOverview) {
       return <LoadingState label="Memuat ringkasan admin" />;
     }
@@ -795,6 +954,10 @@ export function AppPage() {
   }
 
   function renderEmployeeAttendance() {
+    if (employeeSummaryError) {
+      return <ErrorState title="Status absensi belum tersedia" description={`${employeeSummaryError} Coba buka ulang tab absensi setelah koneksi stabil.`} />;
+    }
+
     if (!employeeSummary) {
       return <LoadingState label="Memuat status absensi hari ini" />;
     }
@@ -844,16 +1007,20 @@ export function AppPage() {
                     value={attendanceCapture.scannerToken}
                     onChange={(event) => setAttendanceCapture((current) => ({ ...current, scannerToken: event.target.value }))}
                     placeholder="Masukkan token QR gate"
+                    hint="Isi hanya jika check-in melalui kiosk scanner."
                   />
                   <label className="block">
-                    <span className="mb-2 block text-sm font-bold text-[#111827]">Selfie proof</span>
+                    <span id="selfie-proof-label" className="mb-2 block text-sm font-bold text-[#111827]">Selfie proof</span>
                     <input
                       type="file"
                       accept="image/*"
                       capture="user"
                       onChange={handleSelfieUpload}
-                      className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827]"
+                      aria-labelledby="selfie-proof-label"
+                      aria-describedby="selfie-proof-hint"
+                      className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
                     />
+                    <p id="selfie-proof-hint" className="mt-2 text-sm leading-6 text-[#667085]">Preview tersedia di perangkat. Upload server masih nullable sampai integrasi storage final selesai.</p>
                   </label>
                   {attendanceCapture.selfieUrl ? (
                     <div className="flex items-center gap-3 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3">
@@ -867,7 +1034,7 @@ export function AppPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-3 [&>button]:w-full">
                 {attendanceMethods.map((method) => (
                   <PrimaryButton
                     key={`checkin-${method}`}
@@ -964,8 +1131,12 @@ export function AppPage() {
               </button>
             ))}
           </div>
-          {historyRows.length === 0 ? (
-            <EmptyState title="Belum ada histori absensi" description="Riwayat check-in dan check-out akan muncul setelah tindakan pertama hari ini." />
+          {!attendanceHistoryLoaded ? (
+            <LoadingState label="Memuat riwayat absensi" />
+          ) : attendanceHistoryError ? (
+            <ErrorState title="Riwayat absensi belum tersedia" description={`${attendanceHistoryError} Coba ganti filter atau muat ulang tab ini.`} />
+          ) : historyRows.length === 0 ? (
+            <EmptyState title="Belum ada histori absensi" description="Riwayat check-in dan check-out pribadi akan muncul setelah Anda melakukan absensi atau approval terkait sudah diproses." />
           ) : (
             <DataTable
               caption="Riwayat absensi employee"
@@ -1044,6 +1215,7 @@ export function AppPage() {
                 className="min-h-[140px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
               />
             </label>
+            {requestFormError ? <ErrorState title="Form pengajuan belum lengkap" description={requestFormError} /> : null}
             <PrimaryButton type="submit" disabled={busyAction === "create-request"}>
               {busyAction === "create-request" ? "Mengirim..." : "Kirim pengajuan"}
             </PrimaryButton>
@@ -1078,8 +1250,17 @@ export function AppPage() {
                       <FormInput
                         label="Catatan approval"
                         value={approvalNotes[item.id] ?? ""}
-                        onChange={(event) => setApprovalNotes((current) => ({ ...current, [item.id!]: event.target.value }))}
+                        onChange={(event) => {
+                          setApprovalNotes((current) => ({ ...current, [item.id!]: event.target.value }));
+                          setApprovalErrors((current) => {
+                            const next = { ...current };
+                            delete next[item.id!];
+                            return next;
+                          });
+                        }}
                         placeholder="Tambahkan alasan atau catatan reviewer"
+                        error={approvalErrors[item.id]}
+                        hint="Catatan wajib saat menolak agar alasan keputusan jelas."
                       />
                     </div>
                   ) : null}
@@ -1144,13 +1325,14 @@ export function AppPage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8495]" />
               <input
                 type="text"
+                aria-label="Cari karyawan berdasarkan nama atau email"
                 placeholder="Cari nama atau email..."
                 value={employeeSearch}
                 onChange={(e) => setEmployeeSearch(e.target.value)}
                 className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] py-3 pl-10 pr-4 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(["present", "late", "absent", "leave"] as const).map((filter) => {
                 const countMap = {
                   present: employeeList.filter((e) => e.todayStatus === "present").length,
@@ -1167,8 +1349,12 @@ export function AppPage() {
               })}
             </div>
           </div>
-          {employeeList.length === 0 ? (
+          {!employeeListLoaded ? (
             <LoadingState label="Memuat daftar karyawan" />
+          ) : employeeListError ? (
+            <ErrorState title="Daftar karyawan belum tersedia" description={`${employeeListError} Coba refresh roster untuk memuat ulang data tim.`} />
+          ) : employeeList.length === 0 ? (
+            <EmptyState title="Belum ada karyawan terdaftar" description="Admin HR perlu menambahkan anggota tim atau menyinkronkan data pegawai sebelum roster bisa dipakai." />
           ) : filteredEmployees.length === 0 ? (
             <EmptyState title="Tidak ada karyawan yang cocok" description="Coba kata kunci berbeda atau hapus filter pencarian." />
           ) : (
@@ -1210,8 +1396,12 @@ export function AppPage() {
 
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <Panel eyebrow="Exception queue" title="Attendance exceptions yang perlu keputusan">
-            {exceptionQueue.length === 0 ? (
-              <EmptyState title="Tidak ada exception aktif" description="Queue ini akan menampung kasus radius, token, selfie, atau device mismatch." />
+            {!exceptionQueueLoaded ? (
+              <LoadingState label="Memuat exception queue" />
+            ) : exceptionQueueError ? (
+              <ErrorState title="Exception queue belum tersedia" description={`${exceptionQueueError} Coba buka ulang tab tim untuk melanjutkan review.`} />
+            ) : exceptionQueue.length === 0 ? (
+              <EmptyState title="Semua record attendance sedang clear" description="Belum ada kasus radius, token, selfie, atau device mismatch yang menunggu keputusan operasional." />
             ) : (
               <div className="space-y-3">
                 {exceptionQueue.map((item) => (
@@ -1229,8 +1419,17 @@ export function AppPage() {
                         <FormInput
                           label="Catatan review"
                           value={exceptionNotes[item.id] ?? ""}
-                          onChange={(event) => setExceptionNotes((current) => ({ ...current, [item.id]: event.target.value }))}
+                          onChange={(event) => {
+                            setExceptionNotes((current) => ({ ...current, [item.id]: event.target.value }));
+                            setExceptionErrors((current) => {
+                              const next = { ...current };
+                              delete next[item.id];
+                              return next;
+                            });
+                          }}
                           placeholder="Tambahkan alasan keputusan"
+                          error={exceptionErrors[item.id]}
+                          hint="Catatan wajib saat reject atau request correction."
                         />
                       </div>
                     ) : null}
@@ -1261,6 +1460,14 @@ export function AppPage() {
   }
 
   function renderScannerWorkspace() {
+    if (!scannerLoaded) {
+      return <LoadingState label="Memuat status scanner" />;
+    }
+
+    if (scannerError) {
+      return <ErrorState title="Scanner mode belum siap" description={`${scannerError} Refresh token setelah koneksi scanner kembali stabil.`} />;
+    }
+
     return (
       <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <Panel eyebrow="Scanner mode" title="Gate kiosk aktif">
@@ -1278,11 +1485,14 @@ export function AppPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8bb8ff]">Countdown</p>
-                <p className="mt-2 text-3xl font-black tracking-[-0.04em]">{scannerMeta?.expiresInSeconds ?? 30}s</p>
+                <p className="mt-2 text-3xl font-black tracking-[-0.04em]" aria-live="polite">{scannerMeta?.expiresInSeconds ?? 30}s</p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8bb8ff]">Status</p>
                 <p className="mt-2 text-xl font-black">{scannerMeta?.expiresInSeconds === 0 ? "Expired" : "Active"}</p>
+                <p className="mt-2 text-xs font-semibold text-[#cbd5e1]">
+                  {scannerMeta?.expiresInSeconds === 0 ? "Scan baru akan ditolak sampai token diperbarui." : "Scanner siap menerima scan terbaru."}
+                </p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8bb8ff]">Lokasi</p>
@@ -1298,7 +1508,7 @@ export function AppPage() {
 
         <Panel eyebrow="Recent scans" title="Status scan terakhir">
           {scannerScans.length === 0 ? (
-            <EmptyState title="Belum ada scan terbaru" description="Scan sukses, invalid, atau expired akan masuk ke daftar operasional ini." />
+            <EmptyState title="Belum ada scan terbaru" description="Riwayat scan akan muncul setelah ada percobaan sukses, invalid, atau token kedaluwarsa di kiosk ini." />
           ) : (
             <div className="grid gap-3">
               {scannerScans.map((item) => (
@@ -1334,8 +1544,12 @@ export function AppPage() {
                 </PrimaryButton>
               )}
             </div>
-            {workLocations.length === 0 ? (
+            {!workLocationsLoaded ? (
               <LoadingState label="Memuat lokasi kerja" />
+            ) : workLocationsError ? (
+              <ErrorState title="Lokasi kerja belum tersedia" description={`${workLocationsError} Coba muat ulang workspace lokasi untuk melanjutkan pengaturan geofence.`} />
+            ) : workLocations.length === 0 ? (
+              <EmptyState title="Belum ada work location" description="Admin HR perlu membuat titik kerja dan radius geofence sebelum validasi GPS dipakai." />
             ) : (
               <div className="space-y-3">
                 {workLocations.map((loc) => (
@@ -1381,6 +1595,7 @@ export function AppPage() {
                     <FormInput label="Longitude" type="number" step="any" value={locationForm.longitude} onChange={(e) => setLocationForm((c) => ({ ...c, longitude: e.target.value }))} placeholder="106.8456" required />
                   </div>
                   <FormInput label="Radius (meter)" type="number" value={locationForm.radiusMeters} onChange={(e) => setLocationForm((c) => ({ ...c, radiusMeters: e.target.value }))} placeholder="150" required />
+                  {locationFormError ? <ErrorState title="Form lokasi belum valid" description={locationFormError} /> : null}
                   <div className="flex gap-3">
                     <PrimaryButton type="submit" disabled={busyAction === "save-location"}>{busyAction === "save-location" ? "Menyimpan..." : "Simpan lokasi"}</PrimaryButton>
                     <SecondaryButton type="button" onClick={() => { setLocationFormOpen(false); setEditingLocation(null); }}>Batal</SecondaryButton>
@@ -1400,8 +1615,12 @@ export function AppPage() {
                 </PrimaryButton>
               )}
             </div>
-            {shifts.length === 0 ? (
+            {!shiftsLoaded ? (
               <LoadingState label="Memuat shift" />
+            ) : shiftsError ? (
+              <ErrorState title="Daftar shift belum tersedia" description={`${shiftsError} Coba buka ulang workspace ini sebelum mengubah jadwal kerja.`} />
+            ) : shifts.length === 0 ? (
+              <EmptyState title="Belum ada shift aktif" description="Buat shift terlebih dahulu agar jam kerja dan toleransi keterlambatan bisa dipakai saat absensi." />
             ) : (
               <div className="space-y-3">
                 {shifts.map((shift) => (
@@ -1456,6 +1675,7 @@ export function AppPage() {
                     <FormInput label="Istirahat mulai (opsional)" type="time" value={shiftForm.breakStartTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakStartTime: e.target.value }))} />
                     <FormInput label="Istirahat selesai (opsional)" type="time" value={shiftForm.breakEndTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakEndTime: e.target.value }))} />
                   </div>
+                  {shiftFormError ? <ErrorState title="Form shift belum valid" description={shiftFormError} /> : null}
                   <div className="flex gap-3">
                     <PrimaryButton type="submit" disabled={busyAction === "save-shift"}>{busyAction === "save-shift" ? "Menyimpan..." : "Simpan shift"}</PrimaryButton>
                     <SecondaryButton type="button" onClick={() => { setShiftFormOpen(false); setEditingShift(null); }}>Batal</SecondaryButton>
@@ -1502,10 +1722,11 @@ export function AppPage() {
               </PrimaryButton>
             </div>
           </div>
+          {reportFilterError ? <div className="mt-4"><ErrorState title="Filter laporan belum valid" description={reportFilterError} /></div> : null}
         </Panel>
 
         <Panel eyebrow="Attendance report" title="Rekap kehadiran validasi">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm leading-6 text-[#596172]">
               {reportRows.length} baris data{reportFilters.status || reportFilters.dateFrom ? " (filter aktif)" : ""}.
               Laporan mencakup status validasi, lokasi, perangkat, dan selfie proof.
@@ -1514,16 +1735,18 @@ export function AppPage() {
               <SecondaryButton onClick={() => setShowAuditTrail(!showAuditTrail)}>
                 {showAuditTrail ? "Sembunyikan audit" : "Lihat audit trail"}
               </SecondaryButton>
-              <PrimaryButton onClick={handleExportCsv} data-testid="export-csv-button">
+              <PrimaryButton onClick={handleExportCsv} data-testid="export-csv-button" disabled={!reportLoaded || reportRows.length === 0 || busyAction === "report-filter"}>
                 <Download className="mr-2 h-4 w-4" />
-                Export CSV
+                {!reportLoaded ? "Menyiapkan data..." : reportRows.length === 0 ? "Export CSV belum tersedia" : "Export CSV"}
               </PrimaryButton>
             </div>
           </div>
           {!reportLoaded ? (
             <LoadingState label="Memuat laporan" />
+          ) : reportError ? (
+            <ErrorState title="Laporan belum tersedia" description={`${reportError} Periksa filter lalu coba muat ulang laporan.`} />
           ) : reportRows.length === 0 ? (
-            <EmptyState title="Tidak ada data laporan" description="Coba ubah filter atau pastikan sudah ada data absensi hari ini." />
+            <EmptyState title="Tidak ada data laporan" description="Tidak ada attendance record yang cocok dengan filter saat ini. Ubah rentang tanggal atau status untuk melihat hasil lain." />
           ) : (
             <DataTable
               caption="Laporan kehadiran"
@@ -1563,7 +1786,7 @@ export function AppPage() {
                   <div className="flex flex-wrap gap-1">
                     {row.isLate && <span className="rounded-full bg-[#fff8ed] px-2 py-1 text-xs font-bold text-[#8a5c00]">Late</span>}
                     {row.hasException && <span className="rounded-full bg-[#fff5f5] px-2 py-1 text-xs font-bold text-[#8a2f2f]">Exception</span>}
-                    {row.selfieProof && <span className="rounded-full bg-[#f0fdf4] px-2 py-1 text-xs font-bold text-[#16a34a]">Selfie</span>}
+                    {row.selfieProof && <span className="rounded-full bg-[#f1f5ff] px-2 py-1 text-xs font-bold text-[#1769ff]">Selfie</span>}
                     {row.deviceValidated && <span className="rounded-full bg-[#f1f5ff] px-2 py-1 text-xs font-bold text-[#1769ff]">Device</span>}
                   </div>
                 )
@@ -1690,6 +1913,8 @@ export function AppPage() {
 
       {feedback ? (
         <div
+          role={feedback.tone === "err" ? "alert" : "status"}
+          aria-live="polite"
           className={`rounded-[22px] border px-4 py-3 text-sm shadow-[0_12px_32px_rgba(20,24,31,0.06)] ${
             feedback.tone === "err"
               ? "border-[#f2caca] bg-[#fff5f5] text-[#8a2f2f]"

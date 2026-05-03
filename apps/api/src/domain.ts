@@ -923,6 +923,16 @@ export function createWorkLocationItem(data: {
   };
 }
 
+export function toWorkLocationModel(item: WorkLocationItem): WorkLocation {
+  return {
+    id: item.id,
+    name: item.name,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    radiusMeters: item.radiusMeters
+  };
+}
+
 export function buildAttendanceReportRows(
   store: DemoStore,
   userDirectory: Record<string, string>,

@@ -282,7 +282,7 @@ describe("Phase 4: Reports workspace", () => {
     renderRoute("/app/reports");
 
     expect(await screen.findByText(/terapkan filter/i)).toBeTruthy();
-    expect(screen.getByText(/filter laporan kehadiran/i)).toBeTruthy();
+    expect((await screen.findAllByText(/filter laporan kehadiran/i)).length).toBeGreaterThan(0);
   });
 
   it("renders attendance report table with employee data", async () => {
