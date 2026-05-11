@@ -195,7 +195,7 @@ const DEFAULT_SHIFT: ShiftInfo = {
   locationName: DEFAULT_LOCATION.name
 };
 
-const MANAGER_APPROVAL_TYPES: ApprovalRequestType[] = ["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"];
+const MANAGER_APPROVAL_TYPES: ApprovalRequestType[] = ["Izin", "Koreksi Absensi", "Lupa Check-in/out"];
 
 function createTokenSegment() {
   return Math.random().toString(36).slice(2, 5).toUpperCase();
@@ -725,7 +725,7 @@ export function createInitialStore(): DemoStore {
       {
         id: "req-001",
         userId: "usr-employee-01",
-        category: "Permission",
+        category: "Izin",
         startDate: "2026-05-03",
         endDate: "2026-05-03",
         title: "Izin pribadi",
@@ -736,7 +736,7 @@ export function createInitialStore(): DemoStore {
       {
         id: "req-002",
         userId: "usr-employee-02",
-        category: "Attendance Correction",
+        category: "Koreksi Absensi",
         startDate: "2026-05-02",
         endDate: "2026-05-02",
         title: "Koreksi check-in",

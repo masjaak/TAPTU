@@ -40,6 +40,9 @@ export function AppShell({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const activeItem = navigation.find((item) => item.key === activeKey) ?? navigation[0];
+  const mobilePrimaryKeys = ["home", "attendance", "history", "requests", "profile"];
+  const hasEmployeeSelfService = navigation.some((item) => item.key === "schedule" || item.key === "payslip");
+  const mobileNavigation = hasEmployeeSelfService ? navigation.filter((item) => mobilePrimaryKeys.includes(item.key)) : [];
 
   function handleNavigate(item: AppNavItem) {
     onNavigate(item);
@@ -55,7 +58,7 @@ export function AppShell({
     );
 
   return (
-    <div className="min-h-screen bg-[#e9eaec] px-2 py-2 text-[#101217] sm:px-6 sm:py-4 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
+    <div className="min-h-screen bg-[#e9eaec] px-2 pb-24 pt-2 text-[#101217] sm:px-6 sm:py-4 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
       <main className="mx-auto flex max-w-7xl flex-col gap-3 overflow-hidden rounded-[22px] border border-white/70 bg-[#f9fafc] p-2 shadow-[0_24px_70px_rgba(20,24,31,0.14)] sm:rounded-[34px] sm:p-4 lg:grid lg:min-h-[calc(100vh-32px)] lg:grid-cols-[260px_1fr] lg:gap-4 lg:p-6">
         <header data-testid="mobile-app-header" className="flex items-center justify-between rounded-[20px] border border-[#edf0f5] bg-white px-3 py-3 shadow-[0_12px_28px_rgba(20,24,31,0.07)] sm:px-4 lg:hidden">
           <div className="flex min-w-0 items-center gap-3">
@@ -155,6 +158,30 @@ export function AppShell({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {mobileNavigation.length > 0 ? (
+        <nav
+          aria-label="Navigasi utama mobile"
+          className="fixed inset-x-2 bottom-2 z-40 grid grid-cols-5 gap-1 rounded-[24px] border border-[#edf0f5] bg-white/95 p-2 shadow-[0_18px_50px_rgba(20,24,31,0.18)] backdrop-blur lg:hidden"
+        >
+          {mobileNavigation.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-label={`Mobile ${item.label}`}
+              aria-current={activeKey === item.key ? "page" : undefined}
+              onClick={() => handleNavigate(item)}
+              className={clsx(
+                "grid min-h-14 min-w-0 place-items-center gap-1 rounded-[18px] px-1 py-2 text-[10px] font-black transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+                activeKey === item.key ? "bg-[#111827] text-white" : "text-[#667085] hover:bg-[#f1f5ff] hover:text-[#111827]"
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              <span className="max-w-full truncate">{item.label}</span>
+            </button>
+          ))}
+        </nav>
       ) : null}
     </div>
   );

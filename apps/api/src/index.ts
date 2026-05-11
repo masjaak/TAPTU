@@ -311,7 +311,7 @@ function mergeSelfieStorageReason(
 }
 
 const requestSchema = z.object({
-  category: z.enum(["Izin", "Cuti", "Sakit", "Permission", "Attendance Correction", "Forgot Check-in/out"]),
+  category: z.enum(["Izin", "Cuti", "Sakit", "Koreksi Absensi", "Lupa Check-in/out"]),
   startDate: z.string().min(10),
   endDate: z.string().min(10),
   title: z.string().min(3),
@@ -1044,7 +1044,7 @@ app.get("/api/requests", async (req, res) => {
   if (user.role === "admin" || user.role === "superadmin" || user.role === "manager") {
     return res.json(
       store.requests
-        .filter((item) => user.role !== "manager" || ["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(item.category))
+        .filter((item) => user.role !== "manager" || ["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(item.category))
         .map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName))
     );
   }
@@ -1060,7 +1060,7 @@ app.get("/api/requests/:id", async (req, res) => {
     const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
     const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin);
     if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
-    if (user.role === "manager" && item.category && !["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(item.category)) {
+    if (user.role === "manager" && item.category && !["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(item.category)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     return res.json(item);
@@ -1069,7 +1069,7 @@ app.get("/api/requests/:id", async (req, res) => {
   const request = store.requests.find((item) => item.id === req.params.id);
   if (!request) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
   if (user.role === "employee" && request.userId !== user.id) return res.status(403).json({ message: "Forbidden" });
-  if (user.role === "manager" && !["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(request.category)) {
+  if (user.role === "manager" && !["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(request.category)) {
     return res.status(403).json({ message: "Forbidden" });
   }
   return res.json(buildRequestItem(request, users.find((entry) => entry.id === request.userId)?.fullName));
@@ -1151,7 +1151,7 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
   if (useSupabase && sb) {
     if (user.role === "manager") {
       const existing = await supabaseGetRequestById(sb, req.params.id, user.id, true);
-      if (!existing || !existing.category || !["Izin", "Permission", "Attendance Correction", "Forgot Check-in/out"].includes(existing.category)) {
+      if (!existing || !existing.category || !["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(existing.category)) {
         return res.status(403).json({ message: "Forbidden" });
       }
     }

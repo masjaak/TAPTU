@@ -16,9 +16,8 @@ export type ApprovalRequestType =
   | "Izin"
   | "Cuti"
   | "Sakit"
-  | "Permission"
-  | "Attendance Correction"
-  | "Forgot Check-in/out";
+  | "Koreksi Absensi"
+  | "Lupa Check-in/out";
 
 export interface AuthUser {
   id: string;
@@ -64,6 +63,10 @@ export interface AttendanceTimelineItem {
   status: "Tepat waktu" | "Terlambat" | "Izin" | "Belum check-in";
   time: string;
   method: "QR" | "GPS" | "Selfie" | "Manual";
+  checkInTime?: string;
+  checkOutTime?: string;
+  duration?: string;
+  locationName?: string;
 }
 
 export interface LeaveRequestItem {

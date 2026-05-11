@@ -94,6 +94,7 @@ import { nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow
 import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
+const requestCategories = ["Izin", "Cuti", "Sakit", "Koreksi Absensi", "Lupa Check-in/out"] as const;
 type EmployeeCheckInMode = "qr" | "face";
 type EmployeeCheckInFlowState = "idle" | "qr_scanned" | "face_captured" | "confirmation" | "submitting" | "success";
 type CapturedSelfie = {
@@ -122,6 +123,10 @@ type AttendanceHistorySource = Partial<AttendanceTimelineItem> & {
   check_out_time?: string;
   checkInMethod?: string;
   check_in_method?: string;
+  locationName?: string;
+  location_name?: string;
+  workLocationName?: string;
+  work_location_name?: string;
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -170,7 +175,7 @@ function formatAttendanceDateLabel(value?: string) {
     return value;
   }
 
-  return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  return date.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
 function formatAttendanceTime(value?: string) {
@@ -190,19 +195,47 @@ function formatAttendanceTime(value?: string) {
   return value;
 }
 
+function formatAttendanceDuration(checkInTime?: string, checkOutTime?: string) {
+  if (!checkInTime || !checkOutTime) {
+    return "Belum selesai";
+  }
+
+  const start = new Date(checkInTime);
+  const end = new Date(checkOutTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+    return "Belum selesai";
+  }
+
+  const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}j ${String(minutes).padStart(2, "0")}m`;
+}
+
+function getEffectiveAttendanceState(summary: EmployeeSummary | null, fallback: "idle" | "checked_in" | "checked_out") {
+  return summary?.currentAttendanceState ?? fallback;
+}
+
 function normalizeAttendanceHistoryItems(items: AttendanceHistorySource[]): AttendanceTimelineItem[] {
   return items.map((item) => {
     const date = item.date ?? item.attendanceDate ?? item.attendance_date;
     const checkInTime = item.checkInTime ?? item.check_in_time;
     const checkOutTime = item.checkOutTime ?? item.check_out_time;
     const method = item.method ?? item.checkInMethod ?? item.check_in_method;
+    const locationName = item.locationName ?? item.location_name ?? item.workLocationName ?? item.work_location_name;
+    const checkInLabel = formatAttendanceTime(checkInTime);
+    const checkOutLabel = formatAttendanceTime(checkOutTime);
 
     return {
       id: item.id,
       day: item.day ?? formatAttendanceDateLabel(date ?? checkInTime ?? checkOutTime),
       status: normalizeAttendanceStatus(item.status),
-      time: item.time ?? formatAttendanceTime(checkInTime ?? checkOutTime),
-      method: isAttendanceMethod(method) ? method : "Manual"
+      time: item.time ?? checkInLabel,
+      method: isAttendanceMethod(method) ? method : "Manual",
+      checkInTime: checkInTime ? checkInLabel : item.time,
+      checkOutTime: checkOutTime ? checkOutLabel : undefined,
+      duration: item.duration ?? formatAttendanceDuration(checkInTime, checkOutTime),
+      locationName
     };
   });
 }
@@ -228,7 +261,7 @@ export function AppPage() {
   const [adminOverview, setAdminOverview] = useState<AdminOverview | null>(null);
   const [employeeSummary, setEmployeeSummary] = useState<EmployeeSummary | null>(null);
   const [requestForm, setRequestForm] = useState({
-    category: "Izin" as "Izin" | "Cuti" | "Sakit" | "Permission" | "Attendance Correction" | "Forgot Check-in/out",
+    category: "Izin" as "Izin" | "Cuti" | "Sakit" | "Koreksi Absensi" | "Lupa Check-in/out",
     startDate: "",
     endDate: "",
     title: "",
@@ -1222,18 +1255,130 @@ export function AppPage() {
       return <LoadingState label="Memuat ringkasan hari ini" />;
     }
 
+    const effectiveState = getEffectiveAttendanceState(employeeSummary, attendanceState);
+    const shift = employeeSummary.assignedShift;
+    const checkInLabel = formatAttendanceTime(employeeSummary.todayRecord.checkInTime);
+    const checkOutLabel = formatAttendanceTime(employeeSummary.todayRecord.checkOutTime);
+    const durationLabel = formatAttendanceDuration(employeeSummary.todayRecord.checkInTime, employeeSummary.todayRecord.checkOutTime);
+    const statusCopy =
+      effectiveState === "checked_out"
+        ? {
+            title: "Selesai hari ini",
+            subtitle: `${checkInLabel}-${checkOutLabel} · Durasi ${durationLabel}`,
+            cta: "Lihat riwayat"
+          }
+        : effectiveState === "checked_in"
+          ? {
+              title: "Sedang bekerja",
+              subtitle: `Check-in ${checkInLabel} · ${shift.locationName}`,
+              cta: "Check-out"
+            }
+          : {
+              title: "Belum hadir",
+              subtitle: `${shift.name} · ${shift.startTime}-${shift.endTime} · ${shift.locationName}`,
+              cta: "Mulai Check-in"
+            };
+
     return (
       <>
+        <Panel eyebrow="Beranda" title="Status hari ini" className="border-[#d9e6ff] shadow-[0_18px_46px_rgba(23,105,255,0.10)]">
+          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone={effectiveState === "idle" ? "warning" : effectiveState === "checked_in" ? "info" : "success"}>
+                  {effectiveState === "idle" ? "Perlu aksi" : effectiveState === "checked_in" ? "Aktif" : "Selesai"}
+                </StatusBadge>
+                <span className="text-sm font-semibold text-[#667085]">{now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
+              </div>
+              <p className="mt-4 text-2xl font-black tracking-[-0.02em] text-[#111827] sm:text-3xl">{statusCopy.title}</p>
+              <p className="mt-2 break-words text-sm font-semibold leading-6 text-[#596172] sm:text-base">{statusCopy.subtitle}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <PrimaryButton
+                onClick={() => {
+                  if (effectiveState === "checked_out") {
+                    navigate("/app/history");
+                    return;
+                  }
+                  if (effectiveState === "checked_in") {
+                    void handleCheckOut();
+                    return;
+                  }
+                  navigate("/app/attendance");
+                }}
+                disabled={effectiveState === "checked_in" && busyAction === "checkout"}
+                className="w-full"
+              >
+                {effectiveState === "checked_in" && busyAction === "checkout" ? "Menyimpan..." : statusCopy.cta}
+              </PrimaryButton>
+              <SecondaryButton onClick={() => navigate("/app/schedule")} className="w-full">
+                Lihat jadwal
+              </SecondaryButton>
+            </div>
+          </div>
+        </Panel>
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Status hari ini" value={attendanceState === "checked_out" ? "Selesai" : attendanceState === "checked_in" ? "Sudah check-in" : "Belum check-in"} detail={employeeSummary.assignedShift.name} />
-          <StatCard label="Shift hari ini" value={`${employeeSummary.assignedShift.startTime} - ${employeeSummary.assignedShift.endTime}`} detail={employeeSummary.assignedShift.locationName} />
+          <StatCard label="Status" value={effectiveState === "checked_out" ? "Selesai" : effectiveState === "checked_in" ? "Aktif" : "Perlu aksi"} detail={shift.name} />
+          <StatCard label="Shift" value={`${shift.startTime}-${shift.endTime}`} detail={shift.locationName} />
           <StatCard label="Tepat waktu" value={String(employeeSummary.onTimeDays)} detail={`${employeeSummary.totalDays} hari hadir tercatat`} />
-          <StatCard label="Pending pengajuan" value={String(employeeSummary.pendingRequests)} detail="Menunggu keputusan admin atau manager" />
+          <StatCard label="Pengajuan" value={String(employeeSummary.pendingRequests)} detail="Menunggu keputusan" />
         </section>
-        <Panel eyebrow="Today" title="Aktivitas kerja hari ini">
-          {schedule.length === 0 ? (
-            <EmptyState title="Belum ada agenda tambahan" description="Shift utama tetap mengikuti jadwal yang ditampilkan di tab Jadwal." />
-          ) : (
+        <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+          <Panel eyebrow="Shift" title="Shift hari ini">
+            <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+              <p className="text-sm font-black text-[#111827]">{shift.name}</p>
+              <p className="mt-2 text-2xl font-black text-[#111827]">{shift.startTime}-{shift.endTime}</p>
+              <p className="mt-2 text-sm font-semibold text-[#596172]">{shift.locationName}</p>
+            </div>
+          </Panel>
+
+          <Panel eyebrow="Validasi" title="Validasi singkat">
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge tone={attendanceTrust.canClock ? "success" : "warning"}>{attendanceTrust.canClock ? "Lokasi valid" : "Lokasi perlu cek"}</StatusBadge>
+              <StatusBadge tone="info">Kamera siap</StatusBadge>
+              <StatusBadge tone="info">Device verified</StatusBadge>
+            </div>
+          </Panel>
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-2">
+          <Panel eyebrow="Riwayat" title="Riwayat terbaru">
+            {attendance.length === 0 ? (
+              <EmptyState title="Belum ada riwayat terbaru" description="Check-in dan check-out terbaru akan muncul setelah data attendance tersimpan." />
+            ) : (
+              <div className="grid gap-3">
+                {attendance.slice(0, 3).map((item) => (
+                  <div key={item.id ?? `${item.day}-${item.time}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <p className="text-sm font-black text-[#111827]">{item.day}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#596172]">Check-in {item.checkInTime ?? item.time}{item.checkOutTime ? ` · Check-out ${item.checkOutTime}` : ""}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel eyebrow="Pengajuan" title="Pengajuan aktif">
+            {requests.length === 0 ? (
+              <EmptyState title="Tidak ada pengajuan aktif" description="Pengajuan izin, sakit, cuti, dan koreksi absensi akan tampil di sini." />
+            ) : (
+              <div className="grid gap-3">
+                {requests.slice(0, 3).map((item) => (
+                  <div key={item.id ?? item.title} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-black text-[#111827]">{item.title}</p>
+                      <StatusBadge tone={item.status === "Menunggu" ? "warning" : item.status === "Ditolak" ? "danger" : "success"}>{item.status}</StatusBadge>
+                    </div>
+                    {item.category ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.category}</p> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </section>
+
+        {schedule.length > 0 ? (
+          <Panel eyebrow="Agenda" title="Agenda hari ini">
             <div className="grid gap-3">
               {schedule.map((item) => (
                 <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
@@ -1243,8 +1388,8 @@ export function AppPage() {
                 </div>
               ))}
             </div>
-          )}
-        </Panel>
+          </Panel>
+        ) : null}
       </>
     );
   }
@@ -1277,6 +1422,7 @@ export function AppPage() {
       ? new Date(activeCheckIn.capturedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
       : now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     const isSubmitBlocked = activeCheckIn?.validationStatus === "blocked" || busyAction === "checkin";
+    const effectiveState = getEffectiveAttendanceState(employeeSummary, attendanceState);
 
     return (
       <>
@@ -1318,7 +1464,7 @@ export function AppPage() {
               aria-label="Ambil selfie check-in"
             />
 
-            {attendanceState === "idle" && checkInFlowState !== "success" ? (
+            {effectiveState === "idle" && checkInFlowState !== "success" ? (
               <div className="mt-5">
                 <div className="grid grid-cols-2 rounded-[18px] border border-[#dfe6f2] bg-[#eef4ff] p-1">
                   {[
@@ -1461,7 +1607,7 @@ export function AppPage() {
                   </div>
                 ) : null}
               </div>
-            ) : attendanceState === "checked_out" ? (
+            ) : effectiveState === "checked_out" ? (
               <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-[#f9fafc] p-5">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
@@ -1496,7 +1642,7 @@ export function AppPage() {
                   <SecondaryButton onClick={() => navigate("/app/history")}>Lihat riwayat</SecondaryButton>
                   <PrimaryButton onClick={() => navigate("/app/home")}>Kembali ke dashboard</PrimaryButton>
                 </div>
-                <SecondaryButton className="mt-3 w-full" disabled={attendanceState !== "checked_in" || busyAction === "checkout" || !attendanceTrust.canClock} onClick={handleCheckOut}>
+                <SecondaryButton className="mt-3 w-full" disabled={effectiveState !== "checked_in" || busyAction === "checkout" || !attendanceTrust.canClock} onClick={handleCheckOut}>
                   <Clock3 className="mr-2 h-4 w-4" />
                   {busyAction === "checkout" ? "Menyimpan..." : "Check-out sekarang"}
                 </SecondaryButton>
@@ -1504,7 +1650,7 @@ export function AppPage() {
             )}
           </Panel>
 
-          <Panel eyebrow="Validation" title="Status lokasi dan perangkat">
+          <Panel eyebrow="Validasi" title="Validasi singkat">
             <div className="space-y-4">
               <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1533,13 +1679,16 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-1 h-5 w-5 text-[#1769ff]" />
                   <div>
-                    <p className="text-sm font-black text-[#111827]">Yang dicek sistem</p>
+                    <p className="text-sm font-black text-[#111827]">Lokasi valid · Kamera siap · Device verified</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">{attendanceTrust.detail}</p>
-                    <div className="mt-4 grid gap-2 text-xs font-semibold text-[#667085]">
-                      <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} meter</p>
-                      <p>Jarak saat ini: {attendanceTrustSignal.distanceFromOfficeMeters ?? "Belum dicek"} meter</p>
-                      <p>Device ID: {attendanceCapture.deviceId || "Belum dibuat"}</p>
-                    </div>
+                    <details className="mt-4 rounded-2xl border border-[#dfe6f2] bg-white px-4 py-3">
+                      <summary className="cursor-pointer text-sm font-black text-[#1769ff]">Lihat detail validasi</summary>
+                      <div className="mt-3 grid gap-2 text-xs font-semibold text-[#667085]">
+                        <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} meter</p>
+                        <p>Jarak saat ini: {attendanceTrustSignal.distanceFromOfficeMeters ?? "Belum dicek"} meter</p>
+                        <p>Device ID: {attendanceCapture.deviceId || "Belum dibuat"}</p>
+                      </div>
+                    </details>
                   </div>
                 </div>
                 <SecondaryButton className="mt-4 w-full" disabled={busyAction === "verify-device"} onClick={handleVerifyAttendanceDevice}>
@@ -1584,11 +1733,20 @@ export function AppPage() {
       day: item.day,
       method: item.method,
       time: item.time,
+      checkInTime: item.checkInTime ?? item.time,
+      checkOutTime: item.checkOutTime,
+      duration: item.duration ?? "Belum selesai",
+      locationName: item.locationName ?? employeeSummary?.assignedShift.locationName ?? "Lokasi belum tercatat",
       status: item.status
     }));
+    const filterLabels: Record<(typeof attendanceFilters)[number], string> = {
+      all: "Semua",
+      present: "Hadir",
+      issue: "Masalah"
+    };
 
     return (
-      <Panel eyebrow="Recent history" title="Riwayat absensi terbaru">
+      <Panel eyebrow="Riwayat" title="Riwayat absensi terbaru">
           <div className="mb-5 flex flex-wrap gap-2">
             {attendanceFilters.map((filter) => (
               <button
@@ -1603,7 +1761,7 @@ export function AppPage() {
                   historyFilter === filter ? "bg-[#111827] text-white" : "bg-[#f1f5ff] text-[#1769ff]"
                 }`}
               >
-                {filter}
+                {filterLabels[filter]}
               </button>
             ))}
           </div>
@@ -1624,15 +1782,20 @@ export function AppPage() {
                     <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] [&::-webkit-details-marker]:hidden">
                       <span>
                         <span className="block text-sm font-black text-[#111827]">{item.day}</span>
-                        <span className="mt-1 block text-xs font-semibold text-[#667085]">{item.time} · {item.method}</span>
+                        <span className="mt-1 block text-xs font-semibold text-[#667085]">
+                          Check-in {item.checkInTime}{item.checkOutTime ? ` · Check-out ${item.checkOutTime}` : ""}
+                        </span>
+                        <span className="mt-1 block text-xs font-semibold text-[#667085]">Durasi {item.duration} · {item.locationName}</span>
                       </span>
                       <StatusBadge tone={item.status === "Belum check-in" ? "neutral" : item.status === "Terlambat" ? "warning" : "success"}>{item.status}</StatusBadge>
                     </summary>
                     <div className="border-t border-[#dce7fb] px-4 py-4" role="status">
                       <p className="text-sm font-black text-[#111827]">Detail absensi</p>
                       <div className="mt-3 grid gap-2 text-sm font-semibold text-[#596172] sm:grid-cols-2">
-                        <p>Hari: {item.day}</p>
-                        <p>Jam: {item.time}</p>
+                        <p>Check-in: {item.checkInTime}</p>
+                        <p>Check-out: {item.checkOutTime ?? "Belum check-out"}</p>
+                        <p>Durasi: {item.duration}</p>
+                        <p>Lokasi: {item.locationName}</p>
                         <p>Metode: {item.method}</p>
                         <p>Status: {item.status}</p>
                       </div>
@@ -1657,16 +1820,19 @@ export function AppPage() {
 
     return (
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel eyebrow="Jadwal / Shift" title="Shift yang sedang ditugaskan">
+        <Panel eyebrow="Jadwal / Shift" title="Shift aktif hari ini">
           <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-black text-[#111827]">{employeeSummary.assignedShift.name}</p>
-                <p className="mt-2 break-words text-2xl font-black text-[#111827] sm:text-3xl">{employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime}</p>
+                <p className="mt-2 break-words text-2xl font-black text-[#111827] sm:text-3xl">{employeeSummary.assignedShift.startTime}-{employeeSummary.assignedShift.endTime}</p>
                 <p className="mt-2 text-sm font-semibold text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
               </div>
               <StatusBadge tone="info">Hari ini</StatusBadge>
             </div>
+            <PrimaryButton className="mt-4 w-full" onClick={() => navigate("/app/attendance")}>
+              Mulai Check-in
+            </PrimaryButton>
           </div>
         </Panel>
 
@@ -1691,11 +1857,14 @@ export function AppPage() {
 
   function renderEmployeePayslipWorkspace() {
     return (
-      <Panel eyebrow="Slip Gaji" title="Slip gaji pribadi">
+      <Panel eyebrow="Slip Gaji" title="Payroll belum aktif">
         <EmptyState
-          title="Slip gaji belum tersedia"
-          description="Taptu saat ini menyediakan laporan attendance payroll-ready dan export CSV untuk admin. Slip gaji read-only akan aktif setelah model payroll disambungkan."
+          title="Modul payroll belum tersambung"
+          description="Saat ini Taptu menyiapkan rekap attendance yang bisa digunakan HR untuk payroll. Slip gaji akan tersedia setelah modul payroll disambungkan."
         />
+        <SecondaryButton className="mt-4 w-full sm:w-auto" onClick={() => navigate("/app/history")}>
+          Lihat rekap absensi bulan ini
+        </SecondaryButton>
       </Panel>
     );
   }
@@ -1736,18 +1905,26 @@ export function AppPage() {
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <Panel eyebrow="Request form" title="Pengajuan tetap dekat dengan attendance flow">
           <form className="grid gap-4" onSubmit={handleCreateRequest}>
-            <SelectInput
-              label="Kategori"
-              value={requestForm.category}
-              onChange={(event) => setRequestForm((current) => ({ ...current, category: event.target.value as typeof requestForm.category }))}
-            >
-              <option value="Izin">Izin</option>
-              <option value="Cuti">Cuti</option>
-              <option value="Sakit">Sakit</option>
-              <option value="Permission">Permission</option>
-              <option value="Attendance Correction">Attendance Correction</option>
-              <option value="Forgot Check-in/out">Forgot Check-in/out</option>
-            </SelectInput>
+            <fieldset>
+              <legend className="mb-2 block text-sm font-bold text-[#111827]">Kategori</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {requestCategories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    aria-pressed={requestForm.category === category}
+                    onClick={() => setRequestForm((current) => ({ ...current, category }))}
+                    className={`min-h-11 rounded-2xl border px-4 py-3 text-left text-sm font-black transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
+                      requestForm.category === category
+                        ? "border-[#1769ff] bg-[#edf4ff] text-[#174ea6]"
+                        : "border-[#e2e7f0] bg-[#f9fafc] text-[#596172] hover:border-[#b9c2d3] hover:bg-white"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <p className="text-xs font-semibold leading-5 text-[#667085]">Lembur belum aktif di approval flow saat ini dan tetap masuk roadmap.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormInput label="Tanggal mulai" type="date" value={requestForm.startDate} onChange={(event) => setRequestForm((current) => ({ ...current, startDate: event.target.value }))} />
@@ -1764,7 +1941,7 @@ export function AppPage() {
             </label>
             {requestFormError ? <ErrorState title="Form pengajuan belum lengkap" description={requestFormError} /> : null}
             <PrimaryButton type="submit" disabled={busyAction === "create-request"}>
-              {busyAction === "create-request" ? "Mengirim..." : "Kirim pengajuan"}
+              {busyAction === "create-request" ? "Mengirim..." : "Kirim Pengajuan"}
             </PrimaryButton>
           </form>
         </Panel>

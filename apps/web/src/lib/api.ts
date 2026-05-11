@@ -136,7 +136,7 @@ export async function checkOut(
 
 export async function createRequest(
   token: string,
-  payload: { category: "Izin" | "Cuti" | "Sakit" | "Permission" | "Attendance Correction" | "Forgot Check-in/out"; startDate: string; endDate: string; title: string; detail: string }
+  payload: { category: "Izin" | "Cuti" | "Sakit" | "Koreksi Absensi" | "Lupa Check-in/out"; startDate: string; endDate: string; title: string; detail: string }
 ) {
   if (isDemoToken(token)) {
     const response: RequestActionResponse = {
