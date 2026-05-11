@@ -74,6 +74,7 @@ import {
   supabaseGetAuditLogs,
   supabaseGetScannerState,
   supabaseGetPrimaryWorkLocation,
+  supabaseGetAttendanceReportRows,
   supabaseRefreshScannerToken,
   supabaseReviewException,
   supabaseCreateAuditLog,
@@ -1527,8 +1528,11 @@ app.get("/api/admin/reports", async (req, res) => {
     status: typeof req.query.status === "string" ? req.query.status : undefined
   };
 
-  const dir = Object.fromEntries(users.map((u) => [u.id, u.fullName]));
-  const rows = buildAttendanceReportRows(store, dir, filters);
+  const organizationId = useSupabase && sb ? await getOrganizationIdForUser(user.id) : undefined;
+  const rows =
+    useSupabase && sb && organizationId
+      ? await supabaseGetAttendanceReportRows(sb, organizationId, filters)
+      : buildAttendanceReportRows(store, Object.fromEntries(users.map((u) => [u.id, u.fullName])), filters);
 
   if (req.query.format === "csv") {
     const csv = generateCsvFromRows(rows);

@@ -259,7 +259,7 @@ describe("AppPage", () => {
     expect(await screen.findByText(/08:03 · Manual/i)).toBeTruthy();
   });
 
-  it("keeps existing employee history when an all-history refresh returns empty", async () => {
+  it("replaces existing employee history when the server refresh returns empty", async () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
@@ -311,8 +311,8 @@ describe("AppPage", () => {
     renderRoute("/app/history");
 
     expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
-    expect(await screen.findByText(/07:55 · Selfie/i)).toBeTruthy();
-    expect(screen.queryByText(/belum ada histori absensi/i)).toBeNull();
+    expect(await screen.findByText(/belum ada histori absensi/i)).toBeTruthy();
+    expect(screen.queryByText(/07:55 · Selfie/i)).toBeNull();
   });
 
   it("normalizes employee history records before rendering Riwayat", async () => {
@@ -542,6 +542,69 @@ describe("AppPage", () => {
         requiredSelfie: true
       })
     );
+  });
+
+  it("checks out an active attendance record and leaves the active state", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [{ id: "today-active", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }],
+      attendanceState: "checked_in",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "checked_in",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-real-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        checkInTime: "2026-05-11T01:03:00.000Z",
+        status: "Tepat waktu",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-11T01:03:00.000Z",
+        updatedAt: "2026-05-11T01:03:00.000Z"
+      }
+    });
+    apiMocks.fetchAttendanceHistoryByFilter
+      .mockResolvedValueOnce([{ id: "today-active", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }])
+      .mockResolvedValueOnce([{ id: "today-complete", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }]);
+
+    renderRoute("/app/attendance");
+
+    const checkOutButton = await screen.findByRole("button", { name: /check-out sekarang/i });
+    fireEvent.click(checkOutButton);
+
+    await waitFor(() => expect(apiMocks.checkOut).toHaveBeenCalledWith("demo:employee", expect.objectContaining({ method: "Manual" })));
+    expect((await screen.findAllByText(/check-out berhasil/i)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /check-out sekarang/i })).toBeNull();
+    await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
   });
 
   it("keeps employee check-in clickable and explains when validation is not ready", async () => {

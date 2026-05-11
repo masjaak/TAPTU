@@ -1,6 +1,6 @@
 import type { SupabaseAdmin } from "./supabase";
 import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord } from "./domain";
-import type { AttendanceExceptionItem, AuthUser, UserRole } from "@taptu/shared";
+import type { AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AuthUser, UserRole } from "@taptu/shared";
 import { createInitialStore } from "./domain";
 
 /**
@@ -339,6 +339,101 @@ export async function supabaseGetAllAttendanceHistory(
       : "--.--",
     method: (row.check_in_method ?? "Manual") as "QR" | "GPS" | "Selfie" | "Manual"
   }));
+}
+
+type SupabaseAttendanceReportRow = {
+  id: string;
+  employee_id: string;
+  attendance_date: string;
+  shift_id: string | null;
+  status: AttendanceReportRow["status"] | null;
+  state: string | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  validation_status: AttendanceReportRow["validationStatus"] | null;
+  validation_reasons: string[] | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  selfie_url: string | null;
+  device_id: string | null;
+  profiles?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+  work_locations?: { name?: string | null } | { name?: string | null }[] | null;
+  attendance_exceptions?: Array<{ status?: string | null }> | null;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+export function supabaseBuildAttendanceReportRows(rows: SupabaseAttendanceReportRow[]): AttendanceReportRow[] {
+  return rows.map((row) => {
+    const profile = firstRelation(row.profiles);
+    const workLocation = firstRelation(row.work_locations);
+    const status = row.status ?? (row.state === "checked_out" ? "Selesai" : mapAttendanceStatus(row.state ?? "idle", row.check_in_time));
+    const pendingException = (row.attendance_exceptions ?? []).some(
+      (item) => item.status === "Need Review" || item.status === "Request Correction"
+    );
+
+    return {
+      id: row.id,
+      employeeName: profile?.full_name ?? "Employee",
+      employeeId: row.employee_id,
+      date: row.attendance_date,
+      shiftName: row.shift_id ?? "shift-pagi",
+      workLocationName: workLocation?.name ?? DEFAULT_LOCATION.name,
+      checkInTime: row.check_in_time ?? undefined,
+      checkOutTime: row.check_out_time ?? undefined,
+      status,
+      validationStatus: row.validation_status ?? "verified",
+      validationReasons: row.validation_reasons ?? [],
+      locationLat: row.location_lat ?? undefined,
+      locationLng: row.location_lng ?? undefined,
+      isLate: status === "Terlambat",
+      hasException: pendingException || (row.validation_status !== null && row.validation_status !== "verified"),
+      selfieProof: Boolean(row.selfie_url),
+      deviceValidated: Boolean(row.device_id),
+      approvalStatus: undefined,
+      adminNote: undefined
+    };
+  });
+}
+
+export async function supabaseGetAttendanceReportRows(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  filters: AttendanceReportFilters = {}
+): Promise<AttendanceReportRow[]> {
+  const { data: orgUsers, error: usersError } = await sb
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", organizationId);
+
+  if (usersError) {
+    throw new Error(`Failed to fetch report employees: ${usersError.message}`);
+  }
+
+  const userIds = (orgUsers ?? []).map((user) => user.id);
+  if (userIds.length === 0) return [];
+
+  let query = sb
+    .from("attendance_records")
+    .select("*, profiles(full_name), work_locations(name), attendance_exceptions(status)")
+    .in("employee_id", userIds)
+    .order("attendance_date", { ascending: false })
+    .limit(500);
+
+  if (filters.dateFrom) query = query.gte("attendance_date", filters.dateFrom);
+  if (filters.dateTo) query = query.lte("attendance_date", filters.dateTo);
+  if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+  if (filters.status) query = query.eq("status", filters.status);
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to fetch attendance report: ${error.message}`);
+  }
+
+  return supabaseBuildAttendanceReportRows((data ?? []) as SupabaseAttendanceReportRow[]);
 }
 
 // ─── Requests ───────────────────────────────────────────────

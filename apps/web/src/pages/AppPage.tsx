@@ -375,7 +375,7 @@ export function AppPage() {
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
         .then((items) => {
           const normalizedItems = normalizeAttendanceHistoryItems(items);
-          setAttendance((current) => (normalizedItems.length > 0 || historyFilter !== "all" ? normalizedItems : current));
+          setAttendance(normalizedItems);
           setAttendanceHistoryLoaded(true);
         })
         .catch((error) => {
@@ -554,7 +554,7 @@ export function AppPage() {
     try {
       const items = await fetchAttendanceHistoryByFilter(currentSession.token, historyFilter);
       const normalizedItems = normalizeAttendanceHistoryItems(items);
-      setAttendance((current) => (normalizedItems.length > 0 || historyFilter !== "all" ? normalizedItems : current));
+      setAttendance(normalizedItems);
       setAttendanceHistoryLoaded(true);
     } catch (error) {
       setAttendanceHistoryError(error instanceof Error ? error.message : "Riwayat absensi gagal dimuat.");
@@ -1460,6 +1460,26 @@ export function AppPage() {
                     </div>
                   </div>
                 ) : null}
+              </div>
+            ) : attendanceState === "checked_out" ? (
+              <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-[#f9fafc] p-5">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
+                  <div className="min-w-0">
+                    <p className="text-2xl font-black text-[#111827]">Check-out berhasil</p>
+                    <p className="mt-2 text-sm leading-6 text-[#596172]">
+                      Record hari ini sudah selesai
+                      {employeeSummary.todayRecord.checkOutTime
+                        ? ` pada ${new Date(employeeSummary.todayRecord.checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
+                        : ""}
+                      . Riwayat terbaru memuat data dari server.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <SecondaryButton onClick={() => navigate("/app/history")}>Lihat riwayat</SecondaryButton>
+                  <PrimaryButton onClick={() => navigate("/app/home")}>Kembali ke dashboard</PrimaryButton>
+                </div>
               </div>
             ) : (
               <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-[#f9fafc] p-5">
