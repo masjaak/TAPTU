@@ -254,7 +254,7 @@ describe("AppPage", () => {
     renderRoute("/app/attendance");
 
     expect(await screen.findByText(/check-in sederhana, validasi tetap berjalan/i)).toBeTruthy();
-    expect(screen.getByText(/validasi lokasi dan perangkat/i)).toBeTruthy();
+    expect(screen.getByText(/status lokasi dan perangkat/i)).toBeTruthy();
     expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
     expect(await screen.findByText(/08:03 · Manual/i)).toBeTruthy();
   });
@@ -379,7 +379,7 @@ describe("AppPage", () => {
     expect(screen.queryByText(/undefined/i)).toBeNull();
   });
 
-  it("starts selfie capture from the primary employee check-in button and submits after capture", async () => {
+  it("captures face verification and submits only from the confirmation step", async () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
@@ -406,7 +406,7 @@ describe("AppPage", () => {
     });
     apiMocks.fetchAttendanceHistoryByFilter
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: "hist-after-checkin", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Manual" }]);
+      .mockResolvedValueOnce([{ id: "hist-after-checkin", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }]);
     apiMocks.fetchEmployeeSummary.mockResolvedValue({
       totalDays: 22,
       onTimeDays: 20,
@@ -434,8 +434,8 @@ describe("AppPage", () => {
 
     renderRoute("/app/attendance");
 
-    const checkInButton = await screen.findByRole("button", { name: /check-in sekarang/i });
-    fireEvent.click(checkInButton);
+    fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ambil foto wajah/i }));
     expect(apiMocks.checkIn).not.toHaveBeenCalled();
 
     const selfieInput = screen.getByLabelText(/ambil selfie check-in/i);
@@ -445,11 +445,18 @@ describe("AppPage", () => {
       }
     });
 
-    expect(await screen.findByText(/selfie siap|check-in berhasil/i)).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /gunakan foto ini/i })).toBeTruthy();
+    expect(apiMocks.checkIn).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /gunakan foto ini/i }));
+    expect(await screen.findByText(/review detail sebelum submit/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /submit check-in/i }));
+
+    expect((await screen.findAllByText(/check-in berhasil/i)).length).toBeGreaterThan(0);
     expect(apiMocks.checkIn).toHaveBeenCalledWith(
       "demo:employee",
       expect.objectContaining({
-        method: "Manual",
+        method: "Selfie",
         selfieUrl: undefined,
         selfieData: expect.stringMatching(/^data:image\/jpeg;base64,/),
         selfieFileName: "selfie.jpg",
@@ -458,12 +465,12 @@ describe("AppPage", () => {
       })
     );
     await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/08:03 · Manual/i)).toBeTruthy();
+    expect(await screen.findByText(/08:03 · Selfie/i)).toBeTruthy();
 
     createObjectUrl.mockRestore();
   });
 
-  it("lets employee submit check-in without selfie when camera is unavailable", async () => {
+  it("submits QR check-in through the confirmation step without selfie", async () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
@@ -513,8 +520,13 @@ describe("AppPage", () => {
 
     renderRoute("/app/attendance");
 
-    fireEvent.click(await screen.findByRole("button", { name: /check-in sekarang/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /simpan tanpa selfie/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /scan qr/i }));
+    expect(await screen.findByText(/qr berhasil terbaca/i)).toBeTruthy();
+    expect(apiMocks.checkIn).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /konfirmasi check-in/i }));
+    expect(await screen.findByText(/review detail sebelum submit/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /submit check-in/i }));
 
     expect(apiMocks.checkIn).toHaveBeenCalledWith(
       "demo:employee",
@@ -525,7 +537,7 @@ describe("AppPage", () => {
     expect(apiMocks.checkIn).toHaveBeenCalledWith(
       "demo:employee",
       expect.objectContaining({
-        method: "Manual",
+        method: "QR",
         selfieUrl: undefined,
         requiredSelfie: true
       })
@@ -584,13 +596,14 @@ describe("AppPage", () => {
 
     const verifyButton = await screen.findByRole("button", { name: /verifikasi ulang perangkat/i });
     fireEvent.click(verifyButton);
+    await screen.findByText(/perangkat ini tidak mendukung verifikasi lokasi/i);
 
-    const checkInButton = await screen.findByRole("button", { name: /check-in sekarang/i });
-    expect(checkInButton).not.toHaveProperty("disabled", true);
+    const scanButton = await screen.findByRole("button", { name: /scan qr/i });
+    expect(scanButton).not.toHaveProperty("disabled", true);
 
-    fireEvent.click(checkInButton);
+    fireEvent.click(scanButton);
 
-    expect(await screen.findByText(/izinkan lokasi atau verifikasi ulang perangkat/i)).toBeTruthy();
+    expect(await screen.findByText(/verifikasi perangkat atau izinkan lokasi/i)).toBeTruthy();
     expect(apiMocks.checkIn).not.toHaveBeenCalled();
   });
 

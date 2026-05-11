@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  AlertCircle,
   Building2,
   Calendar,
   Camera,
@@ -11,6 +12,7 @@ import {
   FolderKanban,
   LogOut,
   MapPinned,
+  QrCode,
   RefreshCw,
   ScanFace,
   Search,
@@ -92,12 +94,23 @@ import { nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow
 import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
-type EmployeeCheckInFlowState = "idle" | "waiting_for_selfie" | "submitting";
+type EmployeeCheckInMode = "qr" | "face";
+type EmployeeCheckInFlowState = "idle" | "qr_scanned" | "face_captured" | "confirmation" | "submitting" | "success";
 type CapturedSelfie = {
   previewUrl: string;
   dataUrl: string;
   fileName: string;
   contentType: string;
+};
+type PendingCheckIn = {
+  method: "QR" | "Selfie";
+  capturedAt: string;
+  locationName: string;
+  shiftName: string;
+  validationStatus: AttendanceRecord["validationStatus"];
+  validationReasons: string[];
+  scannerToken?: string;
+  selfie?: CapturedSelfie;
 };
 type AttendanceHistorySource = Partial<AttendanceTimelineItem> & {
   date?: string;
@@ -229,6 +242,9 @@ export function AppPage() {
   const [feedback, setFeedback] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [checkInFlowState, setCheckInFlowState] = useState<EmployeeCheckInFlowState>("idle");
+  const [checkInMode, setCheckInMode] = useState<EmployeeCheckInMode>("qr");
+  const [pendingCheckIn, setPendingCheckIn] = useState<PendingCheckIn | null>(null);
+  const [submittedCheckIn, setSubmittedCheckIn] = useState<PendingCheckIn | null>(null);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -601,27 +617,101 @@ export function AppPage() {
     }
   }
 
-  async function submitCheckIn(capturedSelfie?: CapturedSelfie) {
+  function buildPendingCheckIn(method: "QR" | "Selfie", capturedSelfie?: CapturedSelfie): PendingCheckIn | null {
+    if (!employeeSummary) {
+      setActionMessage("Ringkasan shift belum siap. Muat ulang Presensi lalu coba lagi.", "err");
+      return null;
+    }
+
+    if (!attendanceTrust.canClock) {
+      return {
+        method,
+        capturedAt: new Date().toISOString(),
+        locationName: employeeSummary.assignedShift.locationName,
+        shiftName: employeeSummary.assignedShift.name,
+        validationStatus: "blocked",
+        validationReasons: [`${attendanceTrust.title}. Verifikasi perangkat atau izinkan lokasi sebelum submit.`],
+        scannerToken: method === "QR" ? scannerToken : undefined,
+        selfie: capturedSelfie
+      };
+    }
+
+    return {
+      method,
+      capturedAt: new Date().toISOString(),
+      locationName: employeeSummary.assignedShift.locationName,
+      shiftName: employeeSummary.assignedShift.name,
+      validationStatus: capturedSelfie || method === "QR" ? "verified" : "needs_review",
+      validationReasons: capturedSelfie || method === "QR" ? ["Lokasi dan perangkat siap divalidasi."] : ["Foto wajah belum dilampirkan."],
+      scannerToken: method === "QR" ? scannerToken : undefined,
+      selfie: capturedSelfie
+    };
+  }
+
+  function handleQrScan() {
+    const pending = buildPendingCheckIn("QR");
+    if (!pending) {
+      return;
+    }
+    setPendingCheckIn(pending);
+    setSubmittedCheckIn(null);
+    setCheckInFlowState("qr_scanned");
+    setActionMessage("QR terbaca. Cek ringkasan sebelum submit.");
+  }
+
+  function handleOpenFaceCamera() {
+    const input = selfieInputRef.current;
+    if (!input) {
+      setActionMessage("Kamera belum siap. Muat ulang tab Presensi lalu coba lagi.", "err");
+      return;
+    }
+    input.click();
+  }
+
+  function handleUseCapturedFace() {
+    if (!pendingCheckIn) {
+      setActionMessage("Ambil foto wajah terlebih dahulu.", "err");
+      return;
+    }
+    setCheckInFlowState("confirmation");
+  }
+
+  function handleConfirmPendingCheckIn() {
+    if (!pendingCheckIn) {
+      setActionMessage("Belum ada hasil scan atau foto untuk dikonfirmasi.", "err");
+      return;
+    }
+    setCheckInFlowState("confirmation");
+  }
+
+  function handleContinueToFaceVerification() {
+    setCheckInMode("face");
+    setCheckInFlowState("idle");
+    setActionMessage("Lanjutkan dengan foto wajah.");
+  }
+
+  async function submitCheckIn(pending: PendingCheckIn) {
     if (checkInFlowState === "submitting") {
       return;
     }
 
     setCheckInFlowState("submitting");
     setBusyAction("checkin");
-    const selfiePreviewUrl = capturedSelfie?.previewUrl ?? attendanceCapture.selfieUrl;
-    const selfieData = capturedSelfie?.dataUrl ?? attendanceCapture.selfieData;
+    const selfiePreviewUrl = pending.selfie?.previewUrl ?? attendanceCapture.selfieUrl;
+    const selfieData = pending.selfie?.dataUrl ?? attendanceCapture.selfieData;
 
     try {
       const response = await checkIn(currentSession.token, {
-        method: "Manual",
+        method: pending.method,
         locationLat: attendanceCapture.locationLat,
         locationLng: attendanceCapture.locationLng,
         selfieUrl: undefined,
         selfieData,
-        selfieFileName: capturedSelfie?.fileName ?? attendanceCapture.selfieFileName,
-        selfieContentType: capturedSelfie?.contentType ?? attendanceCapture.selfieContentType,
+        selfieFileName: pending.selfie?.fileName ?? attendanceCapture.selfieFileName,
+        selfieContentType: pending.selfie?.contentType ?? attendanceCapture.selfieContentType,
         deviceId: attendanceCapture.deviceId || undefined,
-        requiredSelfie: attendanceCapture.requiredSelfie
+        requiredSelfie: pending.method === "Selfie" ? true : attendanceCapture.requiredSelfie,
+        scannerToken: pending.scannerToken
       });
       const [record] = normalizeAttendanceHistoryItems([response.record]);
       setAttendanceState(response.attendanceState);
@@ -635,6 +725,15 @@ export function AppPage() {
         },
         response.attendanceState
       );
+      const submitted: PendingCheckIn = {
+        ...pending,
+        capturedAt: new Date().toISOString(),
+        validationStatus: response.validationStatus ?? pending.validationStatus,
+        validationReasons: response.validationReasons?.length ? response.validationReasons : pending.validationReasons
+      };
+      setSubmittedCheckIn(submitted);
+      setPendingCheckIn(null);
+      setCheckInFlowState("success");
       if (selfiePreviewUrl) {
         setActionMessage(response.validationStatus === "needs_review" ? "Check-in berhasil. Bukti selfie menunggu review." : "Check-in berhasil.");
       } else {
@@ -643,36 +742,18 @@ export function AppPage() {
       await refreshEmployeeAttendanceHistory();
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Check-in gagal.", "err");
+      setCheckInFlowState("confirmation");
     } finally {
       setBusyAction(null);
-      setCheckInFlowState("idle");
     }
   }
 
   async function handleCheckIn() {
-    if (checkInFlowState === "submitting") {
+    if (!pendingCheckIn) {
+      setActionMessage("Konfirmasi check-in belum lengkap.", "err");
       return;
     }
-
-    if (!attendanceTrust.canClock) {
-      setActionMessage(`${attendanceTrust.title}. Izinkan lokasi atau verifikasi ulang perangkat sebelum check-in.`, "err");
-      return;
-    }
-
-    if (attendanceCapture.requiredSelfie && !attendanceCapture.selfieUrl) {
-      setCheckInFlowState("waiting_for_selfie");
-      const input = selfieInputRef.current;
-      if (!input) {
-        setCheckInFlowState("idle");
-        setActionMessage("Kamera belum siap. Muat ulang tab Presensi lalu coba lagi.", "err");
-        return;
-      }
-      input.click();
-      setActionMessage("Kamera terbuka. Ambil selfie untuk menyelesaikan check-in.");
-      return;
-    }
-
-    await submitCheckIn();
+    await submitCheckIn(pendingCheckIn);
   }
 
   async function handleCheckOut() {
@@ -732,11 +813,14 @@ export function AppPage() {
         selfieFileName: file.name,
         selfieContentType: file.type || "image/jpeg"
       }));
-      if (checkInFlowState === "waiting_for_selfie") {
-        void submitCheckIn(capturedSelfie);
+      const pending = buildPendingCheckIn("Selfie", capturedSelfie);
+      if (!pending) {
         return;
       }
-      setActionMessage("Selfie siap untuk check-in ini.");
+      setPendingCheckIn(pending);
+      setSubmittedCheckIn(null);
+      setCheckInFlowState("face_captured");
+      setActionMessage("Foto wajah siap. Gunakan foto ini untuk lanjut.");
     } catch (error) {
       setCheckInFlowState("idle");
       setActionMessage(error instanceof Error ? error.message : "Selfie belum bisa diproses.", "err");
@@ -1174,87 +1258,230 @@ export function AppPage() {
       return <LoadingState label="Memuat status absensi hari ini" />;
     }
 
-    const validationTone =
+    const recordValidationTone =
       employeeSummary.todayRecord.validationStatus === "verified"
         ? "success"
         : employeeSummary.todayRecord.validationStatus === "needs_review"
           ? "warning"
           : "danger";
+    const activeCheckIn = submittedCheckIn ?? pendingCheckIn;
+    const activeValidationTone =
+      activeCheckIn?.validationStatus === "verified"
+        ? "success"
+        : activeCheckIn?.validationStatus === "needs_review"
+        ? "warning"
+          : activeCheckIn?.validationStatus === "blocked" || activeCheckIn?.validationStatus === "rejected"
+            ? "danger"
+            : "info";
+    const checkInTimeLabel = activeCheckIn
+      ? new Date(activeCheckIn.capturedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+      : now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    const isSubmitBlocked = activeCheckIn?.validationStatus === "blocked" || busyAction === "checkin";
 
     return (
       <>
-        <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <Panel eyebrow="Absensi karyawan" title="Check-in sederhana, validasi tetap berjalan">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-              <div>
-                <p className="text-sm font-bold text-[#596172]">
-                  {now.toLocaleDateString("id-ID", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric"
-                  })}
-                </p>
-                <p className="mt-2 break-words text-3xl font-black tracking-[-0.02em] text-[#111827] sm:text-4xl sm:tracking-[-0.04em]">{now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <StatusBadge tone="info">{employeeSummary.assignedShift.name}</StatusBadge>
-                  <StatusBadge tone={attendanceState === "checked_out" ? "success" : attendanceState === "checked_in" ? "info" : "neutral"}>
-                    {attendanceState === "checked_out" ? "Sudah check-out" : attendanceState === "checked_in" ? "Sudah check-in" : "Belum check-in"}
-                  </StatusBadge>
+            <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[#596172]">Halo, {currentSession.user.fullName}</p>
+                  <p className="mt-2 break-words text-3xl font-black tracking-[-0.02em] text-[#111827] sm:text-4xl sm:tracking-[-0.03em]">
+                    {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-[#596172]">
+                    {now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                  </p>
                 </div>
-                <p className="mt-4 text-sm leading-7 text-[#596172]">
-                  Shift {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}. Tekan check-in; kamera akan terbuka untuk selfie, lalu lokasi dan sinyal perangkat ikut divalidasi otomatis.
-                </p>
-                <input
-                  ref={selfieInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  onChange={handleSelfieUpload}
-                  className="sr-only"
-                  aria-label="Ambil selfie check-in"
-                />
-                <div className="mt-5 grid gap-3" aria-live="polite">
-                  {attendanceCapture.selfieUrl ? (
-                    <div className="flex min-w-0 items-center gap-3 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3">
-                      <img src={attendanceCapture.selfieUrl} alt="Preview selfie attendance" className="h-16 w-16 rounded-2xl object-cover" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-[#111827]">Selfie siap</p>
-                        <p className="mt-1 text-xs font-semibold text-[#667085]">Bukti selfie akan ikut dipakai untuk validasi check-in ini.</p>
-                      </div>
-                    </div>
-                  ) : null}
+                <div className="rounded-[20px] border border-[#dfe6f2] bg-white px-4 py-3">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">Shift hari ini</p>
+                  <p className="mt-2 text-sm font-black text-[#111827]">{employeeSummary.assignedShift.name}</p>
+                  <p className="mt-1 text-xs font-semibold text-[#667085]">
+                    {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}
+                  </p>
                 </div>
               </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <StatusBadge tone={attendanceTrust.canClock ? "success" : "warning"}>{attendanceTrust.canClock ? "Lokasi valid" : "Lokasi perlu cek"}</StatusBadge>
+                <StatusBadge tone="info">Scanner siap</StatusBadge>
+                <StatusBadge tone="info">Kamera siap</StatusBadge>
+              </div>
+            </div>
 
-              <div className="grid gap-3 [&>button]:w-full">
-                <PrimaryButton
-                  disabled={attendanceState !== "idle" || busyAction === "checkin" || checkInFlowState === "submitting"}
-                  onClick={handleCheckIn}
-                >
-                  <Clock3 className="mr-2 h-4 w-4" />
-                  {busyAction === "checkin" ? "Menyimpan..." : checkInFlowState === "waiting_for_selfie" ? "Menunggu selfie..." : "Check-in sekarang"}
-                </PrimaryButton>
-                <SecondaryButton
-                  disabled={attendanceState !== "checked_in" || busyAction === "checkout" || !attendanceTrust.canClock}
-                  onClick={handleCheckOut}
-                >
+            <input
+              ref={selfieInputRef}
+              type="file"
+              accept="image/*"
+              capture="user"
+              onChange={handleSelfieUpload}
+              className="sr-only"
+              aria-label="Ambil selfie check-in"
+            />
+
+            {attendanceState === "idle" && checkInFlowState !== "success" ? (
+              <div className="mt-5">
+                <div className="grid grid-cols-2 rounded-[18px] border border-[#dfe6f2] bg-[#eef4ff] p-1">
+                  {[
+                    { key: "qr" as const, label: "QR Check-in", icon: QrCode },
+                    { key: "face" as const, label: "Face Verification", icon: ScanFace }
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      aria-pressed={checkInMode === item.key}
+                      onClick={() => {
+                        setCheckInMode(item.key);
+                        setCheckInFlowState("idle");
+                      }}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] px-3 py-2 text-sm font-black transition ${
+                        checkInMode === item.key ? "bg-white text-[#111827] shadow-sm" : "text-[#596172] hover:text-[#111827]"
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {checkInMode === "qr" ? (
+                  <div className="mt-5">
+                    <p className="text-2xl font-black text-[#111827]">Check-in dengan QR</p>
+                    <p className="mt-2 text-sm leading-6 text-[#596172]">Arahkan kamera ke QR scanner untuk memulai absensi.</p>
+                    <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
+                      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
+                        <div className="absolute inset-5 rounded-[20px] border-2 border-dashed border-[#8bb8ff]/60" />
+                        <div className="absolute left-8 top-8 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-[#8bb8ff]" />
+                        <div className="absolute right-8 top-8 h-10 w-10 rounded-tr-2xl border-r-4 border-t-4 border-[#8bb8ff]" />
+                        <div className="absolute bottom-8 left-8 h-10 w-10 rounded-bl-2xl border-b-4 border-l-4 border-[#8bb8ff]" />
+                        <div className="absolute bottom-8 right-8 h-10 w-10 rounded-br-2xl border-b-4 border-r-4 border-[#8bb8ff]" />
+                        <QrCode className="h-16 w-16 text-[#8bb8ff]" />
+                        <span className="absolute bottom-5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">Scanner siap</span>
+                      </div>
+                    </div>
+                    {checkInFlowState === "qr_scanned" && pendingCheckIn ? (
+                      <div className="mt-4 rounded-[24px] border border-[#d6def0] bg-white p-4">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#1769ff]" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-[#111827]">QR berhasil terbaca</p>
+                            <p className="mt-1 text-sm leading-6 text-[#596172]">Cek ringkasan singkat, lalu lanjut ke konfirmasi atau verifikasi wajah.</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-2 text-sm font-semibold text-[#596172] sm:grid-cols-3">
+                          <p>Lokasi: {pendingCheckIn.locationName}</p>
+                          <p>Shift: {pendingCheckIn.shiftName}</p>
+                          <p>Waktu: {checkInTimeLabel}</p>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <SecondaryButton onClick={handleContinueToFaceVerification}>
+                            <ScanFace className="mr-2 h-4 w-4" />
+                            Lanjut verifikasi wajah
+                          </SecondaryButton>
+                          <PrimaryButton onClick={handleConfirmPendingCheckIn}>
+                            Konfirmasi check-in
+                          </PrimaryButton>
+                        </div>
+                      </div>
+                    ) : (
+                      <PrimaryButton className="mt-4 w-full" onClick={handleQrScan}>
+                        <QrCode className="mr-2 h-4 w-4" />
+                        Scan QR
+                      </PrimaryButton>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-5">
+                    <p className="text-2xl font-black text-[#111827]">Verifikasi wajah</p>
+                    <p className="mt-2 text-sm leading-6 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
+                    <div className="mt-4 rounded-[28px] border border-[#d6def0] bg-white p-3 shadow-[0_18px_44px_rgba(20,24,31,0.08)]">
+                      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] bg-[#eef4ff]">
+                        {pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl ? (
+                          <img src={pendingCheckIn?.selfie?.previewUrl ?? attendanceCapture.selfieUrl} alt="Preview verifikasi wajah" className="absolute inset-0 h-full w-full object-cover" />
+                        ) : null}
+                        <div className="absolute h-[70%] w-[54%] rounded-[50%] border-2 border-dashed border-[#1769ff] bg-white/10" />
+                        <ScanFace className="relative h-16 w-16 text-[#1769ff]" />
+                        <div className="absolute bottom-4 flex flex-wrap justify-center gap-2 px-4">
+                          <StatusBadge tone="info">Kamera siap</StatusBadge>
+                          <StatusBadge tone={checkInFlowState === "face_captured" ? "success" : "neutral"}>Wajah terdeteksi</StatusBadge>
+                          <StatusBadge tone="success">Pencahayaan cukup</StatusBadge>
+                        </div>
+                      </div>
+                    </div>
+                    {checkInFlowState === "face_captured" && pendingCheckIn ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <SecondaryButton onClick={handleOpenFaceCamera}>
+                          <Camera className="mr-2 h-4 w-4" />
+                          Ambil ulang
+                        </SecondaryButton>
+                        <PrimaryButton onClick={handleUseCapturedFace}>
+                          Gunakan foto ini
+                        </PrimaryButton>
+                      </div>
+                    ) : (
+                      <PrimaryButton className="mt-4 w-full" onClick={handleOpenFaceCamera}>
+                        <Camera className="mr-2 h-4 w-4" />
+                        Ambil foto wajah
+                      </PrimaryButton>
+                    )}
+                  </div>
+                )}
+
+                {checkInFlowState === "confirmation" && pendingCheckIn ? (
+                  <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-white p-4 sm:p-5" aria-live="polite">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">Konfirmasi check-in</p>
+                        <p className="mt-2 text-xl font-black text-[#111827]">Review detail sebelum submit</p>
+                      </div>
+                      <StatusBadge tone={activeValidationTone}>
+                        {pendingCheckIn.validationStatus === "verified" ? "Validasi siap" : pendingCheckIn.validationStatus === "blocked" || pendingCheckIn.validationStatus === "rejected" ? "Blocked" : "Need review"}
+                      </StatusBadge>
+                    </div>
+                    <div className="mt-4 grid gap-3 rounded-[22px] bg-[#f9fafc] p-4 text-sm font-semibold text-[#596172] sm:grid-cols-2">
+                      <p>Karyawan: <span className="font-black text-[#111827]">{currentSession.user.fullName}</span></p>
+                      <p>Shift: <span className="font-black text-[#111827]">{pendingCheckIn.shiftName}</span></p>
+                      <p>Lokasi: <span className="font-black text-[#111827]">{pendingCheckIn.locationName}</span></p>
+                      <p>Waktu: <span className="font-black text-[#111827]">{checkInTimeLabel}</span></p>
+                      <p>Metode: <span className="font-black text-[#111827]">{pendingCheckIn.method === "QR" ? "QR Check-in" : "Face Verification"}</span></p>
+                      <p>Hasil: <span className="font-black text-[#111827]">{pendingCheckIn.validationReasons.join(" · ")}</span></p>
+                    </div>
+                    {pendingCheckIn.validationStatus === "blocked" ? (
+                      <p role="alert" className="mt-4 rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">
+                        {pendingCheckIn.validationReasons.join(" ")}
+                      </p>
+                    ) : null}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[0.7fr_1fr]">
+                      <SecondaryButton onClick={() => setCheckInFlowState(pendingCheckIn.method === "QR" ? "qr_scanned" : "face_captured")}>
+                        Kembali
+                      </SecondaryButton>
+                      <PrimaryButton disabled={isSubmitBlocked} onClick={handleCheckIn}>
+                        {busyAction === "checkin" ? "Menyimpan..." : "Submit Check-in"}
+                      </PrimaryButton>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-[#f9fafc] p-5">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
+                  <div className="min-w-0">
+                    <p className="text-2xl font-black text-[#111827]">Check-in berhasil</p>
+                    <p className="mt-2 text-sm leading-6 text-[#596172]">
+                      Waktu tercatat {employeeSummary.todayRecord.checkInTime ? new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : checkInTimeLabel} di {activeCheckIn?.locationName ?? employeeSummary.assignedShift.locationName}.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <SecondaryButton onClick={() => navigate("/app/history")}>Lihat riwayat</SecondaryButton>
+                  <PrimaryButton onClick={() => navigate("/app/home")}>Kembali ke dashboard</PrimaryButton>
+                </div>
+                <SecondaryButton className="mt-3 w-full" disabled={attendanceState !== "checked_in" || busyAction === "checkout" || !attendanceTrust.canClock} onClick={handleCheckOut}>
                   <Clock3 className="mr-2 h-4 w-4" />
                   {busyAction === "checkout" ? "Menyimpan..." : "Check-out sekarang"}
                 </SecondaryButton>
-                {checkInFlowState === "waiting_for_selfie" ? (
-                  <SecondaryButton disabled={busyAction === "checkin"} onClick={() => void submitCheckIn()}>
-                    <Camera className="mr-2 h-4 w-4" />
-                    Simpan tanpa selfie
-                  </SecondaryButton>
-                ) : null}
-                {!attendanceTrust.canClock ? (
-                  <p role="alert" className="rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">
-                    {attendanceTrust.title}. Verifikasi perangkat atau izinkan lokasi sebelum absen.
-                  </p>
-                ) : null}
               </div>
-            </div>
+            )}
           </Panel>
 
           <Panel eyebrow="Validation" title="Status lokasi dan perangkat">
@@ -1262,7 +1489,7 @@ export function AppPage() {
               <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[#111827]">Current attendance status</p>
+                    <p className="text-sm font-black text-[#111827]">Status absensi hari ini</p>
                     <p className="mt-2 text-sm leading-6 text-[#667085]">
                       {employeeSummary.todayRecord.checkInTime
                         ? `Check-in tersimpan pada ${new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
@@ -1272,7 +1499,7 @@ export function AppPage() {
                       <p className="mt-2 text-xs font-semibold text-[#8a5c00]">{employeeSummary.todayRecord.validationReasons.join(" · ")}</p>
                     ) : null}
                   </div>
-                  <StatusBadge tone={validationTone}>
+                  <StatusBadge tone={recordValidationTone}>
                     {employeeSummary.todayRecord.validationStatus === "needs_review"
                       ? "Need Review"
                       : employeeSummary.todayRecord.validationStatus === "blocked"
@@ -1286,13 +1513,12 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-1 h-5 w-5 text-[#1769ff]" />
                   <div>
-                    <p className="text-sm font-black text-[#111827]">Validasi lokasi dan perangkat</p>
+                    <p className="text-sm font-black text-[#111827]">Yang dicek sistem</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">{attendanceTrust.detail}</p>
                     <div className="mt-4 grid gap-2 text-xs font-semibold text-[#667085]">
                       <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} meter</p>
                       <p>Jarak saat ini: {attendanceTrustSignal.distanceFromOfficeMeters ?? "Belum dicek"} meter</p>
                       <p>Device ID: {attendanceCapture.deviceId || "Belum dibuat"}</p>
-                      <p>Fake GPS: {attendanceTrustSignal.mockLocationDetected ? "Terdeteksi" : "Tidak terdeteksi"}</p>
                     </div>
                   </div>
                 </div>
@@ -1302,17 +1528,27 @@ export function AppPage() {
                 </SecondaryButton>
               </div>
 
-              <div className="rounded-[24px] border border-dashed border-[#d8dde7] bg-white p-4">
-                <div className="flex items-start gap-3">
-                  <Camera className="mt-1 h-5 w-5 text-[#1769ff]" />
-                  <div>
-                    <p className="text-sm font-black text-[#111827]">Selfie menyatu dengan check-in</p>
-                    <p className="mt-2 text-sm leading-6 text-[#596172]">
-                      Tidak ada aksi scan terpisah untuk karyawan. Jika selfie dibutuhkan, bukti ini dikirim bersama check-in dan status validasi tetap bisa verified, need review, blocked, atau rejected.
-                    </p>
+              {checkInFlowState === "submitting" ? (
+                <div className="rounded-[24px] border border-[#d6def0] bg-white p-4" role="status">
+                  <div className="flex items-start gap-3">
+                    <RefreshCw className="mt-1 h-5 w-5 animate-spin text-[#1769ff]" />
+                    <div>
+                      <p className="text-sm font-black text-[#111827]">Mengirim check-in</p>
+                      <p className="mt-2 text-sm leading-6 text-[#596172]">Taptu sedang menyimpan waktu, lokasi, metode, dan hasil validasi.</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : !attendanceTrust.canClock ? (
+                <div className="rounded-[24px] border border-[#fed7aa] bg-[#fff7ed] p-4" role="alert">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-1 h-5 w-5 text-[#9a3412]" />
+                    <div>
+                      <p className="text-sm font-black text-[#9a3412]">{attendanceTrust.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-[#9a3412]">Verifikasi perangkat atau izinkan lokasi sebelum submit check-in.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Panel>
         </section>
