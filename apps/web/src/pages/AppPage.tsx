@@ -755,6 +755,11 @@ export function AppPage() {
     setActionMessage("Lanjutkan dengan foto wajah.");
   }
 
+  // CODEX: face check-in issues to investigate on backend side:
+  // 1. POST /attendance/checkin with method:"Selfie" — verify selfie_url / selfie_data is saved to DB (not silently dropped)
+  // 2. Confirm selfie_url column is nullable in attendance_records; if NOT NULL, selfie-less check-ins will silently fail
+  // 3. After successful Selfie check-in, confirm attendanceState returns "checked_in" so frontend shows success and refreshes history
+  // 4. Verify fetchAttendanceHistoryByFilter re-fetches from DB after check-in and includes today's record
   async function submitCheckIn(pending: PendingCheckIn) {
     if (checkInFlowState === "submitting") {
       return;
@@ -1483,8 +1488,7 @@ export function AppPage() {
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <StatusBadge tone={attendanceTrust.canClock ? "success" : "warning"}>{attendanceTrust.canClock ? "Lokasi valid" : "Lokasi perlu cek"}</StatusBadge>
-                <StatusBadge tone="info">Scanner siap</StatusBadge>
-                <StatusBadge tone="info">Kamera siap</StatusBadge>
+                <StatusBadge tone="info">{checkInMode === "qr" ? "Scanner siap" : "Kamera siap"}</StatusBadge>
               </div>
             </div>
 
@@ -1525,7 +1529,7 @@ export function AppPage() {
 
                 {checkInMode === "qr" ? (
                   <div className="mt-5">
-                    <p className="text-lg font-bold text-[#111827]">Check-in dengan QR</p>
+                    <p className="text-[17px] font-bold text-[#111827]">Check-in dengan QR</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">Arahkan kamera ke QR scanner untuk memulai absensi.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
@@ -1571,19 +1575,22 @@ export function AppPage() {
                   </div>
                 ) : (
                   <div className="mt-5">
-                    <p className="text-lg font-bold text-[#111827]">Verifikasi wajah</p>
+                    <p className="text-[17px] font-bold text-[#111827]">Verifikasi wajah</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
-                    <div className="mt-4 rounded-[28px] border border-[#d6def0] bg-white p-3 shadow-[0_18px_44px_rgba(20,24,31,0.08)]">
-                      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] bg-[#eef4ff]">
+                    <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
+                      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
                         {pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl ? (
                           <img src={pendingCheckIn?.selfie?.previewUrl ?? attendanceCapture.selfieUrl} alt="Preview verifikasi wajah" className="absolute inset-0 h-full w-full object-cover" />
                         ) : null}
-                        <div className="absolute h-[70%] w-[54%] rounded-[50%] border-2 border-dashed border-[#1769ff] bg-white/10" />
-                        <ScanFace className="relative h-16 w-16 text-[#1769ff]" />
+                        <div className="absolute h-[70%] w-[54%] rounded-[50%] border-2 border-dashed border-[#8bb8ff]/60 bg-white/5" />
+                        <ScanFace className="relative h-16 w-16 text-[#8bb8ff]" />
                         <div className="absolute bottom-4 flex flex-wrap justify-center gap-2 px-4">
                           <StatusBadge tone="info">Kamera siap</StatusBadge>
-                          <StatusBadge tone={checkInFlowState === "face_captured" ? "success" : "neutral"}>Wajah terdeteksi</StatusBadge>
-                          <StatusBadge tone="success">Pencahayaan cukup</StatusBadge>
+                          {checkInFlowState === "face_captured" ? (
+                            <StatusBadge tone="success">Selfie siap</StatusBadge>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-white/60">Belum diambil</span>
+                          )}
                         </div>
                       </div>
                     </div>

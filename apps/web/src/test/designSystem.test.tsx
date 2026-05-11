@@ -187,6 +187,61 @@ describe("post-login design system", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
   });
 
+  it("CategorySelect stays open when scroll event fires inside the listbox", () => {
+    const groups = [
+      { label: "Utama", options: Array.from({ length: 12 }, (_, i) => ({ id: `opt-${i}`, label: `Option ${i}` })) }
+    ];
+    render(<CategorySelect label="Kategori" value="Option 0" onChange={vi.fn()} groups={groups} />);
+    fireEvent.click(screen.getByRole("combobox"));
+    const listbox = screen.getByRole("listbox");
+    expect(listbox).toBeTruthy();
+    fireEvent.scroll(listbox);
+    expect(screen.getByRole("listbox")).toBeTruthy();
+  });
+
+  it("AppShell hides the burger button when bottom nav is active (employee with schedule/payslip)", () => {
+    const { CalendarDays, Clock3, History, Home, TimerReset, UserRound, WalletCards } = require("lucide-react");
+    const employeeNav = [
+      { key: "home", label: "Beranda", icon: Home, path: "/app" },
+      { key: "attendance", label: "Presensi", icon: Clock3, path: "/app/attendance" },
+      { key: "history", label: "Riwayat", icon: History, path: "/app/history" },
+      { key: "requests", label: "Pengajuan", icon: TimerReset, path: "/app/requests" },
+      { key: "schedule", label: "Jadwal", icon: CalendarDays, path: "/app/schedule" },
+      { key: "payslip", label: "Slip Gaji", icon: WalletCards, path: "/app/payslip" },
+      { key: "profile", label: "Profil", icon: UserRound, path: "/app/profile" }
+    ];
+    render(
+      <AppShell
+        user={{ fullName: "Fikri Maulana", organizationName: "TAPTU HQ", roleLabel: "Employee" }}
+        activeKey="home"
+        navigation={employeeNav}
+        onNavigate={vi.fn()}
+      >
+        <div>content</div>
+      </AppShell>
+    );
+    expect(screen.getByRole("navigation", { name: /navigasi utama mobile/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /buka navigasi/i })).toBeNull();
+  });
+
+  it("AppShell shows burger button when bottom nav is not active (admin role)", () => {
+    render(
+      <AppShell
+        user={{ fullName: "Nadia Putri", organizationName: "TAPTU HQ", roleLabel: "Admin HR" }}
+        activeKey="home"
+        navigation={[
+          { key: "home", label: "Beranda", icon: Home, path: "/app" },
+          { key: "team", label: "Tim", icon: Users, path: "/app/team" }
+        ]}
+        onNavigate={vi.fn()}
+      >
+        <div>content</div>
+      </AppShell>
+    );
+    expect(screen.getByRole("button", { name: /buka navigasi/i })).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: /navigasi utama mobile/i })).toBeNull();
+  });
+
   it("does not keep old dashboard theme traces in active post-login source", () => {
     const files = [
       "apps/web/src/pages/AppPage.tsx",

@@ -120,9 +120,9 @@ const STATS: Record<UserRole, DashboardStat[]> = {
     { label: "Open approvals", value: "3", detail: "Izin tim menunggu review" }
   ],
   employee: [
-    { label: "Status hari ini", value: "Sudah check-in", detail: "Masuk 08.03 WIB dari lokasi utama" },
+    { label: "Status hari ini", value: "Belum check-in", detail: "Mulai check-in dari tab Presensi" },
     { label: "Shift aktif", value: "08.00 - 17.00", detail: "Kantor pusat · Shift Pagi" },
-    { label: "Riwayat minggu ini", value: "4 hadir", detail: "1 pengajuan izin masih diproses" }
+    { label: "Riwayat minggu ini", value: "0 hadir", detail: "Belum ada record absensi minggu ini" }
   ],
   scanner: [
     { label: "Token aktif", value: "00:27", detail: "QR akan refresh otomatis" },
@@ -147,11 +147,7 @@ const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
     { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08:24", method: "GPS" },
     { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07:58", method: "Selfie" }
   ],
-  employee: [
-    { id: "a-01", day: "Kemarin", status: "Tepat waktu", time: "07:55", method: "Selfie" },
-    { id: "a-02", day: "Selasa", status: "Tepat waktu", time: "08:02", method: "Manual" },
-    { id: "a-03", day: "Senin", status: "Izin", time: "08:00", method: "Manual" }
-  ],
+  employee: [],
   scanner: [
     { id: "a-01", day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },
     { id: "a-02", day: "08.07", status: "Tepat waktu", time: "Ilham Fadli", method: "QR" },
@@ -171,10 +167,7 @@ const REQUESTS: Record<UserRole, LeaveRequestItem[]> = {
   manager: [
     { id: "req-01", title: "Izin tim lapangan", status: "Menunggu", detail: "Butuh keputusan supervisor sebelum jam 12.00." }
   ],
-  employee: [
-    { id: "req-01", title: "Izin pribadi", status: "Menunggu", detail: "Dokumen pendukung sedang direview admin." },
-    { id: "req-02", title: "Cuti tahunan", status: "Disetujui", detail: "2 hari kerja disetujui untuk minggu depan." }
-  ],
+  employee: [],
   scanner: [
     { id: "req-01", title: "Token gate timur", status: "Disetujui", detail: "QR aktif dan sinkron sampai 30 detik ke depan." }
   ]
@@ -244,10 +237,10 @@ export function getDemoAdminOverview(): AdminOverview {
 
 export function getDemoEmployeeSummary(): EmployeeSummary {
   return {
-    totalDays: 22,
-    onTimeDays: 20,
-    lateDays: 2,
-    pendingRequests: 1,
+    totalDays: 0,
+    onTimeDays: 0,
+    lateDays: 0,
+    pendingRequests: 0,
     currentAttendanceState: "idle",
     assignedShift: SHIFT,
     todayRecord: TODAY_RECORD

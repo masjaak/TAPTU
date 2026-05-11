@@ -69,14 +69,16 @@ export function AppShell({
               <p className="truncate text-xs font-medium text-[#596172]">{activeItem?.label ?? "Workspace"}</p>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="Buka navigasi"
-            onClick={() => setDrawerOpen(true)}
-            className="grid h-9 w-9 place-items-center rounded-xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
+          {mobileNavigation.length === 0 ? (
+            <button
+              type="button"
+              aria-label="Buka navigasi"
+              onClick={() => setDrawerOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          ) : null}
         </header>
 
         <aside data-testid="desktop-app-sidebar" className="hidden flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] lg:flex">
@@ -194,8 +196,8 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow: s
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p>
-          <h1 className="mt-2 break-words text-xl font-bold leading-tight tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-3xl sm:tracking-[-0.03em]">{title}</h1>
-          {description ? <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[#596172] sm:mt-3 sm:leading-7">{description}</p> : null}
+          <h1 className="mt-2 break-words text-xl font-bold leading-tight tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-[28px] sm:tracking-[-0.03em] lg:text-[26px]">{title}</h1>
+          {description ? <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[#596172] sm:mt-3 sm:text-[14px] sm:leading-7">{description}</p> : null}
         </div>
         {action}
       </div>
@@ -207,7 +209,7 @@ export function Panel({ eyebrow, title, children, className }: { eyebrow?: strin
   return (
     <section className={clsx("min-w-0 rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[30px] sm:p-6", className)}>
       {eyebrow ? <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p> : null}
-      {title ? <h2 className="mt-2 break-words text-lg font-bold tracking-[-0.01em] text-[#101217] sm:mt-2.5 sm:text-xl">{title}</h2> : null}
+      {title ? <h2 className="mt-2 break-words text-[17px] font-bold tracking-[-0.01em] text-[#101217] sm:mt-2.5 sm:text-[19px]">{title}</h2> : null}
       <div className={title || eyebrow ? "mt-4 min-w-0 sm:mt-5" : "min-w-0"}>{children}</div>
     </section>
   );
@@ -217,7 +219,7 @@ export function StatCard({ label, value, detail }: { label: string; value: strin
   return (
     <article className="min-w-0 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:rounded-[26px] sm:p-5">
       <p className="break-words text-xs font-semibold uppercase tracking-[0.08em] text-[#596172]">{label}</p>
-      <p className="mt-3 break-words text-2xl font-black tracking-[-0.02em] text-[#111827] sm:mt-3">{value}</p>
+      <p className="mt-3 break-words text-2xl font-black tracking-[-0.02em] text-[#111827] sm:mt-3 lg:text-[22px]">{value}</p>
       {detail ? <p className="mt-1.5 break-words text-xs leading-5 text-[#667085]">{detail}</p> : null}
     </article>
   );
@@ -379,7 +381,8 @@ export function CategorySelect({
       close();
     }
 
-    function handleScroll() {
+    function handleScroll(e: Event) {
+      if (listRef.current?.contains(e.target as Node)) return;
       close();
     }
 
