@@ -1,6 +1,6 @@
 import type { SupabaseAdmin } from "./supabase";
 import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord } from "./domain";
-import type { AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AuthUser, UserRole } from "@taptu/shared";
+import type { AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, UserRole } from "@taptu/shared";
 import { createInitialStore } from "./domain";
 
 /**
@@ -16,6 +16,14 @@ const DEFAULT_LOCATION = {
   longitude: 106.8456,
   radiusMeters: 150
 };
+
+function isUuid(value: string | undefined | null): value is string {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+}
+
+function toNullableUuid(value: string | undefined | null) {
+  return isUuid(value) ? value : null;
+}
 
 // ─── Auth ───────────────────────────────────────────────────
 
@@ -200,7 +208,60 @@ export async function supabaseGetTodayAttendance(
   };
 }
 
-export async function supabaseUpsertAttendance(
+function toAttendanceRecordFromRow(row: Record<string, any>, userId: string): AttendanceRecord {
+  const today = new Date().toISOString().slice(0, 10);
+
+  return {
+    id: row.id,
+    userId: row.employee_id ?? userId,
+    shiftId: row.shift_id ?? "shift-pagi",
+    shiftName: "Shift Pagi",
+    shiftStartTime: "08:00",
+    shiftEndTime: "17:00",
+    locationId: row.location_id ?? DEFAULT_LOCATION.id,
+    locationName: DEFAULT_LOCATION.name,
+    state: row.state,
+    status: row.status ?? (row.state === "checked_out" ? "Selesai" : row.state === "idle" ? "Belum check-in" : "Tepat waktu"),
+    checkInAt: row.check_in_time ?? undefined,
+    checkInMethod: row.check_in_method ?? undefined,
+    checkOutAt: row.check_out_time ?? undefined,
+    checkOutMethod: row.check_out_method ?? undefined,
+    locationLat: row.location_lat ?? undefined,
+    locationLng: row.location_lng ?? undefined,
+    validationStatus: row.validation_status ?? "verified",
+    validationReasons: row.validation_reasons ?? [],
+    selfieUrl: row.selfie_url ?? undefined,
+    deviceId: row.device_id ?? undefined,
+    scannerTokenId: row.scanner_token_id ?? undefined,
+    createdAt: row.created_at ?? `${today}T00:00:00.000Z`,
+    updatedAt: row.updated_at ?? `${today}T00:00:00.000Z`
+  };
+}
+
+function toAttendanceRecordPayload(userId: string, record: AttendanceRecord, attendanceDate = new Date().toISOString().slice(0, 10)) {
+  return {
+    employee_id: userId,
+    attendance_date: attendanceDate,
+    shift_id: record.shiftId,
+    status: record.status,
+    state: record.state,
+    location_id: toNullableUuid(record.locationId),
+    check_in_time: record.checkInAt ?? null,
+    check_in_method: record.checkInMethod ?? null,
+    check_out_time: record.checkOutAt ?? null,
+    check_out_method: record.checkOutMethod ?? null,
+    location_lat: record.locationLat ?? null,
+    location_lng: record.locationLng ?? null,
+    validation_status: record.validationStatus,
+    validation_reasons: record.validationReasons,
+    selfie_url: record.selfieUrl || null,
+    device_id: record.deviceId ?? null,
+    scanner_token_id: toNullableUuid(record.scannerTokenId),
+    updated_at: new Date().toISOString()
+  };
+}
+
+export async function supabaseCreateCheckInRecord(
   sb: SupabaseAdmin,
   userId: string,
   record: AttendanceRecord
@@ -208,61 +269,46 @@ export async function supabaseUpsertAttendance(
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await sb
     .from("attendance_records")
-    .upsert(
-      {
-        employee_id: userId,
-        attendance_date: today,
-        shift_id: record.shiftId,
-        status: record.status,
-        state: record.state,
-        location_id: record.locationId ?? null,
-        check_in_time: record.checkInAt ?? null,
-        check_in_method: record.checkInMethod ?? null,
-        check_out_time: record.checkOutAt ?? null,
-        check_out_method: record.checkOutMethod ?? null,
-        location_lat: record.locationLat ?? null,
-        location_lng: record.locationLng ?? null,
-        validation_status: record.validationStatus,
-        validation_reasons: record.validationReasons,
-        selfie_url: record.selfieUrl ?? null,
-        device_id: record.deviceId ?? null,
-        scanner_token_id: record.scannerTokenId ?? null,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "employee_id,attendance_date" }
-    )
+    .insert(toAttendanceRecordPayload(userId, record, today))
     .select("*")
     .single();
 
   if (error || !data) {
-    throw new Error(`Failed to upsert attendance: ${error?.message ?? "Unknown error"}`);
+    throw new Error(`Failed to create check-in attendance: ${error?.message ?? "Unknown error"}`);
   }
 
-  return {
-    id: data.id,
-    userId: data.employee_id,
-    shiftId: data.shift_id ?? "shift-pagi",
-    shiftName: "Shift Pagi",
-    shiftStartTime: "08:00",
-    shiftEndTime: "17:00",
-    locationId: data.location_id ?? DEFAULT_LOCATION.id,
-    locationName: DEFAULT_LOCATION.name,
-    state: data.state,
-    status: data.status ?? (data.state === "checked_out" ? "Selesai" : data.state === "idle" ? "Belum check-in" : "Tepat waktu"),
-    checkInAt: data.check_in_time ?? undefined,
-    checkInMethod: data.check_in_method ?? undefined,
-    checkOutAt: data.check_out_time ?? undefined,
-    checkOutMethod: data.check_out_method ?? undefined,
-    locationLat: data.location_lat ?? undefined,
-    locationLng: data.location_lng ?? undefined,
-    validationStatus: data.validation_status ?? "verified",
-    validationReasons: data.validation_reasons ?? [],
-    selfieUrl: data.selfie_url ?? undefined,
-    deviceId: data.device_id ?? undefined,
-    scannerTokenId: data.scanner_token_id ?? undefined,
-    createdAt: data.created_at ?? `${today}T00:00:00.000Z`,
-    updatedAt: data.updated_at ?? `${today}T00:00:00.000Z`
-  };
+  return toAttendanceRecordFromRow(data, userId);
+}
+
+export async function supabaseUpdateCheckOutRecord(
+  sb: SupabaseAdmin,
+  recordId: string,
+  record: AttendanceRecord
+): Promise<AttendanceRecord> {
+  const { data, error } = await sb
+    .from("attendance_records")
+    .update(toAttendanceRecordPayload(record.userId, record))
+    .eq("id", recordId)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to update check-out attendance: ${error?.message ?? "Unknown error"}`);
+  }
+
+  return toAttendanceRecordFromRow(data, record.userId);
+}
+
+export async function supabaseUpsertAttendance(
+  sb: SupabaseAdmin,
+  userId: string,
+  record: AttendanceRecord
+): Promise<AttendanceRecord> {
+  if (record.state === "checked_out" && record.id) {
+    return supabaseUpdateCheckOutRecord(sb, record.id, record);
+  }
+
+  return supabaseCreateCheckInRecord(sb, userId, record);
 }
 
 export async function supabaseGetAttendanceHistory(
@@ -270,18 +316,12 @@ export async function supabaseGetAttendanceHistory(
   userId: string,
   filter: "all" | "present" | "issue" = "all"
 ) {
-  let query = sb
+  const query = sb
     .from("attendance_records")
-    .select("*")
+    .select("*, work_locations(name)")
     .eq("employee_id", userId)
     .order("attendance_date", { ascending: false })
     .limit(30);
-
-  if (filter === "present") {
-    query = query.in("state", ["checked_in", "checked_out"]);
-  } else if (filter === "issue") {
-    query = query.eq("state", "idle");
-  }
 
   const { data, error } = await query;
 
@@ -289,15 +329,59 @@ export async function supabaseGetAttendanceHistory(
     throw new Error(`Failed to fetch attendance history: ${error.message}`);
   }
 
-  return (data ?? []).map((row) => ({
+  return filterAttendanceRows(data ?? [], filter).map(toAttendanceTimelineItem);
+}
+
+function filterAttendanceRows<T extends { state?: string | null; validation_status?: string | null; status?: string | null }>(
+  rows: T[],
+  filter: "all" | "present" | "issue"
+) {
+  if (filter === "present") {
+    return rows.filter((row) => row.state === "checked_in" || row.state === "checked_out");
+  }
+
+  if (filter === "issue") {
+    return rows.filter(
+      (row) =>
+        row.state === "idle" ||
+        row.status === "Belum check-in" ||
+        (row.validation_status !== null && row.validation_status !== undefined && row.validation_status !== "verified")
+    );
+  }
+
+  return rows;
+}
+
+function formatDuration(checkInTime?: string | null, checkOutTime?: string | null) {
+  if (!checkInTime || !checkOutTime) return "Belum selesai";
+  const start = new Date(checkInTime);
+  const end = new Date(checkOutTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+    return "Belum selesai";
+  }
+
+  const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}j ${String(minutes).padStart(2, "0")}m`;
+}
+
+function toAttendanceTimelineItem(row: Record<string, any>): AttendanceTimelineItem {
+  const location = firstRelation(row.work_locations);
+
+  return {
     id: row.id,
     day: formatDateLabel(row.attendance_date),
-    status: mapAttendanceStatus(row.state, row.check_in_time),
+    status: row.status === "Terlambat" || row.status === "Belum check-in" ? row.status : mapAttendanceStatus(row.state, row.check_in_time),
     time: row.check_in_time
       ? new Date(row.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
       : "--.--",
-    method: (row.check_in_method ?? "Manual") as "QR" | "GPS" | "Selfie" | "Manual"
-  }));
+    method: (row.check_in_method ?? "Manual") as "QR" | "GPS" | "Selfie" | "Manual",
+    checkInTime: row.check_in_time ?? undefined,
+    checkOutTime: row.check_out_time ?? undefined,
+    duration: formatDuration(row.check_in_time, row.check_out_time),
+    locationName: location?.name ?? DEFAULT_LOCATION.name
+  };
 }
 
 export async function supabaseGetAllAttendanceHistory(
@@ -314,31 +398,17 @@ export async function supabaseGetAllAttendanceHistory(
   const userIds = (orgUsers ?? []).map((u) => u.id);
   if (userIds.length === 0) return [];
 
-  let query = sb
+  const query = sb
     .from("attendance_records")
-    .select("*, profiles(full_name)")
+    .select("*, profiles(full_name), work_locations(name)")
     .in("employee_id", userIds)
     .order("attendance_date", { ascending: false })
     .limit(100);
 
-  if (filter === "present") {
-    query = query.in("state", ["checked_in", "checked_out"]);
-  } else if (filter === "issue") {
-    query = query.eq("state", "idle");
-  }
-
   const { data, error } = await query;
   if (error) throw new Error(`Failed to fetch all attendance: ${error.message}`);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    day: formatDateLabel(row.attendance_date),
-    status: mapAttendanceStatus(row.state, row.check_in_time),
-    time: row.check_in_time
-      ? new Date(row.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
-      : "--.--",
-    method: (row.check_in_method ?? "Manual") as "QR" | "GPS" | "Selfie" | "Manual"
-  }));
+  return filterAttendanceRows(data ?? [], filter).map(toAttendanceTimelineItem);
 }
 
 type SupabaseAttendanceReportRow = {

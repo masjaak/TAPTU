@@ -50,7 +50,8 @@ import {
   updateShiftRecord,
   validateAttendanceSubmission,
   validateScannerToken,
-  type AttendanceMode
+  type AttendanceMode,
+  type AttendanceRecord
 } from "./domain";
 import { getApiConfig } from "./config";
 import { createStorageAdapter, uploadAttendanceSelfie } from "./storage";
@@ -421,6 +422,16 @@ function createEmptyAttendanceRecord(userId: string) {
 
 function buildAttendanceItem(userId: string): AttendanceTimelineItem {
   const record = store.attendance[userId] ?? createEmptyAttendanceRecord(userId);
+  return buildAttendanceItemFromRecord(record);
+}
+
+function buildAttendanceItemFromRecord(record: AttendanceRecord): AttendanceTimelineItem {
+  const duration =
+    record.checkInAt && record.checkOutAt
+      ? `${Math.floor((new Date(record.checkOutAt).getTime() - new Date(record.checkInAt).getTime()) / 3600000)}j ${String(
+          Math.round(((new Date(record.checkOutAt).getTime() - new Date(record.checkInAt).getTime()) % 3600000) / 60000)
+        ).padStart(2, "0")}m`
+      : "Belum selesai";
 
   if (record.state === "checked_in") {
     return {
@@ -428,7 +439,10 @@ function buildAttendanceItem(userId: string): AttendanceTimelineItem {
       day: "Hari ini",
       status: record.status === "Terlambat" ? "Terlambat" : "Tepat waktu",
       time: record.checkInAt?.slice(11, 16) ?? "--.--",
-      method: record.checkInMethod ?? "QR"
+      method: record.checkInMethod ?? "QR",
+      checkInTime: record.checkInAt,
+      duration,
+      locationName: record.locationName
     };
   }
 
@@ -437,8 +451,12 @@ function buildAttendanceItem(userId: string): AttendanceTimelineItem {
       id: record.id,
       day: "Hari ini",
       status: "Tepat waktu",
-      time: record.checkOutAt?.slice(11, 16) ?? "--.--",
-      method: record.checkOutMethod ?? "QR"
+      time: record.checkInAt?.slice(11, 16) ?? "--.--",
+      method: record.checkInMethod ?? record.checkOutMethod ?? "QR",
+      checkInTime: record.checkInAt,
+      checkOutTime: record.checkOutAt,
+      duration,
+      locationName: record.locationName
     };
   }
 
@@ -447,7 +465,9 @@ function buildAttendanceItem(userId: string): AttendanceTimelineItem {
     day: "Hari ini",
     status: "Belum check-in",
     time: "--.--",
-    method: "Manual"
+    method: "Manual",
+    duration,
+    locationName: record.locationName
   };
 }
 
@@ -814,12 +834,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
       attendanceState: persisted.state,
       validationStatus: persisted.validationStatus,
       validationReasons: persisted.validationReasons,
-      record: {
-        day: "Hari ini",
-        status: persisted.status === "Terlambat" ? "Terlambat" : "Tepat waktu",
-        time: new Date().toTimeString().slice(0, 5),
-        method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual"
-      }
+      record: buildAttendanceItemFromRecord(persisted)
     };
     return res.json(response);
   }
@@ -979,7 +994,7 @@ app.post("/api/attendance/checkout", async (req, res) => {
       attendanceState: persisted.state,
       validationStatus: persisted.validationStatus,
       validationReasons: persisted.validationReasons,
-      record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: parsed.data.method as "QR" | "GPS" | "Selfie" | "Manual" }
+      record: buildAttendanceItemFromRecord(persisted)
     };
     return res.json(response);
   }

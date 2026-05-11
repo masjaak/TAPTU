@@ -16,8 +16,23 @@ export type ApprovalRequestType =
   | "Izin"
   | "Cuti"
   | "Sakit"
+  | "Cuti Tahunan"
+  | "Cuti Sakit"
   | "Koreksi Absensi"
-  | "Lupa Check-in/out";
+  | "Lupa Check-in/out"
+  | "Cuti Menikah"
+  | "Cuti Menikahkan Anak"
+  | "Cuti Khitan Anak"
+  | "Cuti Baptis Anak"
+  | "Istri Melahirkan / Keguguran"
+  | "Keluarga Inti Meninggal"
+  | "Anggota Keluarga Serumah Meninggal"
+  | "Cuti Melahirkan"
+  | "Cuti Keguguran"
+  | "Cuti Haid / Menstruasi"
+  | "Cuti Tidak Dibayar"
+  | "Cuti Khusus Perusahaan"
+  | "Dinas / Tugas Luar";
 
 export interface AuthUser {
   id: string;

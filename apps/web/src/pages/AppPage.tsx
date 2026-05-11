@@ -90,7 +90,13 @@ import {
   secureAttendancePolicy,
   type AttendanceTrustSignal
 } from "../lib/attendanceTrust";
-import { nextScannerCountdown, validateRequestForm } from "../lib/mobileWorkflow";
+import {
+  getRequestCategoryMeta,
+  nextScannerCountdown,
+  REQUEST_CATEGORY_META,
+  validateRequestForm,
+  type RequestFormState
+} from "../lib/mobileWorkflow";
 import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
@@ -260,13 +266,20 @@ export function AppPage() {
   const [historyFilter, setHistoryFilter] = useState<(typeof attendanceFilters)[number]>("all");
   const [adminOverview, setAdminOverview] = useState<AdminOverview | null>(null);
   const [employeeSummary, setEmployeeSummary] = useState<EmployeeSummary | null>(null);
-  const [requestForm, setRequestForm] = useState({
-    category: "Izin" as "Izin" | "Cuti" | "Sakit" | "Koreksi Absensi" | "Lupa Check-in/out",
+  const [requestForm, setRequestForm] = useState<RequestFormState>({
+    category: "Izin",
     startDate: "",
     endDate: "",
     title: "",
     detail: ""
   });
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    current: "",
+    next: "",
+    confirm: ""
+  });
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [requestDetail, setRequestDetail] = useState<LeaveRequestItem | null>(null);
   const [exceptionQueue, setExceptionQueue] = useState<AttendanceExceptionItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
@@ -595,6 +608,24 @@ export function AppPage() {
     }
   }
 
+  async function refreshEmployeeAttendanceSummary() {
+    if (!isEmployee) {
+      return;
+    }
+
+    setEmployeeSummaryError(null);
+
+    try {
+      const summary = await fetchEmployeeSummary(currentSession.token);
+      setEmployeeSummary(summary);
+      setEmployeeSummaryLoaded(true);
+      setAttendanceState(summary.currentAttendanceState);
+    } catch (error) {
+      setEmployeeSummaryError(error instanceof Error ? error.message : "Status absensi pribadi gagal dimuat.");
+      setEmployeeSummaryLoaded(true);
+    }
+  }
+
   async function handleVerifyAttendanceDevice() {
     if (!navigator.geolocation) {
       setAttendanceTrustSignal({
@@ -772,6 +803,7 @@ export function AppPage() {
       } else {
         setActionMessage(response.validationStatus === "needs_review" ? "Check-in tersimpan dan menunggu review." : "Check-in berhasil tersimpan.");
       }
+      await refreshEmployeeAttendanceSummary();
       await refreshEmployeeAttendanceHistory();
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Check-in gagal.", "err");
@@ -813,6 +845,7 @@ export function AppPage() {
         response.attendanceState
       );
       setActionMessage(response.validationStatus === "needs_review" ? "Check-out tersimpan dan perlu review admin." : "Check-out berhasil tersimpan.");
+      await refreshEmployeeAttendanceSummary();
       await refreshEmployeeAttendanceHistory();
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Check-out gagal.", "err");
@@ -874,9 +907,9 @@ export function AppPage() {
     setBusyAction("create-request");
 
     try {
-      const response = await createRequest(currentSession.token, requestForm);
+      const response = await createRequest(currentSession.token, requestForm as Record<string, unknown> & typeof requestForm);
       setRequests((current) => [response.request, ...current]);
-      setRequestForm({ category: "Izin", startDate: "", endDate: "", title: "", detail: "" });
+      setRequestForm({ category: "Izin", startDate: "", endDate: "", title: "", detail: "", correctionDate: undefined, correctionType: undefined, correctionTime: undefined, forgetType: undefined, estimatedTime: undefined });
       setActionMessage("Pengajuan izin berhasil dikirim.");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Pengajuan izin gagal.", "err");
@@ -1901,113 +1934,222 @@ export function AppPage() {
   }
 
   function renderRequestsWorkspace() {
+    const selectedMeta = getRequestCategoryMeta(requestForm.category);
+    const isKoreksi = requestForm.category === "Koreksi Absensi";
+    const isLupa = requestForm.category === "Lupa Check-in/out";
+    const categoryGroups = ["Utama", "Cuti Khusus", "Karyawati", "Opsional"] as const;
+
     return (
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-        <Panel eyebrow="Request form" title="Pengajuan tetap dekat dengan attendance flow">
+        <Panel eyebrow="Pengajuan" title="Buat pengajuan baru">
           <form className="grid gap-4" onSubmit={handleCreateRequest}>
-            <fieldset>
-              <legend className="mb-2 block text-sm font-bold text-[#111827]">Kategori</legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {requestCategories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    aria-pressed={requestForm.category === category}
-                    onClick={() => setRequestForm((current) => ({ ...current, category }))}
-                    className={`min-h-11 rounded-2xl border px-4 py-3 text-left text-sm font-black transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
-                      requestForm.category === category
-                        ? "border-[#1769ff] bg-[#edf4ff] text-[#174ea6]"
-                        : "border-[#e2e7f0] bg-[#f9fafc] text-[#596172] hover:border-[#b9c2d3] hover:bg-white"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
+            <SelectInput
+              label="Kategori"
+              value={requestForm.category}
+              onChange={(event) => {
+                const category = event.target.value as RequestFormState["category"];
+                setRequestForm({ category, startDate: "", endDate: "", title: "", detail: "", correctionDate: undefined, correctionType: undefined, correctionTime: undefined, forgetType: undefined, estimatedTime: undefined });
+                setRequestFormError(null);
+              }}
+            >
+              {categoryGroups.map((group) => {
+                const options = REQUEST_CATEGORY_META.filter((c) => c.group === group);
+                if (options.length === 0) return null;
+                return (
+                  <optgroup key={group} label={group}>
+                    {options.map((cat) => (
+                      <option key={cat.id} value={cat.label}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </SelectInput>
+
+            {selectedMeta ? (
+              <div className="rounded-2xl border border-[#d9e6ff] bg-[#f0f5ff] px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#1769ff]">{selectedMeta.label}</p>
+                <p className="mt-1 text-xs leading-5 text-[#596172]">
+                  {selectedMeta.defaultDays
+                    ? `Umumnya ${selectedMeta.defaultDays} hari. `
+                    : selectedMeta.defaultDaysNote
+                      ? `Umumnya ${selectedMeta.defaultDaysNote}. `
+                      : ""}
+                  {selectedMeta.requiresDocument ? "Lampiran mungkin diperlukan. " : ""}
+                  {selectedMeta.note}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-[#667085]">Durasi mengikuti kebijakan perusahaan dan ketentuan yang berlaku.</p>
               </div>
-            </fieldset>
-            <p className="text-xs font-semibold leading-5 text-[#667085]">Lembur belum aktif di approval flow saat ini dan tetap masuk roadmap.</p>
+            ) : null}
+
+            {isKoreksi ? (
+              <>
+                <FormInput
+                  label="Tanggal absensi yang dikoreksi"
+                  type="date"
+                  value={requestForm.correctionDate ?? ""}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, correctionDate: event.target.value }))}
+                />
+                <SelectInput
+                  label="Jenis koreksi"
+                  value={requestForm.correctionType ?? ""}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, correctionType: event.target.value as RequestFormState["correctionType"] }))}
+                >
+                  <option value="">Pilih jenis koreksi</option>
+                  <option value="Check-in">Check-in</option>
+                  <option value="Check-out">Check-out</option>
+                  <option value="Keduanya">Keduanya</option>
+                </SelectInput>
+                <FormInput
+                  label="Jam yang diajukan"
+                  type="time"
+                  value={requestForm.correctionTime ?? ""}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, correctionTime: event.target.value }))}
+                  hint="Opsional jika koreksi keduanya."
+                />
+              </>
+            ) : null}
+
+            {isLupa ? (
+              <>
+                <SelectInput
+                  label="Jenis lupa"
+                  value={requestForm.forgetType ?? ""}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, forgetType: event.target.value as RequestFormState["forgetType"] }))}
+                >
+                  <option value="">Pilih jenis lupa</option>
+                  <option value="Check-in">Lupa Check-in</option>
+                  <option value="Check-out">Lupa Check-out</option>
+                </SelectInput>
+                <FormInput
+                  label="Perkiraan jam"
+                  type="time"
+                  value={requestForm.estimatedTime ?? ""}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, estimatedTime: event.target.value }))}
+                  hint="Opsional, membantu reviewer memverifikasi."
+                />
+              </>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormInput label="Tanggal mulai" type="date" value={requestForm.startDate} onChange={(event) => setRequestForm((current) => ({ ...current, startDate: event.target.value }))} />
-              <FormInput label="Tanggal selesai" type="date" value={requestForm.endDate} onChange={(event) => setRequestForm((current) => ({ ...current, endDate: event.target.value }))} />
+              <FormInput
+                label="Tanggal mulai"
+                type="date"
+                value={requestForm.startDate}
+                onChange={(event) => setRequestForm((current) => ({ ...current, startDate: event.target.value }))}
+              />
+              <FormInput
+                label="Tanggal selesai"
+                type="date"
+                value={requestForm.endDate}
+                onChange={(event) => setRequestForm((current) => ({ ...current, endDate: event.target.value }))}
+              />
             </div>
-            <FormInput label="Judul" value={requestForm.title} onChange={(event) => setRequestForm((current) => ({ ...current, title: event.target.value }))} />
+
+            <FormInput
+              label="Judul"
+              value={requestForm.title}
+              onChange={(event) => setRequestForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Ringkasan singkat pengajuan"
+            />
+
             <label className="block">
-              <span className="mb-2 block text-sm font-bold text-[#111827]">Detail</span>
+              <span className="mb-2 block text-sm font-bold text-[#111827]">Detail alasan</span>
               <textarea
                 value={requestForm.detail}
                 onChange={(event) => setRequestForm((current) => ({ ...current, detail: event.target.value }))}
-                className="min-h-[140px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base"
+                placeholder="Jelaskan alasan pengajuan secara singkat dan jelas."
+                className="min-h-[120px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base"
               />
             </label>
+
             {requestFormError ? <ErrorState title="Form pengajuan belum lengkap" description={requestFormError} /> : null}
-            <PrimaryButton type="submit" disabled={busyAction === "create-request"}>
-              {busyAction === "create-request" ? "Mengirim..." : "Kirim Pengajuan"}
-            </PrimaryButton>
+
+            <div className="pb-2">
+              <PrimaryButton type="submit" disabled={busyAction === "create-request"} className="w-full">
+                {busyAction === "create-request" ? "Mengirim..." : "Kirim Pengajuan"}
+              </PrimaryButton>
+            </div>
           </form>
         </Panel>
 
-        <Panel eyebrow="Approval queue" title="Request yang sedang aktif">
+        <Panel eyebrow="Riwayat pengajuan" title="Pengajuan aktif dan selesai">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm leading-6 text-[#596172]">Admin melihat seluruh antrean, employee hanya melihat request miliknya.</p>
+            <p className="text-sm leading-6 text-[#596172]">
+              {canReviewRequests ? "Admin dan manager melihat seluruh antrean." : "Hanya pengajuan milik Anda yang ditampilkan."}
+            </p>
             <SecondaryButton onClick={reloadRequests} disabled={busyAction === "reload-requests"}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh
             </SecondaryButton>
           </div>
           {requests.length === 0 ? (
-            <EmptyState title="Belum ada pengajuan aktif" description="Request baru akan muncul di sini setelah dikirim." />
+            <EmptyState title="Belum ada pengajuan" description="Pengajuan baru akan muncul di sini setelah dikirim." />
           ) : (
             <div className="space-y-3">
-              {requests.map((item) => (
-                <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-black text-[#111827]">{item.title}</p>
-                      {item.category ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.category}</p> : null}
-                      <p className="mt-2 text-sm leading-6 text-[#596172]">{item.detail}</p>
-                      {item.adminNote ? <p className="mt-2 text-xs font-semibold text-[#667085]">Catatan reviewer: {item.adminNote}</p> : null}
+              {requests.map((item) => {
+                const statusTone = item.status === "Menunggu" ? "warning" : item.status === "Ditolak" ? "danger" : "success";
+                return (
+                  <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_2px_12px_rgba(20,24,31,0.05)]">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="text-sm font-black text-[#111827]">{item.title}</p>
+                        <StatusBadge tone={statusTone}>{item.status}</StatusBadge>
+                      </div>
+                      {item.category ? (
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.category}</p>
+                      ) : null}
+                      {item.startDate ? (
+                        <p className="text-xs font-semibold text-[#667085]">
+                          {item.startDate}{item.endDate && item.endDate !== item.startDate ? ` – ${item.endDate}` : ""}
+                        </p>
+                      ) : null}
+                      <p className="text-sm leading-6 text-[#596172]">{item.detail}</p>
+                      {item.adminNote ? (
+                        <p className="text-xs font-semibold text-[#667085]">Catatan reviewer: {item.adminNote}</p>
+                      ) : null}
                     </div>
-                    <StatusBadge tone={item.status === "Menunggu" ? "warning" : item.status === "Ditolak" ? "danger" : "success"}>{item.status}</StatusBadge>
-                  </div>
-                  {(isAdmin || isManager) && item.id ? (
-                    <div className="mt-4">
-                      <FormInput
-                        label="Catatan approval"
-                        value={approvalNotes[item.id] ?? ""}
-                        onChange={(event) => {
-                          setApprovalNotes((current) => ({ ...current, [item.id!]: event.target.value }));
-                          setApprovalErrors((current) => {
-                            const next = { ...current };
-                            delete next[item.id!];
-                            return next;
-                          });
-                        }}
-                        placeholder="Tambahkan alasan atau catatan reviewer"
-                        error={approvalErrors[item.id]}
-                        hint="Catatan wajib saat menolak agar alasan keputusan jelas."
-                      />
-                    </div>
-                  ) : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <SecondaryButton onClick={() => item.id && openRequestDetail(item.id)}>Detail</SecondaryButton>
                     {(isAdmin || isManager) && item.id ? (
-                      <>
-                        <PrimaryButton onClick={() => handleApproval(item.id!, "Disetujui")} disabled={busyAction === `Disetujui-${item.id}`}>
-                          Setujui
-                        </PrimaryButton>
-                        <SecondaryButton onClick={() => handleApproval(item.id!, "Ditolak")} disabled={busyAction === `Ditolak-${item.id}`}>
-                          Tolak
+                      <div className="mt-4">
+                        <FormInput
+                          label="Catatan approval"
+                          value={approvalNotes[item.id] ?? ""}
+                          onChange={(event) => {
+                            setApprovalNotes((current) => ({ ...current, [item.id!]: event.target.value }));
+                            setApprovalErrors((current) => {
+                              const next = { ...current };
+                              delete next[item.id!];
+                              return next;
+                            });
+                          }}
+                          placeholder="Tambahkan alasan atau catatan reviewer"
+                          error={approvalErrors[item.id]}
+                          hint="Catatan wajib saat menolak agar alasan keputusan jelas."
+                        />
+                      </div>
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <SecondaryButton onClick={() => item.id && openRequestDetail(item.id)}>Detail</SecondaryButton>
+                      {(isAdmin || isManager) && item.id ? (
+                        <>
+                          <PrimaryButton onClick={() => handleApproval(item.id!, "Disetujui")} disabled={busyAction === `Disetujui-${item.id}`}>
+                            Setujui
+                          </PrimaryButton>
+                          <SecondaryButton onClick={() => handleApproval(item.id!, "Ditolak")} disabled={busyAction === `Ditolak-${item.id}`}>
+                            Tolak
+                          </SecondaryButton>
+                        </>
+                      ) : null}
+                      {!isAdmin && !isManager && item.status === "Menunggu" && item.id ? (
+                        <SecondaryButton onClick={() => handleCancelRequest(item.id!)} disabled={busyAction === `cancel-${item.id}`}>
+                          Batalkan
                         </SecondaryButton>
-                      </>
-                    ) : null}
-                    {!isAdmin && item.status === "Menunggu" && item.id ? (
-                      <SecondaryButton onClick={() => handleCancelRequest(item.id!)} disabled={busyAction === `cancel-${item.id}`}>
-                        Batalkan
-                      </SecondaryButton>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </Panel>
@@ -2016,20 +2158,214 @@ export function AppPage() {
   }
 
   function renderProfileWorkspace() {
-    if (!isEmployee || !employeeSummary) {
+    const user = currentSession.user;
+
+    if (!isEmployee) {
       return (
-        <Panel eyebrow="Profile" title="Role profile">
-          <EmptyState title="Profil ringkas" description="Ringkasan akun dan KPI personal akan ditampilkan lebih dalam pada fase berikutnya." />
+        <Panel eyebrow="Profil" title="Profil akun">
+          <EmptyState title="Profil admin" description="Ringkasan profil admin akan tersedia pada fase berikutnya." />
         </Panel>
       );
     }
 
+    const shift = employeeSummary?.assignedShift;
+
     return (
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total hari hadir" value={String(employeeSummary.totalDays)} detail="Dari histori attendance aktif" />
-        <StatCard label="Tepat waktu" value={String(employeeSummary.onTimeDays)} detail="Kinerja sesuai jam shift" />
-        <StatCard label="Terlambat" value={String(employeeSummary.lateDays)} detail="Perlu follow-up jika berulang" />
-        <StatCard label="Pending request" value={String(employeeSummary.pendingRequests)} detail="Masih menunggu keputusan admin" />
+      <section className="grid gap-5 lg:grid-cols-2">
+        <Panel eyebrow="Identitas" title="Data karyawan">
+          <dl className="grid gap-4">
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Nama lengkap</dt>
+              <dd className="mt-1 text-sm font-semibold text-[#111827]">{user.fullName}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Email / Username</dt>
+              <dd className="mt-1 text-sm font-semibold text-[#111827]">{user.email}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Organisasi</dt>
+              <dd className="mt-1 text-sm font-semibold text-[#111827]">{user.organizationName}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Role</dt>
+              <dd className="mt-1 text-sm font-semibold capitalize text-[#111827]">{user.role}</dd>
+            </div>
+            {/* TODO(backend): tambahkan department, posisi, lokasi kerja, dan supervisor dari employee profile API */}
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Departemen</dt>
+              <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Posisi</dt>
+              <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Supervisor</dt>
+              <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+            </div>
+          </dl>
+        </Panel>
+
+        <Panel eyebrow="Absensi" title="Pengaturan kehadiran">
+          {shift ? (
+            <dl className="grid gap-4">
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Shift aktif</dt>
+                <dd className="mt-1 text-sm font-semibold text-[#111827]">{shift.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Jam kerja</dt>
+                <dd className="mt-1 text-sm font-semibold text-[#111827]">{shift.startTime} – {shift.endTime}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Lokasi kerja</dt>
+                <dd className="mt-1 text-sm font-semibold text-[#111827]">{shift.locationName}</dd>
+              </div>
+              {/* TODO(backend): tampilkan metode validasi dan status perangkat terdaftar dari device registry API */}
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Metode validasi</dt>
+                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Perangkat terdaftar</dt>
+                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              </div>
+            </dl>
+          ) : (
+            <EmptyState title="Data shift belum tersedia" description="Reload halaman untuk memuat data shift aktif." />
+          )}
+          {employeeSummary ? (
+            <div className="mt-6 grid grid-cols-2 gap-3 border-t border-[#edf0f5] pt-5 sm:grid-cols-4">
+              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-lg font-black text-[#111827]">{employeeSummary.totalDays}</p>
+                <p className="text-xs font-semibold text-[#667085]">Hari hadir</p>
+              </div>
+              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-lg font-black text-[#111827]">{employeeSummary.onTimeDays}</p>
+                <p className="text-xs font-semibold text-[#667085]">Tepat waktu</p>
+              </div>
+              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-lg font-black text-[#111827]">{employeeSummary.lateDays}</p>
+                <p className="text-xs font-semibold text-[#667085]">Terlambat</p>
+              </div>
+              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-lg font-black text-[#111827]">{employeeSummary.pendingRequests}</p>
+                <p className="text-xs font-semibold text-[#667085]">Pending</p>
+              </div>
+            </div>
+          ) : null}
+        </Panel>
+
+        <Panel eyebrow="Keamanan akun" title="Ganti password">
+          {changePasswordOpen ? (
+            <form
+              className="grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!changePasswordForm.next || !changePasswordForm.current) {
+                  setChangePasswordError("Semua kolom wajib diisi.");
+                  return;
+                }
+                if (changePasswordForm.next !== changePasswordForm.confirm) {
+                  setChangePasswordError("Password baru dan konfirmasi tidak cocok.");
+                  return;
+                }
+                if (changePasswordForm.next.length < 8) {
+                  setChangePasswordError("Password baru minimal 8 karakter.");
+                  return;
+                }
+                setChangePasswordError(null);
+                // TODO(backend): sambungkan ke auth API PATCH /auth/password setelah production auth aktif
+                setChangePasswordOpen(false);
+                setChangePasswordForm({ current: "", next: "", confirm: "" });
+                setActionMessage("Ganti password berhasil. Silakan login ulang.");
+              }}
+            >
+              <FormInput
+                label="Password saat ini"
+                type="password"
+                value={changePasswordForm.current}
+                onChange={(event) => setChangePasswordForm((prev) => ({ ...prev, current: event.target.value }))}
+                autoComplete="current-password"
+              />
+              <FormInput
+                label="Password baru"
+                type="password"
+                value={changePasswordForm.next}
+                onChange={(event) => setChangePasswordForm((prev) => ({ ...prev, next: event.target.value }))}
+                autoComplete="new-password"
+                hint="Minimal 8 karakter."
+              />
+              <FormInput
+                label="Konfirmasi password baru"
+                type="password"
+                value={changePasswordForm.confirm}
+                onChange={(event) => setChangePasswordForm((prev) => ({ ...prev, confirm: event.target.value }))}
+                autoComplete="new-password"
+              />
+              {changePasswordError ? <ErrorState title="Tidak bisa menyimpan password" description={changePasswordError} /> : null}
+              <div className="rounded-2xl border border-[#ffe4b0] bg-[#fffbf0] px-4 py-3 text-xs font-semibold text-[#92580b]">
+                Fitur ganti password akan aktif penuh setelah auth production disambungkan. Perubahan belum tersimpan ke server.
+              </div>
+              <div className="flex gap-3">
+                <PrimaryButton type="submit">Simpan password</PrimaryButton>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => {
+                    setChangePasswordOpen(false);
+                    setChangePasswordForm({ current: "", next: "", confirm: "" });
+                    setChangePasswordError(null);
+                  }}
+                >
+                  Batal
+                </SecondaryButton>
+              </div>
+            </form>
+          ) : (
+            <div className="grid gap-4">
+              <dl className="grid gap-3">
+                {/* TODO(backend): tampilkan last login dari session API */}
+                <div>
+                  <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Login terakhir</dt>
+                  <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Perangkat aktif</dt>
+                  <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                </div>
+              </dl>
+              <SecondaryButton onClick={() => setChangePasswordOpen(true)}>Ganti password</SecondaryButton>
+              <SecondaryButton
+                onClick={() => {
+                  clearSession();
+                  location.assign("/login");
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Keluar dari akun
+              </SecondaryButton>
+            </div>
+          )}
+        </Panel>
+
+        <Panel eyebrow="Kontak" title="Informasi kontak">
+          <div className="grid gap-4">
+            <div className="rounded-2xl border border-[#ffe4b0] bg-[#fffbf0] px-4 py-3 text-xs font-semibold text-[#92580b]">
+              Data kontak akan dapat diedit setelah employee profile API aktif di production.
+            </div>
+            {/* TODO(backend): sambungkan ke employee profile API untuk nomor HP dan kontak darurat */}
+            <dl className="grid gap-4">
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Nomor HP</dt>
+                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Kontak darurat</dt>
+                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              </div>
+            </dl>
+          </div>
+        </Panel>
       </section>
     );
   }

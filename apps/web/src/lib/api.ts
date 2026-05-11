@@ -1,5 +1,6 @@
 import type {
   AdminOverview,
+  ApprovalRequestType,
   AttendanceActionResponse,
   AttendanceExceptionItem,
   AttendanceReportRow,
@@ -136,11 +137,12 @@ export async function checkOut(
 
 export async function createRequest(
   token: string,
-  payload: { category: "Izin" | "Cuti" | "Sakit" | "Koreksi Absensi" | "Lupa Check-in/out"; startDate: string; endDate: string; title: string; detail: string }
+  // TODO(backend): expand API to accept all ApprovalRequestType values and optional correction fields
+  payload: Record<string, unknown> & { category: string; startDate: string; endDate: string; title: string; detail: string }
 ) {
   if (isDemoToken(token)) {
     const response: RequestActionResponse = {
-      request: { id: `demo-req-${Date.now()}`, ...payload, status: "Menunggu" }
+      request: { id: `demo-req-${Date.now()}`, title: payload.title, detail: payload.detail, category: payload.category as ApprovalRequestType, startDate: payload.startDate, endDate: payload.endDate, status: "Menunggu" }
     };
     return Promise.resolve(response);
   }

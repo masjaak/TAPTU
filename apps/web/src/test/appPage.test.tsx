@@ -48,6 +48,7 @@ function renderRoute(initialEntry: string) {
 
 describe("AppPage", () => {
   beforeEach(() => {
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
     apiMocks.fetchRequests.mockResolvedValue([]);
     apiMocks.fetchRequestDetail.mockResolvedValue(null);
@@ -225,7 +226,7 @@ describe("AppPage", () => {
       attendanceState: "idle",
       requests: []
     });
-    apiMocks.fetchEmployeeSummary.mockResolvedValueOnce({
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
       totalDays: 22,
       onTimeDays: 20,
       lateDays: 2,
@@ -257,7 +258,7 @@ describe("AppPage", () => {
     expect(screen.getByRole("button", { name: /mulai check-in/i })).toBeTruthy();
 
     cleanup();
-    apiMocks.fetchEmployeeSummary.mockResolvedValueOnce({
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
       totalDays: 22,
       onTimeDays: 20,
       lateDays: 2,
@@ -340,6 +341,30 @@ describe("AppPage", () => {
         validationReasons: [],
         createdAt: "2026-05-02T08:03:00.000Z",
         updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    }).mockResolvedValueOnce({
+      totalDays: 23,
+      onTimeDays: 21,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "checked_in",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "hist-after-checkin",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        checkInTime: "2026-05-11T01:03:00.000Z",
+        status: "Tepat waktu",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-11T01:03:00.000Z",
+        updatedAt: "2026-05-11T01:03:00.000Z"
       }
     });
 
@@ -570,7 +595,7 @@ describe("AppPage", () => {
     apiMocks.fetchAttendanceHistoryByFilter
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: "hist-after-checkin", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }]);
-    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+    apiMocks.fetchEmployeeSummary.mockResolvedValueOnce({
       totalDays: 22,
       onTimeDays: 20,
       lateDays: 2,
@@ -592,6 +617,30 @@ describe("AppPage", () => {
         validationReasons: [],
         createdAt: "2026-05-02T08:03:00.000Z",
         updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    }).mockResolvedValueOnce({
+      totalDays: 23,
+      onTimeDays: 21,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "checked_in",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "hist-after-checkin",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        checkInTime: "2026-05-11T01:03:00.000Z",
+        status: "Tepat waktu",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-11T01:03:00.000Z",
+        updatedAt: "2026-05-11T01:03:00.000Z"
       }
     });
 
@@ -628,6 +677,7 @@ describe("AppPage", () => {
       })
     );
     await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/Check-in 08:03/i)).toBeTruthy();
 
     createObjectUrl.mockRestore();
@@ -730,7 +780,7 @@ describe("AppPage", () => {
       attendanceState: "checked_in",
       requests: []
     });
-    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+    apiMocks.fetchEmployeeSummary.mockResolvedValueOnce({
       totalDays: 22,
       onTimeDays: 20,
       lateDays: 2,
@@ -754,6 +804,31 @@ describe("AppPage", () => {
         createdAt: "2026-05-11T01:03:00.000Z",
         updatedAt: "2026-05-11T01:03:00.000Z"
       }
+    }).mockResolvedValueOnce({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "checked_out",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-real-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        checkInTime: "2026-05-11T01:03:00.000Z",
+        checkOutTime: "2026-05-11T10:05:00.000Z",
+        status: "Selesai",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-11T01:03:00.000Z",
+        updatedAt: "2026-05-11T10:05:00.000Z"
+      }
     });
     apiMocks.fetchAttendanceHistoryByFilter
       .mockResolvedValueOnce([{ id: "today-active", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }])
@@ -768,6 +843,7 @@ describe("AppPage", () => {
     expect((await screen.findAllByText(/check-out berhasil/i)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /check-out sekarang/i })).toBeNull();
     await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(2));
   });
 
   it("keeps employee check-in clickable and explains when validation is not ready", async () => {
