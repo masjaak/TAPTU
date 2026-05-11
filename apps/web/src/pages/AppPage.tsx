@@ -42,6 +42,7 @@ import type {
 
 import {
   AppShell,
+  CategorySelect,
   DataTable,
   Dialog,
   EmptyState,
@@ -1215,7 +1216,7 @@ export function AppPage() {
                   id: item.id,
                   employee: (
                     <div>
-                      <p className="font-black text-[#111827]">{item.employeeName}</p>
+                      <p className="font-semibold text-[#111827]">{item.employeeName}</p>
                       <p className="mt-1 text-xs font-semibold text-[#667085]">{item.detail}</p>
                     </div>
                   ),
@@ -1247,7 +1248,7 @@ export function AppPage() {
                       <item.icon className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-[#111827]">{item.label}</p>
+                      <p className="text-sm font-semibold text-[#111827]">{item.label}</p>
                       <p className="mt-1 text-xs font-semibold text-[#667085]">Lanjutkan dari shell yang sama.</p>
                     </div>
                   </div>
@@ -1323,8 +1324,8 @@ export function AppPage() {
                 </StatusBadge>
                 <span className="text-sm font-semibold text-[#667085]">{now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
               </div>
-              <p className="mt-4 text-2xl font-black tracking-[-0.02em] text-[#111827] sm:text-3xl">{statusCopy.title}</p>
-              <p className="mt-2 break-words text-sm font-semibold leading-6 text-[#596172] sm:text-base">{statusCopy.subtitle}</p>
+              <p className="mt-3 text-xl font-bold tracking-[-0.01em] text-[#111827] sm:text-2xl">{statusCopy.title}</p>
+              <p className="mt-1.5 break-words text-sm leading-6 text-[#596172]">{statusCopy.subtitle}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <PrimaryButton
@@ -1360,9 +1361,9 @@ export function AppPage() {
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <Panel eyebrow="Shift" title="Shift hari ini">
             <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-              <p className="text-sm font-black text-[#111827]">{shift.name}</p>
-              <p className="mt-2 text-2xl font-black text-[#111827]">{shift.startTime}-{shift.endTime}</p>
-              <p className="mt-2 text-sm font-semibold text-[#596172]">{shift.locationName}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#667085]">{shift.name}</p>
+              <p className="mt-2 text-xl font-bold text-[#111827] sm:text-2xl">{shift.startTime}–{shift.endTime}</p>
+              <p className="mt-1.5 text-sm text-[#596172]">{shift.locationName}</p>
             </div>
           </Panel>
 
@@ -1383,7 +1384,7 @@ export function AppPage() {
               <div className="grid gap-3">
                 {attendance.slice(0, 3).map((item) => (
                   <div key={item.id ?? `${item.day}-${item.time}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                    <p className="text-sm font-black text-[#111827]">{item.day}</p>
+                    <p className="text-sm font-semibold text-[#111827]">{item.day}</p>
                     <p className="mt-1 text-sm font-semibold text-[#596172]">Check-in {item.checkInTime ?? item.time}{item.checkOutTime ? ` · Check-out ${item.checkOutTime}` : ""}</p>
                   </div>
                 ))}
@@ -1399,7 +1400,7 @@ export function AppPage() {
                 {requests.slice(0, 3).map((item) => (
                   <div key={item.id ?? item.title} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-black text-[#111827]">{item.title}</p>
+                      <p className="text-sm font-semibold text-[#111827]">{item.title}</p>
                       <StatusBadge tone={item.status === "Menunggu" ? "warning" : item.status === "Ditolak" ? "danger" : "success"}>{item.status}</StatusBadge>
                     </div>
                     {item.category ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.category}</p> : null}
@@ -1416,7 +1417,7 @@ export function AppPage() {
               {schedule.map((item) => (
                 <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">{item.time}</p>
-                  <p className="mt-2 text-sm font-black text-[#111827]">{item.title}</p>
+                  <p className="mt-2 text-sm font-semibold text-[#111827]">{item.title}</p>
                   <p className="mt-1 text-sm leading-6 text-[#596172]">{item.detail}</p>
                 </div>
               ))}
@@ -1465,7 +1466,7 @@ export function AppPage() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[#596172]">Halo, {currentSession.user.fullName}</p>
-                  <p className="mt-2 break-words text-3xl font-black tracking-[-0.02em] text-[#111827] sm:text-4xl sm:tracking-[-0.03em]">
+                  <p className="mt-2 break-words text-2xl font-bold tracking-[-0.02em] text-[#111827] sm:text-3xl">
                     {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                   </p>
                   <p className="mt-2 text-sm font-semibold text-[#596172]">
@@ -1473,10 +1474,10 @@ export function AppPage() {
                   </p>
                 </div>
                 <div className="rounded-[20px] border border-[#dfe6f2] bg-white px-4 py-3">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">Shift hari ini</p>
-                  <p className="mt-2 text-sm font-black text-[#111827]">{employeeSummary.assignedShift.name}</p>
-                  <p className="mt-1 text-xs font-semibold text-[#667085]">
-                    {employeeSummary.assignedShift.startTime} - {employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1769ff]">Shift hari ini</p>
+                  <p className="mt-1.5 text-sm font-semibold text-[#111827]">{employeeSummary.assignedShift.name}</p>
+                  <p className="mt-0.5 text-xs text-[#667085]">
+                    {employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}
                   </p>
                 </div>
               </div>
@@ -1524,7 +1525,7 @@ export function AppPage() {
 
                 {checkInMode === "qr" ? (
                   <div className="mt-5">
-                    <p className="text-2xl font-black text-[#111827]">Check-in dengan QR</p>
+                    <p className="text-lg font-bold text-[#111827]">Check-in dengan QR</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">Arahkan kamera ke QR scanner untuk memulai absensi.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
@@ -1542,7 +1543,7 @@ export function AppPage() {
                         <div className="flex items-start gap-3">
                           <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#1769ff]" />
                           <div className="min-w-0">
-                            <p className="text-sm font-black text-[#111827]">QR berhasil terbaca</p>
+                            <p className="text-sm font-semibold text-[#111827]">QR berhasil terbaca</p>
                             <p className="mt-1 text-sm leading-6 text-[#596172]">Cek ringkasan singkat, lalu lanjut ke konfirmasi atau verifikasi wajah.</p>
                           </div>
                         </div>
@@ -1570,7 +1571,7 @@ export function AppPage() {
                   </div>
                 ) : (
                   <div className="mt-5">
-                    <p className="text-2xl font-black text-[#111827]">Verifikasi wajah</p>
+                    <p className="text-lg font-bold text-[#111827]">Verifikasi wajah</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
                     <div className="mt-4 rounded-[28px] border border-[#d6def0] bg-white p-3 shadow-[0_18px_44px_rgba(20,24,31,0.08)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] bg-[#eef4ff]">
@@ -1610,19 +1611,19 @@ export function AppPage() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">Konfirmasi check-in</p>
-                        <p className="mt-2 text-xl font-black text-[#111827]">Review detail sebelum submit</p>
+                        <p className="mt-2 text-base font-bold text-[#111827]">Review detail sebelum submit</p>
                       </div>
                       <StatusBadge tone={activeValidationTone}>
                         {pendingCheckIn.validationStatus === "verified" ? "Validasi siap" : pendingCheckIn.validationStatus === "blocked" || pendingCheckIn.validationStatus === "rejected" ? "Blocked" : "Need review"}
                       </StatusBadge>
                     </div>
                     <div className="mt-4 grid gap-3 rounded-[22px] bg-[#f9fafc] p-4 text-sm font-semibold text-[#596172] sm:grid-cols-2">
-                      <p>Karyawan: <span className="font-black text-[#111827]">{currentSession.user.fullName}</span></p>
-                      <p>Shift: <span className="font-black text-[#111827]">{pendingCheckIn.shiftName}</span></p>
-                      <p>Lokasi: <span className="font-black text-[#111827]">{pendingCheckIn.locationName}</span></p>
-                      <p>Waktu: <span className="font-black text-[#111827]">{checkInTimeLabel}</span></p>
-                      <p>Metode: <span className="font-black text-[#111827]">{pendingCheckIn.method === "QR" ? "QR Check-in" : "Face Verification"}</span></p>
-                      <p>Hasil: <span className="font-black text-[#111827]">{pendingCheckIn.validationReasons.join(" · ")}</span></p>
+                      <p>Karyawan: <span className="font-semibold text-[#111827]">{currentSession.user.fullName}</span></p>
+                      <p>Shift: <span className="font-semibold text-[#111827]">{pendingCheckIn.shiftName}</span></p>
+                      <p>Lokasi: <span className="font-semibold text-[#111827]">{pendingCheckIn.locationName}</span></p>
+                      <p>Waktu: <span className="font-semibold text-[#111827]">{checkInTimeLabel}</span></p>
+                      <p>Metode: <span className="font-semibold text-[#111827]">{pendingCheckIn.method === "QR" ? "QR Check-in" : "Face Verification"}</span></p>
+                      <p>Hasil: <span className="font-semibold text-[#111827]">{pendingCheckIn.validationReasons.join(" · ")}</span></p>
                     </div>
                     {pendingCheckIn.validationStatus === "blocked" ? (
                       <p role="alert" className="mt-4 rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">
@@ -1645,7 +1646,7 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
                   <div className="min-w-0">
-                    <p className="text-2xl font-black text-[#111827]">Check-out berhasil</p>
+                    <p className="text-lg font-bold text-[#111827]">Check-out berhasil</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">
                       Record hari ini sudah selesai
                       {employeeSummary.todayRecord.checkOutTime
@@ -1665,7 +1666,7 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
                   <div className="min-w-0">
-                    <p className="text-2xl font-black text-[#111827]">Check-in berhasil</p>
+                    <p className="text-lg font-bold text-[#111827]">Check-in berhasil</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">
                       Waktu tercatat {employeeSummary.todayRecord.checkInTime ? new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : checkInTimeLabel} di {activeCheckIn?.locationName ?? employeeSummary.assignedShift.locationName}.
                     </p>
@@ -1688,7 +1689,7 @@ export function AppPage() {
               <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[#111827]">Status absensi hari ini</p>
+                    <p className="text-sm font-semibold text-[#111827]">Status absensi hari ini</p>
                     <p className="mt-2 text-sm leading-6 text-[#667085]">
                       {employeeSummary.todayRecord.checkInTime
                         ? `Check-in tersimpan pada ${new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
@@ -1712,7 +1713,7 @@ export function AppPage() {
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-1 h-5 w-5 text-[#1769ff]" />
                   <div>
-                    <p className="text-sm font-black text-[#111827]">Lokasi valid · Kamera siap · Device verified</p>
+                    <p className="text-sm font-semibold text-[#111827]">Lokasi valid · Kamera siap · Device verified</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">{attendanceTrust.detail}</p>
                     <details className="mt-4 rounded-2xl border border-[#dfe6f2] bg-white px-4 py-3">
                       <summary className="cursor-pointer text-sm font-black text-[#1769ff]">Lihat detail validasi</summary>
@@ -1735,7 +1736,7 @@ export function AppPage() {
                   <div className="flex items-start gap-3">
                     <RefreshCw className="mt-1 h-5 w-5 animate-spin text-[#1769ff]" />
                     <div>
-                      <p className="text-sm font-black text-[#111827]">Mengirim check-in</p>
+                      <p className="text-sm font-semibold text-[#111827]">Mengirim check-in</p>
                       <p className="mt-2 text-sm leading-6 text-[#596172]">Taptu sedang menyimpan waktu, lokasi, metode, dan hasil validasi.</p>
                     </div>
                   </div>
@@ -1812,19 +1813,19 @@ export function AppPage() {
                     key={item.id}
                     className="group rounded-[22px] border border-[#edf0f5] bg-white transition open:border-[#1769ff] open:bg-[#f1f5ff]"
                   >
-                    <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] [&::-webkit-details-marker]:hidden">
+                    <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] [&::-webkit-details-marker]:hidden">
                       <span>
-                        <span className="block text-sm font-black text-[#111827]">{item.day}</span>
-                        <span className="mt-1 block text-xs font-semibold text-[#667085]">
-                          Check-in {item.checkInTime}{item.checkOutTime ? ` · Check-out ${item.checkOutTime}` : ""}
+                        <span className="block text-sm font-semibold text-[#111827]">{item.day}</span>
+                        <span className="mt-0.5 block text-xs text-[#667085]">
+                          {item.checkInTime ? `Masuk ${item.checkInTime}` : ""}{item.checkOutTime ? ` · Keluar ${item.checkOutTime}` : ""}
                         </span>
-                        <span className="mt-1 block text-xs font-semibold text-[#667085]">Durasi {item.duration} · {item.locationName}</span>
+                        <span className="mt-0.5 block text-xs text-[#667085]">Durasi {item.duration} · {item.locationName}</span>
                       </span>
                       <StatusBadge tone={item.status === "Belum check-in" ? "neutral" : item.status === "Terlambat" ? "warning" : "success"}>{item.status}</StatusBadge>
                     </summary>
                     <div className="border-t border-[#dce7fb] px-4 py-4" role="status">
-                      <p className="text-sm font-black text-[#111827]">Detail absensi</p>
-                      <div className="mt-3 grid gap-2 text-sm font-semibold text-[#596172] sm:grid-cols-2">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Detail absensi</p>
+                      <div className="mt-3 grid gap-2 text-sm text-[#596172] sm:grid-cols-2">
                         <p>Check-in: {item.checkInTime}</p>
                         <p>Check-out: {item.checkOutTime ?? "Belum check-out"}</p>
                         <p>Durasi: {item.duration}</p>
@@ -1857,9 +1858,9 @@ export function AppPage() {
           <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-black text-[#111827]">{employeeSummary.assignedShift.name}</p>
-                <p className="mt-2 break-words text-2xl font-black text-[#111827] sm:text-3xl">{employeeSummary.assignedShift.startTime}-{employeeSummary.assignedShift.endTime}</p>
-                <p className="mt-2 text-sm font-semibold text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#667085]">{employeeSummary.assignedShift.name}</p>
+                <p className="mt-2 break-words text-xl font-bold text-[#111827] sm:text-2xl">{employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime}</p>
+                <p className="mt-1.5 text-sm text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
               </div>
               <StatusBadge tone="info">Hari ini</StatusBadge>
             </div>
@@ -1877,7 +1878,7 @@ export function AppPage() {
               {schedule.map((item) => (
                 <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">{item.time}</p>
-                  <p className="mt-2 text-sm font-black text-[#111827]">{item.title}</p>
+                  <p className="mt-2 text-sm font-semibold text-[#111827]">{item.title}</p>
                   <p className="mt-1 text-sm leading-6 text-[#596172]">{item.detail}</p>
                 </div>
               ))}
@@ -1937,35 +1938,25 @@ export function AppPage() {
     const selectedMeta = getRequestCategoryMeta(requestForm.category);
     const isKoreksi = requestForm.category === "Koreksi Absensi";
     const isLupa = requestForm.category === "Lupa Check-in/out";
-    const categoryGroups = ["Utama", "Cuti Khusus", "Karyawati", "Opsional"] as const;
+    const categoryGroupDefs = (["Utama", "Cuti Khusus", "Karyawati", "Opsional"] as const).map((group) => ({
+      label: group,
+      options: REQUEST_CATEGORY_META.filter((c) => c.group === group).map((c) => ({ id: c.id, label: c.label }))
+    })).filter((g) => g.options.length > 0);
 
     return (
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <Panel eyebrow="Pengajuan" title="Buat pengajuan baru">
           <form className="grid gap-4" onSubmit={handleCreateRequest}>
-            <SelectInput
+            <CategorySelect
               label="Kategori"
               value={requestForm.category}
-              onChange={(event) => {
-                const category = event.target.value as RequestFormState["category"];
+              onChange={(value) => {
+                const category = value as RequestFormState["category"];
                 setRequestForm({ category, startDate: "", endDate: "", title: "", detail: "", correctionDate: undefined, correctionType: undefined, correctionTime: undefined, forgetType: undefined, estimatedTime: undefined });
                 setRequestFormError(null);
               }}
-            >
-              {categoryGroups.map((group) => {
-                const options = REQUEST_CATEGORY_META.filter((c) => c.group === group);
-                if (options.length === 0) return null;
-                return (
-                  <optgroup key={group} label={group}>
-                    {options.map((cat) => (
-                      <option key={cat.id} value={cat.label}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </SelectInput>
+              groups={categoryGroupDefs}
+            />
 
             {selectedMeta ? (
               <div className="rounded-2xl border border-[#d9e6ff] bg-[#f0f5ff] px-4 py-3">
@@ -2094,7 +2085,7 @@ export function AppPage() {
                   <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_2px_12px_rgba(20,24,31,0.05)]">
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-black text-[#111827]">{item.title}</p>
+                        <p className="text-sm font-semibold text-[#111827]">{item.title}</p>
                         <StatusBadge tone={statusTone}>{item.status}</StatusBadge>
                       </div>
                       {item.category ? (
@@ -2237,19 +2228,19 @@ export function AppPage() {
           {employeeSummary ? (
             <div className="mt-6 grid grid-cols-2 gap-3 border-t border-[#edf0f5] pt-5 sm:grid-cols-4">
               <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-black text-[#111827]">{employeeSummary.totalDays}</p>
+                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.totalDays}</p>
                 <p className="text-xs font-semibold text-[#667085]">Hari hadir</p>
               </div>
               <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-black text-[#111827]">{employeeSummary.onTimeDays}</p>
+                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.onTimeDays}</p>
                 <p className="text-xs font-semibold text-[#667085]">Tepat waktu</p>
               </div>
               <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-black text-[#111827]">{employeeSummary.lateDays}</p>
+                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.lateDays}</p>
                 <p className="text-xs font-semibold text-[#667085]">Terlambat</p>
               </div>
               <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-black text-[#111827]">{employeeSummary.pendingRequests}</p>
+                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.pendingRequests}</p>
                 <p className="text-xs font-semibold text-[#667085]">Pending</p>
               </div>
             </div>
@@ -2432,7 +2423,7 @@ export function AppPage() {
                 id: emp.id,
                 name: (
                   <div>
-                    <p className="font-black text-[#111827]">{emp.fullName}</p>
+                    <p className="font-semibold text-[#111827]">{emp.fullName}</p>
                     <p className="mt-1 text-xs font-semibold text-[#667085]">{emp.email}</p>
                   </div>
                 ),
@@ -2468,7 +2459,7 @@ export function AppPage() {
                   <article key={item.id} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-[#111827]">{item.employeeName}</p>
+                        <p className="text-sm font-semibold text-[#111827]">{item.employeeName}</p>
                         <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.exceptionType}</p>
                         <p className="mt-2 break-words text-sm leading-6 text-[#596172]">{item.reason}</p>
                       </div>
@@ -2508,7 +2499,7 @@ export function AppPage() {
             <div className="grid gap-3">
               {["Outside radius", "Late check-in", "Invalid QR", "Expired QR", "Different device", "Missing selfie"].map((item) => (
                 <div key={item} className="rounded-[20px] border border-[#edf0f5] bg-white p-4">
-                  <p className="text-sm font-black text-[#111827]">{item}</p>
+                  <p className="text-sm font-semibold text-[#111827]">{item}</p>
                   <p className="mt-2 text-sm leading-6 text-[#667085]">Kasus ini tidak dibuang. Taptu menyimpannya sebagai exception agar HR tetap bisa memutuskan dengan jejak audit.</p>
                 </div>
               ))}
@@ -2575,7 +2566,7 @@ export function AppPage() {
                 <div key={item.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-black text-[#111827]">{item.employeeName}</p>
+                      <p className="text-sm font-semibold text-[#111827]">{item.employeeName}</p>
                       <p className="mt-2 text-sm leading-6 text-[#667085]">{item.detail}</p>
                     </div>
                     <StatusBadge tone={item.status === "success" ? "success" : item.status === "expired" ? "warning" : "danger"}>{item.status}</StatusBadge>
@@ -2616,7 +2607,7 @@ export function AppPage() {
                   <div key={loc.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <p className="font-black text-[#111827]">{loc.name}</p>
+                        <p className="font-semibold text-[#111827]">{loc.name}</p>
                         {loc.address && <p className="mt-1 text-xs font-semibold text-[#667085]">{loc.address}</p>}
                         <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-[#7a8495]">
                           <span>Radius: {loc.radiusMeters} m</span>
@@ -2646,7 +2637,7 @@ export function AppPage() {
 
             {locationFormOpen && isAdmin && (
               <div className="mt-5 rounded-[24px] border border-[#d6def0] bg-white p-5">
-                <p className="mb-4 text-sm font-black text-[#111827]">{editingLocation ? "Edit lokasi" : "Tambah lokasi baru"}</p>
+                <p className="mb-4 text-sm font-semibold text-[#111827]">{editingLocation ? "Edit lokasi" : "Tambah lokasi baru"}</p>
                 <form className="grid gap-4" onSubmit={handleSaveLocation}>
                   <FormInput label="Nama lokasi" value={locationForm.name} onChange={(e) => setLocationForm((c) => ({ ...c, name: e.target.value }))} placeholder="Kantor Pusat" required />
                   <FormInput label="Alamat (opsional)" value={locationForm.address} onChange={(e) => setLocationForm((c) => ({ ...c, address: e.target.value }))} placeholder="Jl. Sudirman No. 1" />
@@ -2687,7 +2678,7 @@ export function AppPage() {
                   <div key={shift.id} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <p className="font-black text-[#111827]">{shift.name}</p>
+                        <p className="font-semibold text-[#111827]">{shift.name}</p>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-[#7a8495]">
                           <span>{shift.startTime} - {shift.endTime}</span>
                           <span>Toleransi: {shift.gracePeriodMinutes} mnt</span>
@@ -2717,7 +2708,7 @@ export function AppPage() {
 
             {shiftFormOpen && isAdmin && (
               <div className="mt-5 rounded-[24px] border border-[#d6def0] bg-white p-5">
-                <p className="mb-4 text-sm font-black text-[#111827]">{editingShift ? "Edit shift" : "Tambah shift baru"}</p>
+                <p className="mb-4 text-sm font-semibold text-[#111827]">{editingShift ? "Edit shift" : "Tambah shift baru"}</p>
                 <form className="grid gap-4" onSubmit={handleSaveShift}>
                   <FormInput label="Nama shift" value={shiftForm.name} onChange={(e) => setShiftForm((c) => ({ ...c, name: e.target.value }))} placeholder="Shift Pagi" required />
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -2824,7 +2815,7 @@ export function AppPage() {
                 id: row.id,
                 employee: (
                   <div>
-                    <p className="font-black text-[#111827]">{row.employeeName}</p>
+                    <p className="font-semibold text-[#111827]">{row.employeeName}</p>
                     <p className="mt-1 text-xs font-semibold text-[#667085]">{row.workLocationName}</p>
                   </div>
                 ),

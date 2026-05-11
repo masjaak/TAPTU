@@ -6,6 +6,7 @@ import { Home, Users } from "lucide-react";
 
 import {
   AppShell,
+  CategorySelect,
   DataTable,
   EmptyState,
   ErrorState,
@@ -112,6 +113,78 @@ describe("post-login design system", () => {
     expect(screen.getByText("Belum ada data")).toBeTruthy();
     expect(screen.getByText("Memuat data")).toBeTruthy();
     expect(screen.getByText("Gagal memuat")).toBeTruthy();
+  });
+
+  it("CategorySelect renders trigger with selected label and closed state", () => {
+    const groups = [
+      { label: "Utama", options: [{ id: "izin", label: "Izin" }, { id: "cuti_tahunan", label: "Cuti Tahunan" }] }
+    ];
+    render(<CategorySelect label="Kategori" value="Izin" onChange={vi.fn()} groups={groups} />);
+    const trigger = screen.getByRole("combobox");
+    expect(trigger).toBeTruthy();
+    expect(trigger.textContent).toContain("Izin");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("CategorySelect opens dropdown and shows all options and groups on click", () => {
+    const groups = [
+      { label: "Utama", options: [{ id: "izin", label: "Izin" }, { id: "cuti_tahunan", label: "Cuti Tahunan" }] },
+      { label: "Cuti Khusus", options: [{ id: "cuti_menikah", label: "Cuti Menikah" }] }
+    ];
+    render(<CategorySelect label="Kategori" value="Izin" onChange={vi.fn()} groups={groups} />);
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(screen.getByText("Cuti Tahunan")).toBeTruthy();
+    expect(screen.getByText("Cuti Menikah")).toBeTruthy();
+    expect(screen.getByText("Cuti Khusus")).toBeTruthy();
+  });
+
+  it("CategorySelect calls onChange and closes when option is clicked", () => {
+    const handleChange = vi.fn();
+    const groups = [
+      { label: "Utama", options: [{ id: "izin", label: "Izin" }, { id: "cuti_tahunan", label: "Cuti Tahunan" }] }
+    ];
+    render(<CategorySelect label="Kategori" value="Izin" onChange={handleChange} groups={groups} />);
+    fireEvent.click(screen.getByRole("combobox"));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Cuti Tahunan" }));
+    expect(handleChange).toHaveBeenCalledWith("Cuti Tahunan");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("CategorySelect closes on Escape key", () => {
+    const groups = [{ label: "Utama", options: [{ id: "izin", label: "Izin" }] }];
+    render(<CategorySelect label="Kategori" value="Izin" onChange={vi.fn()} groups={groups} />);
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("CategorySelect marks selected option with aria-selected true", () => {
+    const groups = [
+      { label: "Utama", options: [{ id: "izin", label: "Izin" }, { id: "cuti_tahunan", label: "Cuti Tahunan" }] }
+    ];
+    render(<CategorySelect label="Kategori" value="Izin" onChange={vi.fn()} groups={groups} />);
+    fireEvent.click(screen.getByRole("combobox"));
+    const selectedOpt = screen.getByRole("option", { name: "Izin" });
+    const unselectedOpt = screen.getByRole("option", { name: "Cuti Tahunan" });
+    expect(selectedOpt.getAttribute("aria-selected")).toBe("true");
+    expect(unselectedOpt.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("CategorySelect closes when clicking outside the trigger and listbox", () => {
+    const groups = [{ label: "Utama", options: [{ id: "izin", label: "Izin" }] }];
+    render(
+      <div>
+        <div data-testid="outside">Outside</div>
+        <CategorySelect label="Kategori" value="Izin" onChange={vi.fn()} groups={groups} />
+      </div>
+    );
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    fireEvent.mouseDown(screen.getByTestId("outside"));
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 
   it("does not keep old dashboard theme traces in active post-login source", () => {

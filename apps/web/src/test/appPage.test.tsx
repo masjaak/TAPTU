@@ -374,7 +374,7 @@ describe("AppPage", () => {
     expect(screen.getByText(/validasi singkat/i)).toBeTruthy();
     expect(screen.getByText(/Lihat detail validasi/i)).toBeTruthy();
     expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
-    expect(await screen.findByText(/Check-in 08:03/i)).toBeTruthy();
+    expect(await screen.findByText(/Masuk 08[.:]03/i)).toBeTruthy();
   });
 
   it("replaces existing employee history when the server refresh returns empty", async () => {
@@ -493,7 +493,7 @@ describe("AppPage", () => {
     renderRoute("/app/history");
 
     expect((await screen.findAllByText(/2 Mei 2026/i)).length).toBeGreaterThan(0);
-    expect(await screen.findByText(/Check-in 08[.:]03/i)).toBeTruthy();
+    expect(await screen.findByText(/Masuk 08[.:]03/i)).toBeTruthy();
     expect(screen.queryByText(/undefined/i)).toBeNull();
   });
 
@@ -562,7 +562,7 @@ describe("AppPage", () => {
     expect(screen.getByRole("button", { name: "Hadir" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Masalah" })).toBeTruthy();
     expect(await screen.findByText(/Senin, 11 Mei 2026/i)).toBeTruthy();
-    expect(screen.getByText(/Check-in 08:02 · Check-out 17:05/i)).toBeTruthy();
+    expect(screen.getByText(/Masuk 08[.:]02 · Keluar 17[.:]05/i)).toBeTruthy();
     expect(screen.getByText(/Durasi 9j 03m · Kantor Pusat/i)).toBeTruthy();
     expect(screen.getByText(/Metode: QR/i)).toBeTruthy();
   });
@@ -678,7 +678,7 @@ describe("AppPage", () => {
     );
     await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/Check-in 08:03/i)).toBeTruthy();
+    expect(await screen.findByText(/Masuk 08[.:]03/i)).toBeTruthy();
 
     createObjectUrl.mockRestore();
   });
@@ -1024,7 +1024,7 @@ describe("AppPage", () => {
 
     renderRoute("/app/history");
 
-    const historySummary = await screen.findByText(/Check-in 08:03/i);
+    const historySummary = await screen.findByText(/Masuk 08[.:]03/i);
     const historyDetails = historySummary.closest("details");
 
     expect(historyDetails).toBeTruthy();
@@ -1127,11 +1127,14 @@ describe("AppPage", () => {
 
     renderRoute("/app/requests");
 
-    expect(await screen.findByText("Koreksi Absensi")).toBeTruthy();
+    const combobox = await screen.findByRole("combobox");
+    fireEvent.click(combobox);
+    expect(screen.getByText("Koreksi Absensi")).toBeTruthy();
     expect(screen.getByText("Lupa Check-in/out")).toBeTruthy();
     expect(screen.queryByText("Permission")).toBeNull();
     expect(screen.queryByText("Attendance Correction")).toBeNull();
     expect(screen.queryByText("Forgot Check-in/out")).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByRole("button", { name: /kirim pengajuan/i })).toBeTruthy();
   });
 });

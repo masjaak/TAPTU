@@ -1,13 +1,14 @@
 import { clsx } from "clsx";
+import { createPortal } from "react-dom";
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
   SelectHTMLAttributes
 } from "react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { AlertCircle, Loader2, Menu, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Loader2, Menu, X } from "lucide-react";
 
 export interface AppNavItem {
   key: string;
@@ -51,43 +52,43 @@ export function AppShell({
 
   const navButtonClass = (key: string) =>
     clsx(
-      "flex min-w-0 items-center gap-3 rounded-[18px] px-3 py-3 text-left text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+      "flex min-w-0 items-center gap-3 rounded-[18px] px-3 py-2.5 text-left text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
       activeKey === key
-        ? "bg-[#111827] text-white shadow-[0_14px_30px_rgba(20,24,31,0.16)]"
+        ? "bg-[#111827] font-bold text-white shadow-[0_14px_30px_rgba(20,24,31,0.16)]"
         : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
     );
 
   return (
     <div className="min-h-screen bg-[#e9eaec] px-2 pb-24 pt-2 text-[#101217] sm:px-6 sm:py-4 lg:px-8" data-testid="app-shell" data-visual-language="landing-canvas">
-      <main className="mx-auto flex max-w-7xl flex-col gap-3 overflow-hidden rounded-[22px] border border-white/70 bg-[#f9fafc] p-2 shadow-[0_24px_70px_rgba(20,24,31,0.14)] sm:rounded-[34px] sm:p-4 lg:grid lg:min-h-[calc(100vh-32px)] lg:grid-cols-[260px_1fr] lg:gap-4 lg:p-6">
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 overflow-hidden rounded-[22px] border border-white/70 bg-[#f9fafc] p-2 shadow-[0_24px_70px_rgba(20,24,31,0.14)] sm:rounded-[34px] sm:p-4 lg:grid lg:min-h-[calc(100vh-32px)] lg:grid-cols-[256px_1fr] lg:gap-5 lg:p-6">
         <header data-testid="mobile-app-header" className="flex items-center justify-between rounded-[20px] border border-[#edf0f5] bg-white px-3 py-3 shadow-[0_12px_28px_rgba(20,24,31,0.07)] sm:px-4 lg:hidden">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#111827] text-sm font-black text-white">T</span>
             <div className="min-w-0">
-              <p className="text-sm font-black tracking-[-0.02em] text-[#111827]">Taptu</p>
-              <p className="truncate text-xs font-semibold text-[#596172]">{activeItem?.label ?? "Workspace"}</p>
+              <p className="text-sm font-bold tracking-[-0.02em] text-[#111827]">Taptu</p>
+              <p className="truncate text-xs font-medium text-[#596172]">{activeItem?.label ?? "Workspace"}</p>
             </div>
           </div>
           <button
             type="button"
             aria-label="Buka navigasi"
             onClick={() => setDrawerOpen(true)}
-            className="grid h-10 w-10 place-items-center rounded-2xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+            className="grid h-9 w-9 place-items-center rounded-xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </button>
         </header>
 
         <aside data-testid="desktop-app-sidebar" className="hidden flex-col rounded-[28px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] lg:flex">
           <div className="flex items-center gap-3 px-1 py-2">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#111827] text-sm font-black text-white">T</span>
             <div>
-              <p className="text-sm font-black tracking-[-0.02em] text-[#111827]">Taptu</p>
-              <p className="text-xs font-semibold text-[#7a8495]">Attendance OS</p>
+              <p className="text-sm font-bold tracking-[-0.02em] text-[#111827]">Taptu</p>
+              <p className="text-xs font-medium text-[#7a8495]">Attendance OS</p>
             </div>
           </div>
 
-          <nav className="mt-6 grid gap-2" aria-label="Workspace navigation">
+          <nav className="mt-5 grid gap-1" aria-label="Workspace navigation">
             {navigation.map((item) => (
               <button
                 key={item.key}
@@ -101,15 +102,15 @@ export function AppShell({
             ))}
           </nav>
 
-          <div className="mt-6 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4 lg:mt-auto">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
-            <p className="mt-2 text-sm font-black text-[#111827]">{user.fullName}</p>
-            <p className="mt-1 text-xs font-semibold text-[#7a8495]">{user.organizationName}</p>
+          <div className="mt-5 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4 lg:mt-auto">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
+            <p className="mt-2 text-sm font-bold text-[#111827]">{user.fullName}</p>
+            <p className="mt-0.5 text-xs font-medium text-[#7a8495]">{user.organizationName}</p>
             {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col gap-3 lg:gap-4">
+        <section className="flex min-w-0 flex-col gap-4 lg:gap-5">
           {children}
         </section>
       </main>
@@ -125,23 +126,23 @@ export function AppShell({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#111827] text-sm font-black text-white">T</span>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#111827] text-sm font-black text-white">T</span>
                 <div>
-                  <p className="text-sm font-black tracking-[-0.02em] text-[#111827]">Taptu</p>
-                  <p className="text-xs font-semibold text-[#596172]">{user.organizationName}</p>
+                  <p className="text-sm font-bold tracking-[-0.02em] text-[#111827]">Taptu</p>
+                  <p className="text-xs font-medium text-[#596172]">{user.organizationName}</p>
                 </div>
               </div>
               <button
                 type="button"
                 aria-label="Tutup navigasi"
                 onClick={() => setDrawerOpen(false)}
-                className="grid h-10 w-10 place-items-center rounded-2xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+                className="grid h-9 w-9 place-items-center rounded-xl border border-[#d8dde7] bg-white text-[#111827] transition hover:bg-[#f8faff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <nav className="mt-6 grid gap-2" aria-label="Mobile workspace navigation">
+            <nav className="mt-5 grid gap-1" aria-label="Mobile workspace navigation">
               {navigation.map((item) => (
                 <button key={item.key} type="button" onClick={() => handleNavigate(item)} className={navButtonClass(item.key)}>
                   <item.icon className="h-4 w-4 shrink-0" />
@@ -150,10 +151,10 @@ export function AppShell({
               ))}
             </nav>
 
-            <div className="mt-auto rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
-              <p className="mt-2 text-sm font-black text-[#111827]">{user.fullName}</p>
-              <p className="mt-1 text-xs font-semibold text-[#7a8495]">{user.organizationName}</p>
+            <div className="mt-auto rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
+              <p className="mt-2 text-sm font-bold text-[#111827]">{user.fullName}</p>
+              <p className="mt-0.5 text-xs font-medium text-[#7a8495]">{user.organizationName}</p>
               {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
             </div>
           </div>
@@ -173,7 +174,7 @@ export function AppShell({
               aria-current={activeKey === item.key ? "page" : undefined}
               onClick={() => handleNavigate(item)}
               className={clsx(
-                "grid min-h-14 min-w-0 place-items-center gap-1 rounded-[18px] px-1 py-2 text-[10px] font-black transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+                "grid min-h-13 min-w-0 place-items-center gap-1 rounded-[18px] px-1 py-2 text-[10px] font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
                 activeKey === item.key ? "bg-[#111827] text-white" : "text-[#667085] hover:bg-[#f1f5ff] hover:text-[#111827]"
               )}
             >
@@ -193,8 +194,8 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow: s
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p>
-          <h1 className="mt-2 break-words text-xl font-black leading-tight tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-4xl sm:tracking-[-0.03em]">{title}</h1>
-          {description ? <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[#596172] sm:mt-3 sm:text-base sm:leading-7">{description}</p> : null}
+          <h1 className="mt-2 break-words text-xl font-bold leading-tight tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-3xl sm:tracking-[-0.03em]">{title}</h1>
+          {description ? <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[#596172] sm:mt-3 sm:leading-7">{description}</p> : null}
         </div>
         {action}
       </div>
@@ -206,7 +207,7 @@ export function Panel({ eyebrow, title, children, className }: { eyebrow?: strin
   return (
     <section className={clsx("min-w-0 rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[30px] sm:p-6", className)}>
       {eyebrow ? <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p> : null}
-      {title ? <h2 className="mt-2 break-words text-xl font-black tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-2xl sm:tracking-[-0.03em]">{title}</h2> : null}
+      {title ? <h2 className="mt-2 break-words text-lg font-bold tracking-[-0.01em] text-[#101217] sm:mt-2.5 sm:text-xl">{title}</h2> : null}
       <div className={title || eyebrow ? "mt-4 min-w-0 sm:mt-5" : "min-w-0"}>{children}</div>
     </section>
   );
@@ -215,9 +216,9 @@ export function Panel({ eyebrow, title, children, className }: { eyebrow?: strin
 export function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <article className="min-w-0 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:rounded-[26px] sm:p-5">
-      <p className="break-words text-sm font-bold text-[#596172]">{label}</p>
-      <p className="mt-3 break-words text-2xl font-black tracking-[-0.02em] text-[#111827] sm:mt-4 sm:text-3xl sm:tracking-[-0.04em]">{value}</p>
-      {detail ? <p className="mt-2 break-words text-sm leading-6 text-[#667085]">{detail}</p> : null}
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.08em] text-[#596172]">{label}</p>
+      <p className="mt-3 break-words text-2xl font-black tracking-[-0.02em] text-[#111827] sm:mt-3">{value}</p>
+      {detail ? <p className="mt-1.5 break-words text-xs leading-5 text-[#667085]">{detail}</p> : null}
     </article>
   );
 }
@@ -225,7 +226,7 @@ export function StatCard({ label, value, detail }: { label: string; value: strin
 export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "success" | "warning" | "danger" | "neutral" | "info" }) {
   return (
     <span
-      className={clsx("inline-flex max-w-full items-center rounded-full px-3 py-1 text-left text-[11px] font-black uppercase tracking-[0.08em] sm:text-xs sm:tracking-[0.12em]", {
+      className={clsx("inline-flex max-w-full shrink-0 items-center rounded-full px-2.5 py-1 text-left text-[11px] font-semibold tracking-[0.04em]", {
         "bg-[#edf4ff] text-[#174ea6]": tone === "success",
         "bg-[#fff3dc] text-[#92600a]": tone === "warning",
         "bg-[#fff2ee] text-[#a54c2f]": tone === "danger",
@@ -242,7 +243,7 @@ export function PrimaryButton({ className, ...props }: ButtonHTMLAttributes<HTML
   return (
     <button
       className={clsx(
-        "inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1769ff] px-4 py-3 text-center text-sm font-bold text-white shadow-[0_16px_34px_rgba(23,105,255,0.22)] transition hover:bg-[#0d5be8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] sm:px-5",
+        "inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1769ff] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-[0_16px_34px_rgba(23,105,255,0.22)] transition hover:bg-[#0d5be8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] sm:px-5",
         className
       )}
       {...props}
@@ -254,7 +255,7 @@ export function SecondaryButton({ className, ...props }: ButtonHTMLAttributes<HT
   return (
     <button
       className={clsx(
-        "inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d8dde7] bg-white px-4 py-3 text-center text-sm font-bold text-[#111827] transition hover:border-[#b9c2d3] hover:bg-[#f8faff] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] sm:px-5",
+        "inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d8dde7] bg-white px-4 py-2.5 text-center text-sm font-semibold text-[#111827] transition hover:border-[#b9c2d3] hover:bg-[#f8faff] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] sm:px-5",
         className
       )}
       {...props}
@@ -275,20 +276,20 @@ export function FormInput({
 
   return (
     <label htmlFor={inputId} className="block">
-      <span className="mb-2 block text-sm font-bold text-[#111827]">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold text-[#111827]">{label}</span>
       <input
         id={inputId}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
         className={clsx(
-          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base",
+          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
           error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
         {...props}
       />
-      {error ? <p id={`${inputId}-error`} className="mt-2 text-sm font-semibold text-[#a54c2f]">{error}</p> : null}
-      {!error && hint ? <p id={`${inputId}-hint`} className="mt-2 text-sm leading-6 text-[#667085]">{hint}</p> : null}
+      {error ? <p id={`${inputId}-error`} className="mt-1.5 text-xs font-semibold text-[#a54c2f]">{error}</p> : null}
+      {!error && hint ? <p id={`${inputId}-hint`} className="mt-1.5 text-xs leading-5 text-[#667085]">{hint}</p> : null}
     </label>
   );
 }
@@ -307,13 +308,13 @@ export function SelectInput({
 
   return (
     <label htmlFor={selectId} className="block">
-      <span className="mb-2 block text-sm font-bold text-[#111827]">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold text-[#111827]">{label}</span>
       <select
         id={selectId}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
         className={clsx(
-          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base",
+          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
           error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
@@ -321,9 +322,195 @@ export function SelectInput({
       >
         {children}
       </select>
-      {error ? <p id={`${selectId}-error`} className="mt-2 text-sm font-semibold text-[#a54c2f]">{error}</p> : null}
-      {!error && hint ? <p id={`${selectId}-hint`} className="mt-2 text-sm leading-6 text-[#667085]">{hint}</p> : null}
+      {error ? <p id={`${selectId}-error`} className="mt-1.5 text-xs font-semibold text-[#a54c2f]">{error}</p> : null}
+      {!error && hint ? <p id={`${selectId}-hint`} className="mt-1.5 text-xs leading-5 text-[#667085]">{hint}</p> : null}
     </label>
+  );
+}
+
+export interface CategorySelectOption {
+  id: string;
+  label: string;
+}
+
+export interface CategorySelectGroup {
+  label: string;
+  options: CategorySelectOption[];
+}
+
+export function CategorySelect({
+  label,
+  value,
+  onChange,
+  groups,
+  error,
+  hint
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  groups: CategorySelectGroup[];
+  error?: string;
+  hint?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedLabel =
+    groups.flatMap((g) => g.options).find((o) => o.label === value || o.id === value)?.label ?? value;
+
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        close();
+        triggerRef.current?.focus();
+      }
+    }
+
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      close();
+    }
+
+    function handleScroll() {
+      close();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open, close]);
+
+  function handleToggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    if (triggerRef.current) {
+      setTriggerRect(triggerRef.current.getBoundingClientRect());
+    }
+    setOpen(true);
+  }
+
+  function handleSelect(optionLabel: string) {
+    onChange(optionLabel);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  const inputId = label.toLowerCase().replace(/\s+/g, "-");
+  const listboxId = `${inputId}-listbox`;
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
+
+  const dropdownStyle: React.CSSProperties = triggerRect
+    ? {
+        position: "fixed",
+        top: `${triggerRect.bottom + 4}px`,
+        left: `${triggerRect.left}px`,
+        width: `${triggerRect.width}px`,
+        maxHeight: "300px",
+        zIndex: 9999,
+        overflowY: "auto"
+      }
+    : { position: "fixed", top: "0", left: "0", width: "0", maxHeight: "300px", zIndex: 9999 };
+
+  return (
+    <div className="block">
+      <span className="mb-1.5 block text-sm font-semibold text-[#111827]">{label}</span>
+      <button
+        ref={triggerRef}
+        type="button"
+        id={inputId}
+        role="combobox"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={open ? listboxId : undefined}
+        aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
+        onClick={handleToggle}
+        className={clsx(
+          "flex w-full items-center justify-between rounded-2xl border bg-[#f9fafc] px-4 py-3 text-left text-sm text-[#111827] outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+          open
+            ? "border-[#1769ff] bg-white ring-2 ring-[#1769ff]/10"
+            : error
+              ? "border-[#e7b4b4] bg-[#fffafa]"
+              : "border-[#e2e7f0] hover:border-[#c8d0e0] hover:bg-white"
+        )}
+      >
+        <span className="min-w-0 truncate font-medium">{selectedLabel}</span>
+        <ChevronDown
+          className={clsx(
+            "ml-2 h-4 w-4 shrink-0 text-[#667085] transition-transform duration-150",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={listRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={label}
+            style={dropdownStyle}
+            className="rounded-2xl border border-[#e2e7f0] bg-white shadow-[0_8px_32px_rgba(20,24,31,0.14)]"
+          >
+            {groups.map((group) => (
+              <div key={group.label} role="group" aria-label={group.label}>
+                <p className="px-4 pb-1 pt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#667085]">
+                  {group.label}
+                </p>
+                {group.options.map((option) => {
+                  const isSelected = option.label === value || option.id === value;
+                  return (
+                    <div
+                      key={option.id}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={0}
+                      onMouseDown={() => handleSelect(option.label)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleSelect(option.label);
+                        }
+                      }}
+                      className={clsx(
+                        "flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm transition",
+                        isSelected
+                          ? "bg-[#edf4ff] font-semibold text-[#1769ff]"
+                          : "font-medium text-[#111827] hover:bg-[#f4f7ff]"
+                      )}
+                    >
+                      <span>{option.label}</span>
+                      {isSelected ? <Check className="h-3.5 w-3.5 shrink-0 text-[#1769ff]" /> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="h-2" />
+          </div>,
+          document.body
+        )}
+
+      {error ? <p id={`${inputId}-error`} className="mt-1.5 text-xs font-semibold text-[#a54c2f]">{error}</p> : null}
+      {!error && hint ? <p id={`${inputId}-hint`} className="mt-1.5 text-xs leading-5 text-[#667085]">{hint}</p> : null}
+    </div>
   );
 }
 
@@ -344,7 +531,7 @@ export function DataTable({
           <thead className="bg-[#f9fafc]">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} scope="col" className="px-4 py-3 text-left text-xs font-black uppercase tracking-[0.14em] text-[#667085]">
+                <th key={column.key} scope="col" className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#667085]">
                   {column.header}
                 </th>
               ))}
@@ -354,7 +541,7 @@ export function DataTable({
             {rows.map((row) => (
               <tr key={row.id}>
                 {columns.map((column) => (
-                  <td key={column.key} className="max-w-[240px] break-words px-3 py-3 text-sm font-semibold text-[#111827] sm:px-4 sm:py-4">
+                  <td key={column.key} className="max-w-[240px] break-words px-3 py-3.5 text-sm text-[#111827] sm:px-4">
                     {row[column.key]}
                   </td>
                 ))}
@@ -369,8 +556,8 @@ export function DataTable({
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-4 py-7 text-center sm:px-5 sm:py-8" role="status">
-      <p className="break-words text-base font-black text-[#111827]">{title}</p>
+    <div className="rounded-[22px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-4 py-8 text-center sm:px-5 sm:py-10" role="status">
+      <p className="break-words text-sm font-bold text-[#111827]">{title}</p>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#596172]">{description}</p>
     </div>
   );
@@ -379,14 +566,14 @@ export function EmptyState({ title, description }: { title: string; description:
 export function LoadingState({ label = "Memuat data" }: { label?: string }) {
   return (
     <div className="rounded-[24px] border border-[#edf0f5] bg-white p-4" role="status" aria-live="polite" aria-busy="true">
-      <div className="flex items-center gap-3 text-sm font-bold text-[#596172]">
+      <div className="flex items-center gap-3 text-sm font-medium text-[#596172]">
         <Loader2 className="h-4 w-4 animate-spin text-[#1769ff]" />
         {label}
       </div>
       <div className="mt-4 grid gap-3">
-        <div className="h-3 w-2/5 animate-pulse rounded-full bg-[#edf0f5]" />
-        <div className="h-3 w-full animate-pulse rounded-full bg-[#f1f5ff]" />
-        <div className="h-3 w-4/5 animate-pulse rounded-full bg-[#edf0f5]" />
+        <div className="h-2.5 w-2/5 animate-pulse rounded-full bg-[#edf0f5]" />
+        <div className="h-2.5 w-full animate-pulse rounded-full bg-[#f1f5ff]" />
+        <div className="h-2.5 w-4/5 animate-pulse rounded-full bg-[#edf0f5]" />
       </div>
     </div>
   );
@@ -395,9 +582,9 @@ export function LoadingState({ label = "Memuat data" }: { label?: string }) {
 export function ErrorState({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex items-start gap-3 rounded-[24px] border border-[#f2caca] bg-[#fff5f5] p-4" role="alert">
-      <AlertCircle className="mt-0.5 h-5 w-5 text-[#a54c2f]" />
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#a54c2f]" />
       <div>
-        <p className="text-sm font-black text-[#8a2f2f]">{title}</p>
+        <p className="text-sm font-bold text-[#8a2f2f]">{title}</p>
         <p className="mt-1 text-sm leading-6 text-[#a54c2f]">{description}</p>
       </div>
     </div>
@@ -415,7 +602,7 @@ export function Dialog({ title, open, children, onClose }: { title: string; open
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#101217]/45 px-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="w-full max-w-lg rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)] sm:rounded-[30px] sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <h2 id={titleId} className="break-words text-xl font-black tracking-[-0.02em] text-[#111827] sm:text-2xl sm:tracking-[-0.03em]">{title}</h2>
+          <h2 id={titleId} className="break-words text-lg font-bold tracking-[-0.01em] text-[#111827] sm:text-xl">{title}</h2>
           <SecondaryButton onClick={onClose} aria-label={`Tutup dialog ${title}`}>Tutup</SecondaryButton>
         </div>
         <div className="mt-5">{children}</div>
