@@ -1329,8 +1329,8 @@ export function AppPage() {
                 </StatusBadge>
                 <span className="text-[12px] font-medium text-[#8099c8]">{now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
               </div>
-              <p className="mt-2.5 text-[17px] font-semibold tracking-[-0.01em] text-[#111827] sm:text-[18px]">{statusCopy.title}</p>
-              <p className="mt-1 break-words text-[13px] leading-5 text-[#596172]">{statusCopy.subtitle}</p>
+              <p className="mt-2 text-[16px] font-semibold leading-snug text-[#111827] sm:text-[17px]">{statusCopy.title}</p>
+              <p className="mt-1 break-words text-[13px] leading-[1.45] text-[#596172]">{statusCopy.subtitle}</p>
             </div>
             <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
               <PrimaryButton
@@ -1367,8 +1367,8 @@ export function AppPage() {
           <Panel eyebrow="Shift" title="Shift hari ini">
             <div className="rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
               <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#7a8495]">{shift.name}</p>
-              <p className="mt-1.5 text-[17px] font-semibold text-[#111827]">{shift.startTime}–{shift.endTime}</p>
-              <p className="mt-1 text-[13px] text-[#596172]">{shift.locationName}</p>
+              <p className="mt-1.5 tabular-nums text-[17px] font-semibold leading-tight text-[#111827]">{shift.startTime}–{shift.endTime}</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#596172]">{shift.locationName}</p>
             </div>
           </Panel>
 
@@ -1471,10 +1471,13 @@ export function AppPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-[12px] font-medium text-[#8099c8]">Halo, {currentSession.user.fullName}</p>
-                  <p className="mt-1.5 break-words text-[26px] font-bold tracking-[-0.02em] text-[#111827] sm:text-[28px]">
+                  <p
+                    data-testid="attendance-clock"
+                    className="mt-1.5 tabular-nums text-[24px] font-semibold leading-none tracking-[-0.01em] text-[#111827] sm:text-[26px]"
+                  >
                     {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                   </p>
-                  <p className="mt-1 text-[13px] text-[#596172]">
+                  <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">
                     {now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </p>
                 </div>
@@ -1530,7 +1533,7 @@ export function AppPage() {
                 {checkInMode === "qr" ? (
                   <div className="mt-4">
                     <p className="text-[15px] font-semibold text-[#111827]">Check-in dengan QR</p>
-                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Arahkan kamera ke QR scanner untuk memulai absensi.</p>
+                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Gunakan QR aktif di kiosk untuk memulai check-in.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
                         <div className="absolute inset-5 rounded-[20px] border-2 border-dashed border-[#8bb8ff]/60" />
@@ -1649,17 +1652,17 @@ export function AppPage() {
                 ) : null}
               </div>
             ) : effectiveState === "checked_out" ? (
-              <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-[#f9fafc] p-5">
+              <div className="mt-4 rounded-[22px] border border-[#d6def0] bg-[#f9fafc] p-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#1769ff]" />
                   <div className="min-w-0">
-                    <p className="text-lg font-bold text-[#111827]">Check-out berhasil</p>
-                    <p className="mt-2 text-sm leading-6 text-[#596172]">
-                      Record hari ini sudah selesai
+                    <p className="text-[14px] font-semibold text-[#111827]">Check-out berhasil</p>
+                    <p className="mt-1 text-[13px] leading-[1.45] text-[#596172]">
+                      Kehadiran hari ini sudah tercatat
                       {employeeSummary.todayRecord.checkOutTime
-                        ? ` pada ${new Date(employeeSummary.todayRecord.checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
+                        ? ` · Keluar ${new Date(employeeSummary.todayRecord.checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
                         : ""}
-                      . Riwayat terbaru memuat data dari server.
+                      .
                     </p>
                   </div>
                 </div>
@@ -1669,13 +1672,13 @@ export function AppPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-[#f9fafc] p-5">
+              <div className="mt-4 rounded-[22px] border border-[#d6def0] bg-[#f9fafc] p-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-1 h-6 w-6 text-[#1769ff]" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#1769ff]" />
                   <div className="min-w-0">
-                    <p className="text-lg font-bold text-[#111827]">Check-in berhasil</p>
-                    <p className="mt-2 text-sm leading-6 text-[#596172]">
-                      Waktu tercatat {employeeSummary.todayRecord.checkInTime ? new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : checkInTimeLabel} di {activeCheckIn?.locationName ?? employeeSummary.assignedShift.locationName}.
+                    <p className="text-[14px] font-semibold text-[#111827]">Check-in berhasil</p>
+                    <p className="mt-1 tabular-nums text-[13px] leading-[1.45] text-[#596172]">
+                      Masuk {employeeSummary.todayRecord.checkInTime ? new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : checkInTimeLabel} · {activeCheckIn?.locationName ?? employeeSummary.assignedShift.locationName}.
                     </p>
                   </div>
                 </div>
@@ -1692,47 +1695,47 @@ export function AppPage() {
           </Panel>
 
           <Panel eyebrow="Validasi" title="Validasi singkat">
-            <div className="space-y-4">
-              <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-3">
+              <div className="rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#111827]">Status absensi hari ini</p>
-                    <p className="mt-2 text-sm leading-6 text-[#667085]">
+                    <p className="text-[13px] font-semibold text-[#111827]">Status absensi hari ini</p>
+                    <p className="mt-1 tabular-nums text-[12px] leading-5 text-[#667085]">
                       {employeeSummary.todayRecord.checkInTime
-                        ? `Check-in tersimpan pada ${new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
-                        : "Belum ada record check-in hari ini."}
+                        ? `Masuk ${new Date(employeeSummary.todayRecord.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
+                        : "Belum ada catatan check-in hari ini."}
                     </p>
                     {employeeSummary.todayRecord.validationReasons.length > 0 ? (
-                      <p className="mt-2 text-xs font-semibold text-[#8a5c00]">{employeeSummary.todayRecord.validationReasons.join(" · ")}</p>
+                      <p className="mt-1.5 text-[12px] font-medium text-[#8a5c00]">{employeeSummary.todayRecord.validationReasons.join(" · ")}</p>
                     ) : null}
                   </div>
                   <StatusBadge tone={recordValidationTone}>
                     {employeeSummary.todayRecord.validationStatus === "needs_review"
-                      ? "Need Review"
+                      ? "Perlu review"
                       : employeeSummary.todayRecord.validationStatus === "blocked"
-                        ? "Blocked"
-                        : "Verified"}
+                        ? "Terblokir"
+                        : "Terverifikasi"}
                   </StatusBadge>
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+              <div className="rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
                 <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-1 h-5 w-5 text-[#1769ff]" />
-                  <div>
-                    <p className="text-sm font-semibold text-[#111827]">Lokasi valid · Kamera siap · Device verified</p>
-                    <p className="mt-2 text-sm leading-6 text-[#596172]">{attendanceTrust.detail}</p>
-                    <details className="mt-3 rounded-xl border border-[#dfe6f2] bg-white px-3.5 py-2.5">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#1769ff]" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[#111827]">Lokasi · Kamera · Perangkat</p>
+                    <p className="mt-1 text-[12px] leading-5 text-[#596172]">{attendanceTrust.detail}</p>
+                    <details className="mt-2.5 rounded-xl border border-[#dfe6f2] bg-white px-3.5 py-2.5">
                       <summary className="cursor-pointer text-[13px] font-semibold text-[#1769ff]">Lihat detail validasi</summary>
-                      <div className="mt-3 grid gap-2 text-xs font-semibold text-[#667085]">
-                        <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} meter</p>
-                        <p>Jarak saat ini: {attendanceTrustSignal.distanceFromOfficeMeters ?? "Belum dicek"} meter</p>
+                      <div className="mt-2.5 grid gap-1.5 tabular-nums text-[12px] text-[#667085]">
+                        <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} m</p>
+                        <p>Jarak saat ini: {attendanceTrustSignal.distanceFromOfficeMeters ?? "Belum dicek"} m</p>
                         <p>Device ID: {attendanceCapture.deviceId || "Belum dibuat"}</p>
                       </div>
                     </details>
                   </div>
                 </div>
-                <SecondaryButton className="mt-4 w-full" disabled={busyAction === "verify-device"} onClick={handleVerifyAttendanceDevice}>
+                <SecondaryButton className="mt-3 w-full" disabled={busyAction === "verify-device"} onClick={handleVerifyAttendanceDevice}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   {busyAction === "verify-device" ? "Memverifikasi..." : "Verifikasi ulang perangkat"}
                 </SecondaryButton>
@@ -1744,7 +1747,7 @@ export function AppPage() {
                     <RefreshCw className="mt-1 h-5 w-5 animate-spin text-[#1769ff]" />
                     <div>
                       <p className="text-sm font-semibold text-[#111827]">Mengirim check-in</p>
-                      <p className="mt-2 text-sm leading-6 text-[#596172]">Taptu sedang menyimpan waktu, lokasi, metode, dan hasil validasi.</p>
+                      <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Menyimpan waktu, lokasi, dan hasil validasi absensi Anda.</p>
                     </div>
                   </div>
                 </div>
@@ -1811,7 +1814,7 @@ export function AppPage() {
           ) : attendanceHistoryError ? (
             <ErrorState title="Riwayat absensi belum tersedia" description={`${attendanceHistoryError} Coba ganti filter atau muat ulang tab ini.`} />
           ) : historyRows.length === 0 ? (
-            <EmptyState title="Belum ada histori absensi" description="Riwayat check-in dan check-out pribadi akan muncul setelah Anda melakukan absensi atau approval terkait sudah diproses." />
+            <EmptyState title="Belum ada riwayat" description="Data absensi akan muncul setelah check-in pertama Anda tercatat." />
           ) : (
             <div className="grid gap-3">
               <div className="grid gap-3" aria-label="Riwayat absensi employee">
@@ -1822,17 +1825,17 @@ export function AppPage() {
                   >
                     <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] [&::-webkit-details-marker]:hidden">
                       <span>
-                        <span className="block text-sm font-medium text-[#111827]">{item.day}</span>
-                        <span className="mt-0.5 block text-xs text-[#667085]">
+                        <span className="block text-[13px] font-medium text-[#111827]">{item.day}</span>
+                        <span className="mt-0.5 block tabular-nums text-[12px] text-[#667085]">
                           {item.checkInTime ? `Masuk ${item.checkInTime}` : ""}{item.checkOutTime ? ` · Keluar ${item.checkOutTime}` : ""}
                         </span>
-                        <span className="mt-0.5 block text-xs text-[#667085]">Durasi {item.duration} · {item.locationName}</span>
+                        <span className="mt-0.5 block tabular-nums text-[12px] text-[#7a8495]">Durasi {item.duration} · {item.locationName}</span>
                       </span>
                       <StatusBadge tone={item.status === "Belum check-in" ? "neutral" : item.status === "Terlambat" ? "warning" : "success"}>{item.status}</StatusBadge>
                     </summary>
                     <div className="border-t border-[#dce7fb] px-4 py-3.5" role="status">
                       <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Detail absensi</p>
-                      <div className="mt-2.5 grid gap-1.5 text-[13px] text-[#596172] sm:grid-cols-2">
+                      <div className="mt-2.5 grid gap-1.5 tabular-nums text-[12px] text-[#596172] sm:grid-cols-2">
                         <p>Check-in: {item.checkInTime}</p>
                         <p>Check-out: {item.checkOutTime ?? "Belum check-out"}</p>
                         <p>Durasi: {item.duration}</p>
@@ -1866,8 +1869,8 @@ export function AppPage() {
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#7a8495]">{employeeSummary.assignedShift.name}</p>
-                <p className="mt-1.5 break-words text-[17px] font-semibold text-[#111827]">{employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime}</p>
-                <p className="mt-1 text-[13px] text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
+                <p className="mt-1.5 tabular-nums text-[17px] font-semibold leading-tight text-[#111827]">{employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime}</p>
+                <p className="mt-1 text-[13px] leading-5 text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
               </div>
               <StatusBadge tone="info">Hari ini</StatusBadge>
             </div>
@@ -1879,7 +1882,7 @@ export function AppPage() {
 
         <Panel eyebrow="Upcoming" title="Jadwal berikutnya">
           {schedule.length === 0 ? (
-            <EmptyState title="Belum ada jadwal mendatang" description="Data assignment lanjutan belum tersedia; saat ini Taptu menampilkan shift aktif dari ringkasan karyawan." />
+            <EmptyState title="Belum ada jadwal" description="Hubungi HR jika shift belum ditetapkan." />
           ) : (
             <div className="grid gap-3">
               {schedule.map((item) => (
@@ -1901,7 +1904,7 @@ export function AppPage() {
       <Panel eyebrow="Slip Gaji" title="Payroll belum aktif">
         <EmptyState
           title="Modul payroll belum tersambung"
-          description="Saat ini Taptu menyiapkan rekap attendance yang bisa digunakan HR untuk payroll. Slip gaji akan tersedia setelah modul payroll disambungkan."
+          description="Slip gaji akan tersedia setelah modul payroll disambungkan oleh HR."
         />
         <SecondaryButton className="mt-4 w-full sm:w-auto" onClick={() => navigate("/app/history")}>
           Lihat rekap absensi bulan ini

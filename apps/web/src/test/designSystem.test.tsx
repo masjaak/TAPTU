@@ -267,6 +267,12 @@ describe("post-login design system", () => {
     expect(value.className).toContain("font-bold");
   });
 
+  it("StatCard value uses tabular-nums so time values like 08:00–17:00 align consistently", () => {
+    render(<StatCard label="Shift" value="08:00–17:00" detail="Kantor Pusat" />);
+    const value = screen.getByText("08:00–17:00");
+    expect(value.className).toContain("tabular-nums");
+  });
+
   it("does not keep old dashboard theme traces in active post-login source", () => {
     const files = [
       "apps/web/src/pages/AppPage.tsx",

@@ -292,6 +292,28 @@ describe("AppPage", () => {
     expect(screen.getByRole("button", { name: /lihat riwayat/i })).toBeTruthy();
   });
 
+  it("Presensi attendance clock uses tabular-nums and data-testid for precise time display", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: { id: "usr-e", fullName: "Fikri", email: "e@taptu.app", organizationName: "HQ", role: "employee" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 0, onTimeDays: 0, lateDays: 0, pendingRequests: 0, currentAttendanceState: "idle",
+      assignedShift: { id: "s1", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor" },
+      todayRecord: { id: "r1", employeeId: "usr-e", shiftId: "s1", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "", updatedAt: "" }
+    });
+
+    renderRoute("/app/attendance");
+
+    const clock = await screen.findByTestId("attendance-clock");
+    expect(clock.className).toContain("tabular-nums");
+  });
+
   it("renders employee attendance with history on Presensi", async () => {
     localStorage.setItem(
       "taptu-session",
@@ -374,7 +396,7 @@ describe("AppPage", () => {
     expect(screen.getByText(/validasi singkat/i)).toBeTruthy();
     expect(screen.getByText(/Lihat detail validasi/i)).toBeTruthy();
     expect(await screen.findByText(/riwayat absensi/i)).toBeTruthy();
-    expect(await screen.findByText(/Masuk 08[.:]03/i)).toBeTruthy();
+    expect((await screen.findAllByText(/Masuk 08[.:]03/i)).length).toBeGreaterThan(0);
   });
 
   it("replaces existing employee history when the server refresh returns empty", async () => {
@@ -429,7 +451,7 @@ describe("AppPage", () => {
     renderRoute("/app/history");
 
     expect(await screen.findByText(/riwayat absensi/i)).toBeTruthy();
-    expect(await screen.findByText(/belum ada histori absensi/i)).toBeTruthy();
+    expect(await screen.findByText(/belum ada riwayat/i)).toBeTruthy();
     expect(screen.queryByText(/07:55 · Selfie/i)).toBeNull();
   });
 
@@ -678,7 +700,7 @@ describe("AppPage", () => {
     );
     await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/Masuk 08[.:]03/i)).toBeTruthy();
+    expect((await screen.findAllByText(/Masuk 08[.:]03/i)).length).toBeGreaterThan(0);
 
     createObjectUrl.mockRestore();
   });
@@ -1088,7 +1110,7 @@ describe("AppPage", () => {
 
     expect(await screen.findByText(/shift aktif hari ini/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /mulai check-in/i })).toBeTruthy();
-    expect(screen.getByText(/belum ada jadwal mendatang/i)).toBeTruthy();
+    expect(screen.getByText(/belum ada jadwal/i)).toBeTruthy();
 
     cleanup();
     renderRoute("/app/payslip");

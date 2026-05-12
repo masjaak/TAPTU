@@ -219,7 +219,7 @@ export function StatCard({ label, value, detail }: { label: string; value: strin
   return (
     <article className="min-w-0 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:rounded-[22px]">
       <p className="break-words text-[11px] font-medium uppercase tracking-[0.08em] text-[#7a8495]">{label}</p>
-      <p className="mt-2 break-words text-[22px] font-bold tracking-[-0.02em] text-[#111827] lg:text-[20px]">{value}</p>
+      <p className="mt-2 break-words tabular-nums text-[20px] font-bold tracking-[-0.01em] text-[#111827] lg:text-[18px]">{value}</p>
       {detail ? <p className="mt-1 break-words text-[12px] leading-5 text-[#667085]">{detail}</p> : null}
     </article>
   );
