@@ -52,9 +52,9 @@ export function AppShell({
 
   const navButtonClass = (key: string) =>
     clsx(
-      "flex min-w-0 items-center gap-3 rounded-[18px] px-3 py-2.5 text-left text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+      "flex min-w-0 items-center gap-3 rounded-[18px] px-3 py-2 text-left text-[13px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
       activeKey === key
-        ? "bg-[#111827] font-bold text-white shadow-[0_14px_30px_rgba(20,24,31,0.16)]"
+        ? "bg-[#111827] font-semibold text-white shadow-[0_10px_24px_rgba(20,24,31,0.14)]"
         : "text-[#596172] hover:bg-[#f0f4ff] hover:text-[#111827]"
     );
 
@@ -104,11 +104,11 @@ export function AppShell({
             ))}
           </nav>
 
-          <div className="mt-5 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4 lg:mt-auto">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
-            <p className="mt-2 text-sm font-bold text-[#111827]">{user.fullName}</p>
-            <p className="mt-0.5 text-xs font-medium text-[#7a8495]">{user.organizationName}</p>
-            {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
+          <div className="mt-5 rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5 lg:mt-auto">
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#8099c8]">{user.roleLabel}</p>
+            <p className="mt-1.5 text-[13px] font-semibold text-[#111827]">{user.fullName}</p>
+            <p className="mt-0.5 text-[12px] font-medium text-[#7a8495]">{user.organizationName}</p>
+            {actions ? <div className="mt-3 grid gap-2">{actions}</div> : null}
           </div>
         </aside>
 
@@ -153,11 +153,11 @@ export function AppShell({
               ))}
             </nav>
 
-            <div className="mt-auto rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1769ff]">{user.roleLabel}</p>
-              <p className="mt-2 text-sm font-bold text-[#111827]">{user.fullName}</p>
-              <p className="mt-0.5 text-xs font-medium text-[#7a8495]">{user.organizationName}</p>
-              {actions ? <div className="mt-4 grid gap-2">{actions}</div> : null}
+            <div className="mt-auto rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#8099c8]">{user.roleLabel}</p>
+              <p className="mt-1.5 text-[13px] font-semibold text-[#111827]">{user.fullName}</p>
+              <p className="mt-0.5 text-[12px] font-medium text-[#7a8495]">{user.organizationName}</p>
+              {actions ? <div className="mt-3 grid gap-2">{actions}</div> : null}
             </div>
           </div>
         </div>
@@ -192,12 +192,12 @@ export function AppShell({
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: ReactNode }) {
   return (
-    <header className="rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[28px] sm:p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <header className="rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[28px] sm:p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p>
-          <h1 className="mt-2 break-words text-xl font-bold leading-tight tracking-[-0.02em] text-[#101217] sm:mt-3 sm:text-[28px] sm:tracking-[-0.03em] lg:text-[26px]">{title}</h1>
-          {description ? <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[#596172] sm:mt-3 sm:text-[14px] sm:leading-7">{description}</p> : null}
+          <p className="break-words text-[11px] font-medium uppercase tracking-[0.10em] text-[#8099c8]">{eyebrow}</p>
+          <h1 className="mt-1.5 break-words text-[22px] font-semibold leading-tight tracking-[-0.02em] text-[#101217] sm:mt-2 sm:text-[26px] sm:tracking-[-0.03em] lg:text-[24px]">{title}</h1>
+          {description ? <p className="mt-1.5 max-w-2xl break-words text-[13px] leading-6 text-[#596172] sm:mt-2">{description}</p> : null}
         </div>
         {action}
       </div>
@@ -207,20 +207,20 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow: s
 
 export function Panel({ eyebrow, title, children, className }: { eyebrow?: string; title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={clsx("min-w-0 rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[30px] sm:p-6", className)}>
-      {eyebrow ? <p className="break-words text-[11px] font-black uppercase tracking-[0.14em] text-[#1769ff] sm:text-xs sm:tracking-[0.22em]">{eyebrow}</p> : null}
-      {title ? <h2 className="mt-2 break-words text-[17px] font-bold tracking-[-0.01em] text-[#101217] sm:mt-2.5 sm:text-[19px]">{title}</h2> : null}
-      <div className={title || eyebrow ? "mt-4 min-w-0 sm:mt-5" : "min-w-0"}>{children}</div>
+    <section className={clsx("min-w-0 rounded-[22px] border border-[#edf0f5] bg-white p-4 shadow-[0_16px_42px_rgba(20,24,31,0.07)] sm:rounded-[28px] sm:p-5", className)}>
+      {eyebrow ? <p className="break-words text-[11px] font-medium uppercase tracking-[0.08em] text-[#8099c8]">{eyebrow}</p> : null}
+      {title ? <h2 className="mt-1.5 break-words text-[15px] font-semibold tracking-[-0.01em] text-[#101217] sm:text-[16px]">{title}</h2> : null}
+      <div className={title || eyebrow ? "mt-4 min-w-0" : "min-w-0"}>{children}</div>
     </section>
   );
 }
 
 export function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <article className="min-w-0 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:rounded-[26px] sm:p-5">
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.08em] text-[#596172]">{label}</p>
-      <p className="mt-3 break-words text-2xl font-black tracking-[-0.02em] text-[#111827] sm:mt-3 lg:text-[22px]">{value}</p>
-      {detail ? <p className="mt-1.5 break-words text-xs leading-5 text-[#667085]">{detail}</p> : null}
+    <article className="min-w-0 rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:rounded-[22px]">
+      <p className="break-words text-[11px] font-medium uppercase tracking-[0.08em] text-[#7a8495]">{label}</p>
+      <p className="mt-2 break-words text-[22px] font-bold tracking-[-0.02em] text-[#111827] lg:text-[20px]">{value}</p>
+      {detail ? <p className="mt-1 break-words text-[12px] leading-5 text-[#667085]">{detail}</p> : null}
     </article>
   );
 }
@@ -278,13 +278,13 @@ export function FormInput({
 
   return (
     <label htmlFor={inputId} className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-[#111827]">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.05em] text-[#596172]">{label}</span>
       <input
         id={inputId}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
         className={clsx(
-          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
+          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-2.5 text-[13px] text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
           error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
@@ -310,13 +310,13 @@ export function SelectInput({
 
   return (
     <label htmlFor={selectId} className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-[#111827]">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.05em] text-[#596172]">{label}</span>
       <select
         id={selectId}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
         className={clsx(
-          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
+          "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-2.5 text-[13px] text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10",
           error ? "border-[#e7b4b4] bg-[#fffafa]" : undefined,
           className
         )}
@@ -432,7 +432,7 @@ export function CategorySelect({
 
   return (
     <div className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-[#111827]">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.05em] text-[#596172]">{label}</span>
       <button
         ref={triggerRef}
         type="button"
@@ -445,7 +445,7 @@ export function CategorySelect({
         aria-describedby={describedBy}
         onClick={handleToggle}
         className={clsx(
-          "flex w-full items-center justify-between rounded-2xl border bg-[#f9fafc] px-4 py-3 text-left text-sm text-[#111827] outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
+          "flex w-full items-center justify-between rounded-2xl border bg-[#f9fafc] px-4 py-2.5 text-left text-[13px] text-[#111827] outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]",
           open
             ? "border-[#1769ff] bg-white ring-2 ring-[#1769ff]/10"
             : error
@@ -474,7 +474,7 @@ export function CategorySelect({
           >
             {groups.map((group) => (
               <div key={group.label} role="group" aria-label={group.label}>
-                <p className="px-4 pb-1 pt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#667085]">
+                <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#9aa3b2]">
                   {group.label}
                 </p>
                 {group.options.map((option) => {
@@ -493,7 +493,7 @@ export function CategorySelect({
                         }
                       }}
                       className={clsx(
-                        "flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm transition",
+                        "flex cursor-pointer items-center justify-between px-4 py-2 text-[13px] transition",
                         isSelected
                           ? "bg-[#edf4ff] font-semibold text-[#1769ff]"
                           : "font-medium text-[#111827] hover:bg-[#f4f7ff]"
@@ -559,9 +559,9 @@ export function DataTable({
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-4 py-8 text-center sm:px-5 sm:py-10" role="status">
-      <p className="break-words text-sm font-bold text-[#111827]">{title}</p>
-      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#596172]">{description}</p>
+    <div className="rounded-[18px] border border-dashed border-[#d8dde7] bg-[#f9fafc] px-4 py-4 text-center" role="status">
+      <p className="break-words text-[12px] font-semibold text-[#596172]">{title}</p>
+      <p className="mx-auto mt-1.5 max-w-sm text-[12px] leading-5 text-[#9aa3b2]">{description}</p>
     </div>
   );
 }

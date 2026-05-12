@@ -370,10 +370,10 @@ describe("AppPage", () => {
 
     renderRoute("/app/attendance");
 
-    expect(await screen.findByText(/check-in sederhana, validasi tetap berjalan/i)).toBeTruthy();
+    expect(await screen.findByText(/check-in karyawan/i)).toBeTruthy();
     expect(screen.getByText(/validasi singkat/i)).toBeTruthy();
     expect(screen.getByText(/Lihat detail validasi/i)).toBeTruthy();
-    expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
+    expect(await screen.findByText(/riwayat absensi/i)).toBeTruthy();
     expect(await screen.findByText(/Masuk 08[.:]03/i)).toBeTruthy();
   });
 
@@ -428,7 +428,7 @@ describe("AppPage", () => {
 
     renderRoute("/app/history");
 
-    expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
+    expect(await screen.findByText(/riwayat absensi/i)).toBeTruthy();
     expect(await screen.findByText(/belum ada histori absensi/i)).toBeTruthy();
     expect(screen.queryByText(/07:55 · Selfie/i)).toBeNull();
   });
@@ -963,11 +963,11 @@ describe("AppPage", () => {
     renderRoute("/app");
 
     fireEvent.click(await screen.findByRole("button", { name: "Presensi" }));
-    expect(await screen.findByText(/check-in sederhana/i)).toBeTruthy();
+    expect(await screen.findByText(/check-in karyawan/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Presensi" }).className).toContain("bg-[#111827]");
 
     fireEvent.click(screen.getByRole("button", { name: "Riwayat" }));
-    expect(await screen.findByText(/riwayat absensi terbaru/i)).toBeTruthy();
+    expect(await screen.findByText(/riwayat absensi/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Riwayat" }).className).toContain("bg-[#111827]");
   });
 
@@ -1233,5 +1233,61 @@ describe("Phase 4: Reports workspace", () => {
 
     const elements = await screen.findAllByText("Fikri Maulana");
     expect(elements.length).toBeGreaterThan(0);
+  });
+
+  it("profile page uses shortened placeholder text without 'dari backend' wording", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 0,
+      onTimeDays: 0,
+      lateDays: 0,
+      pendingRequests: 0,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:00:00.000Z",
+        updatedAt: "2026-05-02T08:00:00.000Z"
+      }
+    });
+
+    renderRoute("/app/profile");
+
+    expect((await screen.findAllByText("Fikri Maulana")).length).toBeGreaterThan(0);
+
+    expect(screen.queryByText(/dari backend/i)).toBeNull();
+    expect(screen.getAllByText(/^Belum tersedia$/).length).toBeGreaterThan(0);
   });
 });

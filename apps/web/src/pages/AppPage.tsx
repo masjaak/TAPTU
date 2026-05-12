@@ -1320,19 +1320,19 @@ export function AppPage() {
 
     return (
       <>
-        <Panel eyebrow="Beranda" title="Status hari ini" className="border-[#d9e6ff] shadow-[0_18px_46px_rgba(23,105,255,0.10)]">
-          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <Panel eyebrow="Beranda" title="Status hari ini" className="border-[#d9e6ff] shadow-[0_18px_46px_rgba(23,105,255,0.08)]">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge tone={effectiveState === "idle" ? "warning" : effectiveState === "checked_in" ? "info" : "success"}>
                   {effectiveState === "idle" ? "Perlu aksi" : effectiveState === "checked_in" ? "Aktif" : "Selesai"}
                 </StatusBadge>
-                <span className="text-sm font-semibold text-[#667085]">{now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
+                <span className="text-[12px] font-medium text-[#8099c8]">{now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
               </div>
-              <p className="mt-3 text-xl font-bold tracking-[-0.01em] text-[#111827] sm:text-2xl">{statusCopy.title}</p>
-              <p className="mt-1.5 break-words text-sm leading-6 text-[#596172]">{statusCopy.subtitle}</p>
+              <p className="mt-2.5 text-[17px] font-semibold tracking-[-0.01em] text-[#111827] sm:text-[18px]">{statusCopy.title}</p>
+              <p className="mt-1 break-words text-[13px] leading-5 text-[#596172]">{statusCopy.subtitle}</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
               <PrimaryButton
                 onClick={() => {
                   if (effectiveState === "checked_out") {
@@ -1350,25 +1350,25 @@ export function AppPage() {
               >
                 {effectiveState === "checked_in" && busyAction === "checkout" ? "Menyimpan..." : statusCopy.cta}
               </PrimaryButton>
-              <SecondaryButton onClick={() => navigate("/app/schedule")} className="w-full">
+              <SecondaryButton onClick={() => navigate("/app/schedule")} className="w-full text-[#596172] shadow-none">
                 Lihat jadwal
               </SecondaryButton>
             </div>
           </div>
         </Panel>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Status" value={effectiveState === "checked_out" ? "Selesai" : effectiveState === "checked_in" ? "Aktif" : "Perlu aksi"} detail={shift.name} />
           <StatCard label="Shift" value={`${shift.startTime}-${shift.endTime}`} detail={shift.locationName} />
-          <StatCard label="Tepat waktu" value={String(employeeSummary.onTimeDays)} detail={`${employeeSummary.totalDays} hari hadir tercatat`} />
+          <StatCard label="Tepat waktu" value={String(employeeSummary.onTimeDays)} detail={`${employeeSummary.totalDays} hari hadir`} />
           <StatCard label="Pengajuan" value={String(employeeSummary.pendingRequests)} detail="Menunggu keputusan" />
         </section>
-        <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
           <Panel eyebrow="Shift" title="Shift hari ini">
-            <div className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#667085]">{shift.name}</p>
-              <p className="mt-2 text-xl font-bold text-[#111827] sm:text-2xl">{shift.startTime}–{shift.endTime}</p>
-              <p className="mt-1.5 text-sm text-[#596172]">{shift.locationName}</p>
+            <div className="rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
+              <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#7a8495]">{shift.name}</p>
+              <p className="mt-1.5 text-[17px] font-semibold text-[#111827]">{shift.startTime}–{shift.endTime}</p>
+              <p className="mt-1 text-[13px] text-[#596172]">{shift.locationName}</p>
             </div>
           </Panel>
 
@@ -1381,16 +1381,16 @@ export function AppPage() {
           </Panel>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-2">
+        <section className="grid gap-4 xl:grid-cols-2">
           <Panel eyebrow="Riwayat" title="Riwayat terbaru">
             {attendance.length === 0 ? (
-              <EmptyState title="Belum ada riwayat terbaru" description="Check-in dan check-out terbaru akan muncul setelah data attendance tersimpan." />
+              <EmptyState title="Belum ada riwayat" description="Check-in dan check-out akan muncul setelah data tersimpan." />
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-2.5">
                 {attendance.slice(0, 3).map((item) => (
-                  <div key={item.id ?? `${item.day}-${item.time}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                    <p className="text-sm font-semibold text-[#111827]">{item.day}</p>
-                    <p className="mt-1 text-sm font-semibold text-[#596172]">Check-in {item.checkInTime ?? item.time}{item.checkOutTime ? ` · Check-out ${item.checkOutTime}` : ""}</p>
+                  <div key={item.id ?? `${item.day}-${item.time}`} className="rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
+                    <p className="text-[13px] font-medium text-[#111827]">{item.day}</p>
+                    <p className="mt-1 text-[12px] leading-5 text-[#596172]">Masuk {item.checkInTime ?? item.time}{item.checkOutTime ? ` · Keluar ${item.checkOutTime}` : ""}</p>
                   </div>
                 ))}
               </div>
@@ -1399,16 +1399,16 @@ export function AppPage() {
 
           <Panel eyebrow="Pengajuan" title="Pengajuan aktif">
             {requests.length === 0 ? (
-              <EmptyState title="Tidak ada pengajuan aktif" description="Pengajuan izin, sakit, cuti, dan koreksi absensi akan tampil di sini." />
+              <EmptyState title="Belum ada pengajuan" description="Pengajuan izin, cuti, atau koreksi absensi akan tampil di sini." />
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-2.5">
                 {requests.slice(0, 3).map((item) => (
-                  <div key={item.id ?? item.title} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+                  <div key={item.id ?? item.title} className="rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-[#111827]">{item.title}</p>
+                      <p className="text-[13px] font-semibold text-[#111827]">{item.title}</p>
                       <StatusBadge tone={item.status === "Menunggu" ? "warning" : item.status === "Ditolak" ? "danger" : "success"}>{item.status}</StatusBadge>
                     </div>
-                    {item.category ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.category}</p> : null}
+                    {item.category ? <p className="mt-1 text-[11px] font-medium text-[#596172]">{item.category}</p> : null}
                   </div>
                 ))}
               </div>
@@ -1418,12 +1418,12 @@ export function AppPage() {
 
         {schedule.length > 0 ? (
           <Panel eyebrow="Agenda" title="Agenda hari ini">
-            <div className="grid gap-3">
+            <div className="grid gap-2.5">
               {schedule.map((item) => (
-                <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">{item.time}</p>
-                  <p className="mt-2 text-sm font-semibold text-[#111827]">{item.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-[#596172]">{item.detail}</p>
+                <div key={`${item.time}-${item.title}`} className="rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
+                  <p className="text-[11px] font-medium text-[#8099c8]">{item.time}</p>
+                  <p className="mt-1.5 text-[13px] font-semibold text-[#111827]">{item.title}</p>
+                  <p className="mt-1 text-[13px] leading-5 text-[#596172]">{item.detail}</p>
                 </div>
               ))}
             </div>
@@ -1466,27 +1466,27 @@ export function AppPage() {
     return (
       <>
         <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-          <Panel eyebrow="Absensi karyawan" title="Check-in sederhana, validasi tetap berjalan">
-            <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-4 sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <Panel eyebrow="Presensi" title="Check-in karyawan">
+            <div className="rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#596172]">Halo, {currentSession.user.fullName}</p>
-                  <p className="mt-2 break-words text-2xl font-bold tracking-[-0.02em] text-[#111827] sm:text-3xl">
+                  <p className="text-[12px] font-medium text-[#8099c8]">Halo, {currentSession.user.fullName}</p>
+                  <p className="mt-1.5 break-words text-[26px] font-bold tracking-[-0.02em] text-[#111827] sm:text-[28px]">
                     {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-[#596172]">
+                  <p className="mt-1 text-[13px] text-[#596172]">
                     {now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </p>
                 </div>
-                <div className="rounded-[20px] border border-[#dfe6f2] bg-white px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1769ff]">Shift hari ini</p>
-                  <p className="mt-1.5 text-sm font-semibold text-[#111827]">{employeeSummary.assignedShift.name}</p>
-                  <p className="mt-0.5 text-xs text-[#667085]">
+                <div className="rounded-[16px] border border-[#dfe6f2] bg-white px-3.5 py-2.5">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#8099c8]">Shift hari ini</p>
+                  <p className="mt-1 text-[13px] font-semibold text-[#111827]">{employeeSummary.assignedShift.name}</p>
+                  <p className="mt-0.5 text-[12px] text-[#667085]">
                     {employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime} · {employeeSummary.assignedShift.locationName}
                   </p>
                 </div>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <StatusBadge tone={attendanceTrust.canClock ? "success" : "warning"}>{attendanceTrust.canClock ? "Lokasi valid" : "Lokasi perlu cek"}</StatusBadge>
                 <StatusBadge tone="info">{checkInMode === "qr" ? "Scanner siap" : "Kamera siap"}</StatusBadge>
               </div>
@@ -1528,9 +1528,9 @@ export function AppPage() {
                 </div>
 
                 {checkInMode === "qr" ? (
-                  <div className="mt-5">
-                    <p className="text-[17px] font-bold text-[#111827]">Check-in dengan QR</p>
-                    <p className="mt-2 text-sm leading-6 text-[#596172]">Arahkan kamera ke QR scanner untuk memulai absensi.</p>
+                  <div className="mt-4">
+                    <p className="text-[15px] font-semibold text-[#111827]">Check-in dengan QR</p>
+                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Arahkan kamera ke QR scanner untuk memulai absensi.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
                         <div className="absolute inset-5 rounded-[20px] border-2 border-dashed border-[#8bb8ff]/60" />
@@ -1574,9 +1574,9 @@ export function AppPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="mt-5">
-                    <p className="text-[17px] font-bold text-[#111827]">Verifikasi wajah</p>
-                    <p className="mt-2 text-sm leading-6 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
+                  <div className="mt-4">
+                    <p className="text-[15px] font-semibold text-[#111827]">Verifikasi wajah</p>
+                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
                         {pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl ? (
@@ -1614,11 +1614,11 @@ export function AppPage() {
                 )}
 
                 {checkInFlowState === "confirmation" && pendingCheckIn ? (
-                  <div className="mt-5 rounded-[26px] border border-[#d6def0] bg-white p-4 sm:p-5" aria-live="polite">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="mt-4 rounded-[22px] border border-[#d6def0] bg-white p-4" aria-live="polite">
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">Konfirmasi check-in</p>
-                        <p className="mt-2 text-base font-bold text-[#111827]">Review detail sebelum submit</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#8099c8]">Konfirmasi check-in</p>
+                        <p className="mt-1 text-[14px] font-semibold text-[#111827]">Review detail sebelum submit</p>
                       </div>
                       <StatusBadge tone={activeValidationTone}>
                         {pendingCheckIn.validationStatus === "verified" ? "Validasi siap" : pendingCheckIn.validationStatus === "blocked" || pendingCheckIn.validationStatus === "rejected" ? "Blocked" : "Need review"}
@@ -1722,8 +1722,8 @@ export function AppPage() {
                   <div>
                     <p className="text-sm font-semibold text-[#111827]">Lokasi valid · Kamera siap · Device verified</p>
                     <p className="mt-2 text-sm leading-6 text-[#596172]">{attendanceTrust.detail}</p>
-                    <details className="mt-4 rounded-2xl border border-[#dfe6f2] bg-white px-4 py-3">
-                      <summary className="cursor-pointer text-sm font-black text-[#1769ff]">Lihat detail validasi</summary>
+                    <details className="mt-3 rounded-xl border border-[#dfe6f2] bg-white px-3.5 py-2.5">
+                      <summary className="cursor-pointer text-[13px] font-semibold text-[#1769ff]">Lihat detail validasi</summary>
                       <div className="mt-3 grid gap-2 text-xs font-semibold text-[#667085]">
                         <p>Radius kantor: {secureAttendancePolicy.allowedRadiusMeters} meter</p>
                         <p>Jarak saat ini: {attendanceTrustSignal.distanceFromOfficeMeters ?? "Belum dicek"} meter</p>
@@ -1787,8 +1787,8 @@ export function AppPage() {
     };
 
     return (
-      <Panel eyebrow="Riwayat" title="Riwayat absensi terbaru">
-          <div className="mb-5 flex flex-wrap gap-2">
+      <Panel eyebrow="Riwayat" title="Riwayat absensi">
+          <div className="mb-4 flex flex-wrap gap-2">
             {attendanceFilters.map((filter) => (
               <button
                 key={filter}
@@ -1798,8 +1798,8 @@ export function AppPage() {
                   setAttendanceHistoryLoaded(false);
                   setHistoryFilter(filter);
                 }}
-                className={`min-h-11 rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.12em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
-                  historyFilter === filter ? "bg-[#111827] text-white" : "bg-[#f1f5ff] text-[#1769ff]"
+                className={`min-h-9 rounded-full px-3.5 py-1.5 text-[12px] font-semibold tracking-[0.04em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
+                  historyFilter === filter ? "bg-[#111827] text-white" : "bg-[#f1f5ff] text-[#596172]"
                 }`}
               >
                 {filterLabels[filter]}
@@ -1822,7 +1822,7 @@ export function AppPage() {
                   >
                     <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] [&::-webkit-details-marker]:hidden">
                       <span>
-                        <span className="block text-sm font-semibold text-[#111827]">{item.day}</span>
+                        <span className="block text-sm font-medium text-[#111827]">{item.day}</span>
                         <span className="mt-0.5 block text-xs text-[#667085]">
                           {item.checkInTime ? `Masuk ${item.checkInTime}` : ""}{item.checkOutTime ? ` · Keluar ${item.checkOutTime}` : ""}
                         </span>
@@ -1830,9 +1830,9 @@ export function AppPage() {
                       </span>
                       <StatusBadge tone={item.status === "Belum check-in" ? "neutral" : item.status === "Terlambat" ? "warning" : "success"}>{item.status}</StatusBadge>
                     </summary>
-                    <div className="border-t border-[#dce7fb] px-4 py-4" role="status">
-                      <p className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Detail absensi</p>
-                      <div className="mt-3 grid gap-2 text-sm text-[#596172] sm:grid-cols-2">
+                    <div className="border-t border-[#dce7fb] px-4 py-3.5" role="status">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Detail absensi</p>
+                      <div className="mt-2.5 grid gap-1.5 text-[13px] text-[#596172] sm:grid-cols-2">
                         <p>Check-in: {item.checkInTime}</p>
                         <p>Check-out: {item.checkOutTime ?? "Belum check-out"}</p>
                         <p>Durasi: {item.duration}</p>
@@ -1863,11 +1863,11 @@ export function AppPage() {
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <Panel eyebrow="Jadwal / Shift" title="Shift aktif hari ini">
           <div className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#667085]">{employeeSummary.assignedShift.name}</p>
-                <p className="mt-2 break-words text-xl font-bold text-[#111827] sm:text-2xl">{employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime}</p>
-                <p className="mt-1.5 text-sm text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#7a8495]">{employeeSummary.assignedShift.name}</p>
+                <p className="mt-1.5 break-words text-[17px] font-semibold text-[#111827]">{employeeSummary.assignedShift.startTime}–{employeeSummary.assignedShift.endTime}</p>
+                <p className="mt-1 text-[13px] text-[#596172]">{employeeSummary.assignedShift.locationName}</p>
               </div>
               <StatusBadge tone="info">Hari ini</StatusBadge>
             </div>
@@ -1883,10 +1883,10 @@ export function AppPage() {
           ) : (
             <div className="grid gap-3">
               {schedule.map((item) => (
-                <div key={`${item.time}-${item.title}`} className="rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1769ff]">{item.time}</p>
-                  <p className="mt-2 text-sm font-semibold text-[#111827]">{item.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-[#596172]">{item.detail}</p>
+                <div key={`${item.time}-${item.title}`} className="rounded-[18px] border border-[#edf0f5] bg-[#f9fafc] p-3.5">
+                  <p className="text-[11px] font-medium text-[#8099c8]">{item.time}</p>
+                  <p className="mt-1.5 text-[13px] font-semibold text-[#111827]">{item.title}</p>
+                  <p className="mt-1 text-[13px] leading-5 text-[#596172]">{item.detail}</p>
                 </div>
               ))}
             </div>
@@ -1966,9 +1966,9 @@ export function AppPage() {
             />
 
             {selectedMeta ? (
-              <div className="rounded-2xl border border-[#d9e6ff] bg-[#f0f5ff] px-4 py-3">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#1769ff]">{selectedMeta.label}</p>
-                <p className="mt-1 text-xs leading-5 text-[#596172]">
+              <div className="rounded-2xl border border-[#d9e6ff] bg-[#f0f5ff] px-3.5 py-3">
+                <p className="text-[12px] font-semibold text-[#1769ff]">{selectedMeta.label}</p>
+                <p className="mt-1 text-[12px] leading-5 text-[#596172]">
                   {selectedMeta.defaultDays
                     ? `Umumnya ${selectedMeta.defaultDays} hari. `
                     : selectedMeta.defaultDaysNote
@@ -2053,12 +2053,12 @@ export function AppPage() {
             />
 
             <label className="block">
-              <span className="mb-2 block text-sm font-bold text-[#111827]">Detail alasan</span>
+              <span className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.05em] text-[#596172]">Detail alasan</span>
               <textarea
                 value={requestForm.detail}
                 onChange={(event) => setRequestForm((current) => ({ ...current, detail: event.target.value }))}
                 placeholder="Jelaskan alasan pengajuan secara singkat dan jelas."
-                className="min-h-[120px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-3.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10 sm:px-5 sm:py-4 sm:text-base"
+                className="min-h-[110px] w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-4 py-2.5 text-[13px] text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
               />
             </label>
 
@@ -2096,7 +2096,7 @@ export function AppPage() {
                         <StatusBadge tone={statusTone}>{item.status}</StatusBadge>
                       </div>
                       {item.category ? (
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#1769ff]">{item.category}</p>
+                        <p className="text-[11px] font-medium text-[#596172]">{item.category}</p>
                       ) : null}
                       {item.startDate ? (
                         <p className="text-xs font-semibold text-[#667085]">
@@ -2173,33 +2173,33 @@ export function AppPage() {
         <Panel eyebrow="Identitas" title="Data karyawan">
           <dl className="grid gap-4">
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Nama lengkap</dt>
-              <dd className="mt-1 text-sm font-semibold text-[#111827]">{user.fullName}</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Nama lengkap</dt>
+              <dd className="mt-1 text-[13px] font-medium text-[#111827]">{user.fullName}</dd>
             </div>
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Email / Username</dt>
-              <dd className="mt-1 text-sm font-semibold text-[#111827]">{user.email}</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Email</dt>
+              <dd className="mt-1 text-[13px] font-medium text-[#111827]">{user.email}</dd>
             </div>
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Organisasi</dt>
-              <dd className="mt-1 text-sm font-semibold text-[#111827]">{user.organizationName}</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Organisasi</dt>
+              <dd className="mt-1 text-[13px] font-medium text-[#111827]">{user.organizationName}</dd>
             </div>
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Role</dt>
-              <dd className="mt-1 text-sm font-semibold capitalize text-[#111827]">{user.role}</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Role</dt>
+              <dd className="mt-1 text-[13px] font-medium capitalize text-[#111827]">{user.role}</dd>
             </div>
             {/* TODO(backend): tambahkan department, posisi, lokasi kerja, dan supervisor dari employee profile API */}
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Departemen</dt>
-              <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Departemen</dt>
+              <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
             </div>
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Posisi</dt>
-              <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Posisi</dt>
+              <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
             </div>
             <div>
-              <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Supervisor</dt>
-              <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Supervisor</dt>
+              <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
             </div>
           </dl>
         </Panel>
@@ -2208,53 +2208,53 @@ export function AppPage() {
           {shift ? (
             <dl className="grid gap-4">
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Shift aktif</dt>
-                <dd className="mt-1 text-sm font-semibold text-[#111827]">{shift.name}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Shift aktif</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">{shift.name}</dd>
               </div>
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Jam kerja</dt>
-                <dd className="mt-1 text-sm font-semibold text-[#111827]">{shift.startTime} – {shift.endTime}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Jam kerja</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">{shift.startTime} – {shift.endTime}</dd>
               </div>
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Lokasi kerja</dt>
-                <dd className="mt-1 text-sm font-semibold text-[#111827]">{shift.locationName}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Lokasi kerja</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">{shift.locationName}</dd>
               </div>
               {/* TODO(backend): tampilkan metode validasi dan status perangkat terdaftar dari device registry API */}
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Metode validasi</dt>
-                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Metode validasi</dt>
+                <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
               </div>
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Perangkat terdaftar</dt>
-                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Perangkat terdaftar</dt>
+                <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
               </div>
             </dl>
           ) : (
             <EmptyState title="Data shift belum tersedia" description="Reload halaman untuk memuat data shift aktif." />
           )}
           {employeeSummary ? (
-            <div className="mt-6 grid grid-cols-2 gap-3 border-t border-[#edf0f5] pt-5 sm:grid-cols-4">
-              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.totalDays}</p>
-                <p className="text-xs font-semibold text-[#667085]">Hari hadir</p>
+            <div className="mt-5 grid grid-cols-2 gap-2.5 border-t border-[#edf0f5] pt-4 sm:grid-cols-4">
+              <div className="rounded-xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-[18px] font-semibold text-[#111827]">{employeeSummary.totalDays}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-[#7a8495]">Hari hadir</p>
               </div>
-              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.onTimeDays}</p>
-                <p className="text-xs font-semibold text-[#667085]">Tepat waktu</p>
+              <div className="rounded-xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-[18px] font-semibold text-[#111827]">{employeeSummary.onTimeDays}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-[#7a8495]">Tepat waktu</p>
               </div>
-              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.lateDays}</p>
-                <p className="text-xs font-semibold text-[#667085]">Terlambat</p>
+              <div className="rounded-xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-[18px] font-semibold text-[#111827]">{employeeSummary.lateDays}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-[#7a8495]">Terlambat</p>
               </div>
-              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
-                <p className="text-lg font-semibold text-[#111827]">{employeeSummary.pendingRequests}</p>
-                <p className="text-xs font-semibold text-[#667085]">Pending</p>
+              <div className="rounded-xl border border-[#edf0f5] bg-[#f9fafc] p-3 text-center">
+                <p className="text-[18px] font-semibold text-[#111827]">{employeeSummary.pendingRequests}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-[#7a8495]">Pending</p>
               </div>
             </div>
           ) : null}
         </Panel>
 
-        <Panel eyebrow="Keamanan akun" title="Ganti password">
+        <Panel eyebrow="Keamanan" title="Keamanan akun">
           {changePasswordOpen ? (
             <form
               className="grid gap-4"
@@ -2302,8 +2302,8 @@ export function AppPage() {
                 autoComplete="new-password"
               />
               {changePasswordError ? <ErrorState title="Tidak bisa menyimpan password" description={changePasswordError} /> : null}
-              <div className="rounded-2xl border border-[#ffe4b0] bg-[#fffbf0] px-4 py-3 text-xs font-semibold text-[#92580b]">
-                Fitur ganti password akan aktif penuh setelah auth production disambungkan. Perubahan belum tersimpan ke server.
+              <div className="rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
+                Ganti password akan aktif setelah auth production disambungkan.
               </div>
               <div className="flex gap-3">
                 <PrimaryButton type="submit">Simpan password</PrimaryButton>
@@ -2321,15 +2321,15 @@ export function AppPage() {
             </form>
           ) : (
             <div className="grid gap-4">
-              <dl className="grid gap-3">
+              <dl className="grid gap-4">
                 {/* TODO(backend): tampilkan last login dari session API */}
                 <div>
-                  <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Login terakhir</dt>
-                  <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                  <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Login terakhir</dt>
+                  <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Perangkat aktif</dt>
-                  <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                  <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Perangkat aktif</dt>
+                  <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
                 </div>
               </dl>
               <SecondaryButton onClick={() => setChangePasswordOpen(true)}>Ganti password</SecondaryButton>
@@ -2348,18 +2348,18 @@ export function AppPage() {
 
         <Panel eyebrow="Kontak" title="Informasi kontak">
           <div className="grid gap-4">
-            <div className="rounded-2xl border border-[#ffe4b0] bg-[#fffbf0] px-4 py-3 text-xs font-semibold text-[#92580b]">
-              Data kontak akan dapat diedit setelah employee profile API aktif di production.
+            <div className="rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
+              Data kontak dapat diedit setelah employee profile API aktif.
             </div>
             {/* TODO(backend): sambungkan ke employee profile API untuk nomor HP dan kontak darurat */}
             <dl className="grid gap-4">
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Nomor HP</dt>
-                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Nomor HP</dt>
+                <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
               </div>
               <div>
-                <dt className="text-xs font-black uppercase tracking-[0.12em] text-[#667085]">Kontak darurat</dt>
-                <dd className="mt-1 text-sm text-[#b0b8c8]">— Belum tersedia dari backend</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Kontak darurat</dt>
+                <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
               </div>
             </dl>
           </div>

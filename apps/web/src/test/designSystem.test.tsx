@@ -242,6 +242,31 @@ describe("post-login design system", () => {
     expect(screen.queryByRole("navigation", { name: /navigasi utama mobile/i })).toBeNull();
   });
 
+  it("Panel eyebrow uses muted slate-blue, not vivid accent blue, to reduce visual noise", () => {
+    render(<Panel eyebrow="Test Section" title="Test Title"><div>content</div></Panel>);
+    const eyebrow = screen.getByText("Test Section");
+    expect(eyebrow.className).toContain("text-[#8099c8]");
+    expect(eyebrow.className).not.toContain("text-[#1769ff]");
+    expect(eyebrow.className).not.toContain("font-black");
+  });
+
+  it("EmptyState uses lighter vertical padding for calmer, less template-like appearance", () => {
+    render(<EmptyState title="Belum ada data" description="Data akan muncul nanti." />);
+    const container = screen.getByRole("status");
+    expect(container.className).toContain("py-4");
+    expect(container.className).not.toContain("py-8");
+    expect(container.className).not.toContain("py-10");
+  });
+
+  it("StatCard label uses muted color and lighter weight, value stays prominent with bold weight", () => {
+    render(<StatCard label="Hadir hari ini" value="91%" detail="Tim aktif" />);
+    const label = screen.getByText("Hadir hari ini");
+    const value = screen.getByText("91%");
+    expect(label.className).toContain("text-[#7a8495]");
+    expect(label.className).not.toContain("font-semibold");
+    expect(value.className).toContain("font-bold");
+  });
+
   it("does not keep old dashboard theme traces in active post-login source", () => {
     const files = [
       "apps/web/src/pages/AppPage.tsx",
