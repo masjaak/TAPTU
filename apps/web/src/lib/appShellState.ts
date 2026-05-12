@@ -72,7 +72,7 @@ const sections: Record<AppSectionKey, AppTabDefinition> = {
 const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
   superadmin: ["home", "team", "attendance", "requests", "locations", "reports", "settings", "profile"],
   admin: ["home", "team", "attendance", "requests", "locations", "reports", "profile"],
-  manager: ["home", "team", "attendance", "requests", "reports", "profile"],
+  manager: ["home", "team", "attendance", "requests", "profile"],
   employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
 };

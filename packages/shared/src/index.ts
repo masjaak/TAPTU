@@ -3,6 +3,15 @@ export type UserRole = "superadmin" | "admin" | "manager" | "employee" | "scanne
 export type AttendanceState = "idle" | "checked_in" | "checked_out";
 export type AttendanceValidationStatus = "verified" | "needs_review" | "blocked" | "rejected" | "corrected";
 export type AttendanceExceptionStatus = "Need Review" | "Approved" | "Rejected" | "Request Correction";
+export type ApprovalStepStatus = "pending" | "approved" | "rejected" | "skipped" | "cancelled";
+export type ApprovalFinalStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type ApprovalWorkflowStatus =
+  | "pending_manager"
+  | "approved_by_manager"
+  | "pending_hr"
+  | "approved"
+  | "rejected"
+  | "cancelled";
 export type AttendanceExceptionType =
   | "Outside radius"
   | "Late check-in"
@@ -40,6 +49,12 @@ export interface AuthUser {
   email: string;
   organizationName: string;
   role: UserRole;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  managerId?: string | null;
+  managerName?: string | null;
+  position?: string | null;
+  employeeCode?: string | null;
 }
 
 export interface LoginRequest {
@@ -97,6 +112,25 @@ export interface LeaveRequestItem {
   createdAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  currentStep?: number | null;
+  finalStatus?: ApprovalFinalStatus | null;
+  workflowStatus?: ApprovalWorkflowStatus;
+  statusLabel?: string;
+  completedAt?: string | null;
+  approvalSteps?: ApprovalStepItem[];
+}
+
+export interface ApprovalStepItem {
+  id?: string;
+  requestId: string;
+  stepOrder: number;
+  approverRole: string;
+  approverId?: string | null;
+  status: ApprovalStepStatus;
+  note?: string | null;
+  reviewedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ShiftInfo {
@@ -240,6 +274,14 @@ export interface EmployeeSummary {
   currentAttendanceState: AttendanceState;
   assignedShift: ShiftInfo;
   todayRecord: AttendanceRecord;
+  profile?: {
+    departmentId?: string | null;
+    departmentName?: string | null;
+    managerId?: string | null;
+    managerName?: string | null;
+    position?: string | null;
+    employeeCode?: string | null;
+  };
 }
 
 export interface ValidationDecisionPayload {
@@ -252,6 +294,12 @@ export interface EmployeeListItem {
   fullName: string;
   email: string;
   role: UserRole;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  managerId?: string | null;
+  managerName?: string | null;
+  position?: string | null;
+  employeeCode?: string | null;
   todayStatus: "present" | "late" | "absent" | "leave";
   checkInTime?: string;
   validationStatus?: AttendanceValidationStatus;

@@ -144,6 +144,25 @@ const roleLabels: Record<UserRole, string> = {
   scanner: "Scanner Kiosk"
 };
 
+const EMPTY_PROFILE_VALUE = "Belum ditetapkan";
+
+const WORKFLOW_STATUS_LABELS: Record<string, string> = {
+  pending_manager: "Menunggu Manager",
+  approved_by_manager: "Disetujui Manager",
+  pending_hr: "Menunggu HR",
+  approved: "Disetujui",
+  rejected: "Ditolak",
+  cancelled: "Dibatalkan"
+};
+
+function getWorkflowStatusLabel(workflowStatus?: string): string | undefined {
+  return workflowStatus ? WORKFLOW_STATUS_LABELS[workflowStatus] : undefined;
+}
+
+function profileValue(value?: string | null) {
+  return value && value.trim() !== "" ? value : EMPTY_PROFILE_VALUE;
+}
+
 function isAttendanceMethod(value: unknown): value is AttendanceTimelineItem["method"] {
   return value === "QR" || value === "GPS" || value === "Selfie" || value === "Manual";
 }
@@ -431,7 +450,7 @@ export function AppPage() {
         });
     }
 
-    if (tab === "home" && isAdmin && !adminOverview && !adminOverviewLoaded) {
+    if (tab === "home" && (isAdmin || isManager) && !adminOverview && !adminOverviewLoaded) {
       fetchAdminOverview(session.token)
         .then((data) => {
           setAdminOverview(data);
@@ -489,7 +508,7 @@ export function AppPage() {
         });
     }
 
-    if (tab === "team" && (isAdmin || isManager) && !employeeListLoaded) {
+    if ((tab === "team" || (tab === "attendance" && isManager)) && (isAdmin || isManager) && !employeeListLoaded) {
       setEmployeeListError(null);
       fetchEmployeeList(session.token)
         .then((items) => {
@@ -940,7 +959,13 @@ export function AppPage() {
     try {
       const response = await approveRequest(currentSession.token, id, status, approvalNotes[id]);
       setRequests((current) => current.map((item) => (item.id === id ? response.request : item)));
-      setActionMessage(status === "Disetujui" ? "Pengajuan disetujui." : "Pengajuan ditolak.");
+      setActionMessage(
+        isManager && status === "Disetujui"
+          ? "Pengajuan diteruskan ke HR untuk keputusan final."
+          : status === "Disetujui"
+            ? "Pengajuan disetujui."
+            : "Pengajuan ditolak."
+      );
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Approval gagal.", "err");
     } finally {
@@ -1187,34 +1212,34 @@ export function AppPage() {
     }
 
     const quickActions = [
-      { key: "team", label: "Kelola karyawan", icon: Users },
-      { key: "requests", label: "Review approval", icon: TimerReset },
-      { key: "scanner", label: "Scanner mode", icon: ScanFace },
-      { key: "reports", label: "Buka laporan", icon: FileClock },
-      { key: "locations", label: "Atur lokasi", icon: MapPinned }
+      { key: "team", label: "Kelola karyawan", icon: Users, description: "Tambah, ubah, dan pantau data karyawan." },
+      { key: "requests", label: "Review approval", icon: TimerReset, description: "Tinjau izin dan pengajuan cuti tim." },
+      { key: "scanner", label: "Scanner mode", icon: ScanFace, description: "Aktifkan mode kiosk untuk scan QR massal." },
+      { key: "reports", label: "Buka laporan", icon: FileClock, description: "Unduh rekap kehadiran dan audit trail." },
+      { key: "locations", label: "Atur lokasi", icon: MapPinned, description: "Kelola lokasi dan shift kerja karyawan." }
     ] as const;
 
     return (
       <>
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard label="Present today" value={String(adminOverview.checkedInToday)} detail={`${adminOverview.onTimeToday} tepat waktu`} />
-          <StatCard label="Late employees" value={String(adminOverview.lateToday)} detail="Perlu follow-up supervisor" />
-          <StatCard label="Absent / not checked-in" value={String(adminOverview.absentToday)} detail={`Dari ${adminOverview.totalEmployees} karyawan`} />
-          <StatCard label="Pending approvals" value={String(adminOverview.pendingRequests)} detail="Izin dan cuti menunggu keputusan" />
-          <StatCard label="Need review" value={String(adminOverview.exceptionCount)} detail="Validasi lokasi atau perangkat" />
+          <StatCard label="Hadir hari ini" value={String(adminOverview.checkedInToday)} detail={`${adminOverview.onTimeToday} tepat waktu`} />
+          <StatCard label="Terlambat" value={String(adminOverview.lateToday)} detail="Perlu follow-up supervisor" />
+          <StatCard label="Belum hadir" value={String(adminOverview.absentToday)} detail={`Dari ${adminOverview.totalEmployees} karyawan`} />
+          <StatCard label="Menunggu approval" value={String(adminOverview.pendingRequests)} detail="Izin dan cuti menunggu keputusan" />
+          <StatCard label="Perlu review" value={String(adminOverview.exceptionCount)} detail="Validasi lokasi atau perangkat" />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-          <Panel eyebrow="Today attendance summary" title="Tim langsung terlihat dari layar pertama">
+          <Panel eyebrow="Ringkasan kehadiran hari ini" title="Tim langsung terlihat dari layar pertama">
             {adminOverview.recentActivity.length === 0 ? (
               <EmptyState title="Belum ada aktivitas hadir" description="Aktivitas check-in dan exception akan muncul di sini setelah tim mulai clock-in." />
             ) : (
               <DataTable
                 caption="Aktivitas absensi terbaru"
                 columns={[
-                  { key: "employee", header: "Employee" },
-                  { key: "event", header: "Event" },
-                  { key: "time", header: "Time" },
+                  { key: "employee", header: "Karyawan" },
+                  { key: "event", header: "Kejadian" },
+                  { key: "time", header: "Waktu" },
                   { key: "status", header: "Status" }
                 ]}
                 rows={adminOverview.recentActivity.map((item) => ({
@@ -1233,7 +1258,7 @@ export function AppPage() {
             )}
           </Panel>
 
-          <Panel eyebrow="Quick actions" title="Operasional HR">
+          <Panel eyebrow="Aksi cepat" title="Operasional HR">
             <div className="grid gap-3">
               {quickActions.map((item) => (
                 <button
@@ -1246,18 +1271,15 @@ export function AppPage() {
                       navigate(next.path);
                     }
                   }}
-                  className="flex min-w-0 flex-col gap-3 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] px-4 py-4 text-left transition hover:border-[#d6def0] hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                  className="flex min-w-0 items-center gap-3 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] px-4 py-3.5 text-left transition hover:border-[#d6def0] hover:bg-white"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#1769ff] shadow-sm">
-                      <item.icon className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#111827]">{item.label}</p>
-                      <p className="mt-1 text-xs font-semibold text-[#667085]">Lanjutkan dari shell yang sama.</p>
-                    </div>
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-[#1769ff] shadow-sm">
+                    <item.icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[#111827]">{item.label}</p>
+                    <p className="mt-0.5 text-[12px] leading-5 text-[#7a8495]">{item.description}</p>
                   </div>
-                  <StatusBadge tone="info">Open</StatusBadge>
                 </button>
               ))}
             </div>
@@ -1268,19 +1290,84 @@ export function AppPage() {
   }
 
   function renderManagerHome() {
+    if (adminOverviewError) {
+      return <ErrorState title="Ringkasan tim belum tersedia" description={`${adminOverviewError} Coba buka ulang workspace atau muat ulang halaman.`} />;
+    }
+
+    if (!adminOverview) {
+      return <LoadingState label="Memuat ringkasan tim" />;
+    }
+
+    const managerQuickActions = [
+      { key: "requests", label: "Review pengajuan", description: "Tinjau izin dan pengajuan cuti anggota tim.", icon: TimerReset },
+      { key: "team", label: "Tim saya", description: "Pantau roster dan pengecualian absensi tim.", icon: Users }
+    ] as const;
+
     return (
       <>
-        <section className="grid gap-4 md:grid-cols-3">
-          {stats.map((item) => (
-            <StatCard key={item.label} label={item.label} value={item.value} detail={item.detail} />
-          ))}
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Hadir hari ini" value={String(adminOverview.checkedInToday)} detail={`${adminOverview.onTimeToday} tepat waktu`} />
+          <StatCard label="Terlambat" value={String(adminOverview.lateToday)} detail="Perlu follow-up" />
+          <StatCard label="Belum hadir" value={String(adminOverview.absentToday)} detail={`Dari ${adminOverview.totalEmployees} anggota`} />
+          <StatCard label="Menunggu approval" value={String(adminOverview.pendingRequests)} detail="Pengajuan menunggu keputusan" />
         </section>
-        <Panel eyebrow="Team dashboard" title="Supervisor view masih dibatasi">
-          <EmptyState
-            title="Manager memakai view yang lebih ringan"
-            description="Gunakan panel ini untuk memantau kehadiran tim, lalu masuk ke tab Absensi atau Izin saat perlu follow-up."
-          />
-        </Panel>
+
+        <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+          <Panel eyebrow="Kehadiran tim hari ini" title="Status absensi tim real-time">
+            {adminOverview.recentActivity.length === 0 ? (
+              <EmptyState title="Belum ada aktivitas" description="Aktivitas check-in anggota tim akan muncul di sini setelah jam kerja dimulai." />
+            ) : (
+              <DataTable
+                caption="Aktivitas absensi tim hari ini"
+                columns={[
+                  { key: "employee", header: "Karyawan" },
+                  { key: "event", header: "Kejadian" },
+                  { key: "time", header: "Waktu" },
+                  { key: "status", header: "Status" }
+                ]}
+                rows={adminOverview.recentActivity.map((item) => ({
+                  id: item.id,
+                  employee: (
+                    <div>
+                      <p className="font-semibold text-[#111827]">{item.employeeName}</p>
+                      <p className="mt-1 text-xs font-semibold text-[#667085]">{item.detail}</p>
+                    </div>
+                  ),
+                  event: item.event,
+                  time: item.time,
+                  status: <StatusBadge tone={item.event === "Butuh review" ? "warning" : "success"}>{item.status}</StatusBadge>
+                }))}
+              />
+            )}
+          </Panel>
+
+          <Panel eyebrow="Aksi cepat" title="Operasional supervisor">
+            <div className="grid gap-3">
+              {managerQuickActions.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => {
+                    const next = appNavigation.find((entry) => entry.key === item.key);
+                    if (next) {
+                      setTab(next.key as AppTabKey);
+                      navigate(next.path);
+                    }
+                  }}
+                  className="flex min-w-0 items-center gap-3 rounded-[22px] border border-[#edf0f5] bg-[#f9fafc] px-4 py-3.5 text-left transition hover:border-[#d6def0] hover:bg-white"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-[#1769ff] shadow-sm">
+                    <item.icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[#111827]">{item.label}</p>
+                    <p className="mt-0.5 text-[12px] leading-5 text-[#7a8495]">{item.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Panel>
+        </section>
       </>
     );
   }
@@ -1918,8 +2005,12 @@ export function AppPage() {
       return renderEmployeeAttendance();
     }
 
+    if (isManager) {
+      return renderManagerAttendanceWorkspace();
+    }
+
     return (
-      <Panel eyebrow="Team attendance" title="Monitor kehadiran tanpa membuka laporan penuh">
+      <Panel eyebrow="Presensi tim" title="Monitor kehadiran tanpa membuka laporan penuh">
         {attendance.length === 0 ? (
           <EmptyState title="Belum ada data absensi" description="Clock-in tim akan muncul di sini saat data mulai masuk." />
         ) : (
@@ -1927,8 +2018,8 @@ export function AppPage() {
             caption="Daftar absensi"
             columns={[
               { key: "day", header: "Hari" },
-              { key: "time", header: "Time" },
-              { key: "method", header: "Method" },
+              { key: "time", header: "Waktu" },
+              { key: "method", header: "Metode" },
               { key: "status", header: "Status" }
             ]}
             rows={attendance.map((item) => ({
@@ -1941,6 +2032,68 @@ export function AppPage() {
           />
         )}
       </Panel>
+    );
+  }
+
+  function renderManagerAttendanceWorkspace() {
+    const statusCountMap = {
+      present: employeeList.filter((e) => e.todayStatus === "present").length,
+      late: employeeList.filter((e) => e.todayStatus === "late").length,
+      absent: employeeList.filter((e) => e.todayStatus === "absent").length,
+      leave: employeeList.filter((e) => e.todayStatus === "leave").length
+    };
+
+    return (
+      <div className="grid gap-5">
+        <section className="grid gap-4 sm:grid-cols-4">
+          <StatCard label="Hadir hari ini" value={String(statusCountMap.present)} detail="Tepat waktu atau masuk" />
+          <StatCard label="Terlambat" value={String(statusCountMap.late)} detail="Melewati toleransi shift" />
+          <StatCard label="Belum hadir" value={String(statusCountMap.absent)} detail="Belum clock-in" />
+          <StatCard label="Izin / cuti" value={String(statusCountMap.leave)} detail="Absensi terencana" />
+        </section>
+
+        <Panel eyebrow="Presensi tim" title="Status kehadiran anggota tim hari ini">
+          {!employeeListLoaded ? (
+            <LoadingState label="Memuat data presensi tim" />
+          ) : employeeListError ? (
+            <ErrorState title="Data presensi tim belum tersedia" description={`${employeeListError} Coba muat ulang halaman.`} />
+          ) : employeeList.length === 0 ? (
+            <EmptyState title="Belum ada anggota tim" description="Anggota tim akan muncul setelah HR menambahkan data karyawan dan menetapkan manager." />
+          ) : (
+            <DataTable
+              caption="Presensi tim hari ini"
+              columns={[
+                { key: "name", header: "Karyawan" },
+                { key: "checkin", header: "Check-in" },
+                { key: "shift", header: "Shift" },
+                { key: "status", header: "Status" },
+                { key: "validation", header: "Validasi" }
+              ]}
+              rows={employeeList.map((emp) => ({
+                id: emp.id,
+                name: (
+                  <div>
+                    <p className="font-semibold text-[#111827]">{emp.fullName}</p>
+                    <p className="mt-1 text-xs font-semibold text-[#667085]">{emp.email}</p>
+                  </div>
+                ),
+                checkin: <span className="tabular-nums">{emp.checkInTime ?? "--:--"}</span>,
+                shift: emp.shiftName ?? "-",
+                status: (
+                  <StatusBadge tone={emp.todayStatus === "present" ? "success" : emp.todayStatus === "late" ? "warning" : emp.todayStatus === "leave" ? "info" : "neutral"}>
+                    {emp.todayStatus === "present" ? "Hadir" : emp.todayStatus === "late" ? "Terlambat" : emp.todayStatus === "leave" ? "Izin" : "Belum hadir"}
+                  </StatusBadge>
+                ),
+                validation: emp.validationStatus ? (
+                  <StatusBadge tone={emp.validationStatus === "verified" ? "success" : emp.validationStatus === "needs_review" ? "warning" : "danger"}>
+                    {emp.validationStatus === "verified" ? "Terverifikasi" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
+                  </StatusBadge>
+                ) : <span className="text-xs text-[#7a8495]">-</span>
+              }))}
+            />
+          )}
+        </Panel>
+      </div>
     );
   }
 
@@ -2076,9 +2229,17 @@ export function AppPage() {
         </Panel>
 
         <Panel eyebrow="Riwayat pengajuan" title="Pengajuan aktif dan selesai">
+          {isManager && (
+            <div className="mb-4 rounded-2xl border border-[#d9e6ff] bg-[#f0f5ff] px-3.5 py-3">
+              <p className="text-[12px] font-semibold text-[#1769ff]">Alur approval dua tahap</p>
+              <p className="mt-1 text-[12px] leading-5 text-[#596172]">
+                Approval Anda akan diteruskan ke HR untuk keputusan final. Pengajuan belum selesai sampai HR menyetujui.
+              </p>
+            </div>
+          )}
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm leading-6 text-[#596172]">
-              {canReviewRequests ? "Admin dan manager melihat seluruh antrean." : "Hanya pengajuan milik Anda yang ditampilkan."}
+              {canReviewRequests ? "Manager melihat seluruh antrean tim." : "Hanya pengajuan milik Anda yang ditampilkan."}
             </p>
             <SecondaryButton onClick={reloadRequests} disabled={busyAction === "reload-requests"}>
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -2090,13 +2251,17 @@ export function AppPage() {
           ) : (
             <div className="space-y-3">
               {requests.map((item) => {
-                const statusTone = item.status === "Menunggu" ? "warning" : item.status === "Ditolak" ? "danger" : "success";
+                const ws = item.workflowStatus;
+                const displayStatus = item.statusLabel ?? getWorkflowStatusLabel(ws) ?? item.status;
+                const statusTone = ws === "rejected" || item.status === "Ditolak" ? "danger"
+                  : ws === "approved" || item.status === "Disetujui" ? "success"
+                  : "warning";
                 return (
                   <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_2px_12px_rgba(20,24,31,0.05)]">
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <p className="text-sm font-semibold text-[#111827]">{item.title}</p>
-                        <StatusBadge tone={statusTone}>{item.status}</StatusBadge>
+                        <StatusBadge tone={statusTone}>{displayStatus}</StatusBadge>
                       </div>
                       {item.category ? (
                         <p className="text-[11px] font-medium text-[#596172]">{item.category}</p>
@@ -2161,7 +2326,7 @@ export function AppPage() {
   function renderProfileWorkspace() {
     const user = currentSession.user;
 
-    if (!isEmployee) {
+    if (isAdmin) {
       return (
         <Panel eyebrow="Profil" title="Profil akun">
           <EmptyState title="Profil admin" description="Ringkasan profil admin akan tersedia pada fase berikutnya." />
@@ -2169,7 +2334,51 @@ export function AppPage() {
       );
     }
 
+    if (isManager) {
+      return (
+        <section className="grid gap-5 lg:grid-cols-2">
+          <Panel eyebrow="Identitas" title="Data supervisor">
+            <dl className="grid gap-4">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Nama lengkap</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">{user.fullName}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Email</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">{user.email}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Organisasi</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">{user.organizationName}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Role</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">Manager / Supervisor</dd>
+              </div>
+            </dl>
+          </Panel>
+          <Panel eyebrow="Hak akses" title="Izin dan batasan akun">
+            <dl className="grid gap-4">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Review pengajuan</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">Dapat menyetujui atau menolak pengajuan tim</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Keputusan final</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#596172]">Dilanjutkan ke HR setelah manager menyetujui</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Laporan global</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#596172]">Tidak tersedia — hubungi HR Admin</dd>
+              </div>
+            </dl>
+          </Panel>
+        </section>
+      );
+    }
+
     const shift = employeeSummary?.assignedShift;
+    const profile = employeeSummary?.profile ?? user;
 
     return (
       <section className="grid gap-5 lg:grid-cols-2">
@@ -2191,18 +2400,17 @@ export function AppPage() {
               <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Role</dt>
               <dd className="mt-1 text-[13px] font-medium capitalize text-[#111827]">{user.role}</dd>
             </div>
-            {/* TODO(backend): tambahkan department, posisi, lokasi kerja, dan supervisor dari employee profile API */}
             <div>
               <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Departemen</dt>
-              <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
+              <dd className="mt-1 text-[13px] text-[#111827]">{profileValue(profile.departmentName)}</dd>
             </div>
             <div>
               <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Posisi</dt>
-              <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
+              <dd className="mt-1 text-[13px] text-[#111827]">{profileValue(profile.position)}</dd>
             </div>
             <div>
-              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Supervisor</dt>
-              <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Manager</dt>
+              <dd className="mt-1 text-[13px] text-[#111827]">{profileValue(profile.managerName)}</dd>
             </div>
           </dl>
         </Panel>
@@ -2375,12 +2583,14 @@ export function AppPage() {
     const filteredEmployees = employeeList.filter((emp) =>
       employeeSearch === "" ||
       emp.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-      emp.email.toLowerCase().includes(employeeSearch.toLowerCase())
+      emp.email.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+      (emp.departmentName ?? "").toLowerCase().includes(employeeSearch.toLowerCase()) ||
+      (emp.managerName ?? "").toLowerCase().includes(employeeSearch.toLowerCase())
     );
 
     return (
       <div className="grid gap-5">
-        <Panel eyebrow="Employee roster" title="Daftar karyawan aktif">
+        <Panel eyebrow={isManager ? "Tim saya" : "Daftar karyawan"} title="Daftar karyawan aktif">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative max-w-sm flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8495]" />
@@ -2424,6 +2634,8 @@ export function AppPage() {
               columns={[
                 { key: "name", header: "Karyawan" },
                 { key: "role", header: "Role" },
+                { key: "department", header: "Departemen" },
+                { key: "manager", header: "Manager" },
                 { key: "shift", header: "Shift" },
                 { key: "checkin", header: "Check-in" },
                 { key: "status", header: "Status" },
@@ -2438,6 +2650,8 @@ export function AppPage() {
                   </div>
                 ),
                 role: <StatusBadge tone="info">{roleLabels[emp.role]}</StatusBadge>,
+                department: profileValue(emp.departmentName),
+                manager: profileValue(emp.managerName),
                 shift: emp.shiftName ?? "-",
                 checkin: emp.checkInTime ?? "--:--",
                 status: (
@@ -2447,7 +2661,7 @@ export function AppPage() {
                 ),
                 validation: emp.validationStatus ? (
                   <StatusBadge tone={emp.validationStatus === "verified" ? "success" : emp.validationStatus === "needs_review" ? "warning" : "danger"}>
-                    {emp.validationStatus === "verified" ? "Verified" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
+                    {emp.validationStatus === "verified" ? "Terverifikasi" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
                   </StatusBadge>
                 ) : <span className="text-xs text-[#7a8495]">-</span>
               }))}
@@ -2456,7 +2670,7 @@ export function AppPage() {
         </Panel>
 
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <Panel eyebrow="Exception queue" title="Attendance exceptions yang perlu keputusan">
+          <Panel eyebrow="Antrian pengecualian" title="Attendance exceptions yang perlu keputusan">
             {!exceptionQueueLoaded ? (
               <LoadingState label="Memuat exception queue" />
             ) : exceptionQueueError ? (
@@ -2495,9 +2709,9 @@ export function AppPage() {
                       </div>
                     ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <PrimaryButton onClick={() => handleExceptionDecision(item.id, "Approved")} disabled={busyAction === `exception-Approved-${item.id}`}>Approve</PrimaryButton>
-                      <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Rejected")} disabled={busyAction === `exception-Rejected-${item.id}`}>Reject</SecondaryButton>
-                      <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Request Correction")} disabled={busyAction === `exception-Request Correction-${item.id}`}>Request correction</SecondaryButton>
+                      <PrimaryButton onClick={() => handleExceptionDecision(item.id, "Approved")} disabled={busyAction === `exception-Approved-${item.id}`}>Setujui</PrimaryButton>
+                      <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Rejected")} disabled={busyAction === `exception-Rejected-${item.id}`}>Tolak</SecondaryButton>
+                      <SecondaryButton onClick={() => handleExceptionDecision(item.id, "Request Correction")} disabled={busyAction === `exception-Request Correction-${item.id}`}>Minta koreksi</SecondaryButton>
                     </div>
                   </article>
                 ))}
@@ -2505,9 +2719,9 @@ export function AppPage() {
             )}
           </Panel>
 
-          <Panel eyebrow="Exception types" title="Apa yang sedang divalidasi">
+          <Panel eyebrow="Jenis pengecualian" title="Apa yang sedang divalidasi">
             <div className="grid gap-3">
-              {["Outside radius", "Late check-in", "Invalid QR", "Expired QR", "Different device", "Missing selfie"].map((item) => (
+              {["Di luar radius", "Terlambat check-in", "QR tidak valid", "QR kedaluwarsa", "Perangkat berbeda", "Selfie tidak ada"].map((item) => (
                 <div key={item} className="rounded-[20px] border border-[#edf0f5] bg-white p-4">
                   <p className="text-sm font-semibold text-[#111827]">{item}</p>
                   <p className="mt-2 text-sm leading-6 text-[#667085]">Kasus ini tidak dibuang. Taptu menyimpannya sebagai exception agar HR tetap bisa memutuskan dengan jejak audit.</p>
@@ -2770,7 +2984,7 @@ export function AppPage() {
 
     return (
       <div className="grid gap-5">
-        <Panel eyebrow="Report filters" title="Filter laporan kehadiran">
+        <Panel eyebrow="Filter laporan" title="Filter laporan kehadiran">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <FormInput label="Dari tanggal" type="date" value={reportFilters.dateFrom} onChange={(e) => setReportFilters((c) => ({ ...c, dateFrom: e.target.value }))} />
             <FormInput label="Sampai tanggal" type="date" value={reportFilters.dateTo} onChange={(e) => setReportFilters((c) => ({ ...c, dateTo: e.target.value }))} />
@@ -2786,7 +3000,7 @@ export function AppPage() {
           {reportFilterError ? <div className="mt-4"><ErrorState title="Filter laporan belum valid" description={reportFilterError} /></div> : null}
         </Panel>
 
-        <Panel eyebrow="Attendance report" title="Rekap kehadiran validasi">
+        <Panel eyebrow="Laporan kehadiran" title="Rekap kehadiran validasi">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm leading-6 text-[#596172]">
               {reportRows.length} baris data{reportFilters.status || reportFilters.dateFrom ? " (filter aktif)" : ""}.
@@ -2840,15 +3054,15 @@ export function AppPage() {
                 ),
                 validation: (
                   <StatusBadge tone={validationTone(row.validationStatus)}>
-                    {row.validationStatus === "verified" ? "Verified" : row.validationStatus === "needs_review" ? "Review" : row.validationStatus}
+                    {row.validationStatus === "verified" ? "Terverifikasi" : row.validationStatus === "needs_review" ? "Perlu review" : row.validationStatus}
                   </StatusBadge>
                 ),
                 flags: (
                   <div className="flex flex-wrap gap-1">
-                    {row.isLate && <span className="rounded-full bg-[#fff8ed] px-2 py-1 text-xs font-bold text-[#8a5c00]">Late</span>}
-                    {row.hasException && <span className="rounded-full bg-[#fff5f5] px-2 py-1 text-xs font-bold text-[#8a2f2f]">Exception</span>}
+                    {row.isLate && <span className="rounded-full bg-[#fff8ed] px-2 py-1 text-xs font-bold text-[#8a5c00]">Terlambat</span>}
+                    {row.hasException && <span className="rounded-full bg-[#fff5f5] px-2 py-1 text-xs font-bold text-[#8a2f2f]">Pengecualian</span>}
                     {row.selfieProof && <span className="rounded-full bg-[#f1f5ff] px-2 py-1 text-xs font-bold text-[#1769ff]">Selfie</span>}
-                    {row.deviceValidated && <span className="rounded-full bg-[#f1f5ff] px-2 py-1 text-xs font-bold text-[#1769ff]">Device</span>}
+                    {row.deviceValidated && <span className="rounded-full bg-[#f1f5ff] px-2 py-1 text-xs font-bold text-[#1769ff]">Perangkat</span>}
                   </div>
                 )
               }))}
@@ -2857,17 +3071,17 @@ export function AppPage() {
         </Panel>
 
         {showAuditTrail && (
-          <Panel eyebrow="Audit trail" title="Jejak keputusan operasional">
+          <Panel eyebrow="Jejak audit" title="Jejak keputusan operasional">
             {auditLogs.length === 0 ? (
-              <EmptyState title="Belum ada audit log" description="Approve/reject exception, approval request, dan scanner invalid attempt akan tampil di sini." />
+              <EmptyState title="Belum ada audit log" description="Setujui/tolak pengecualian, approval request, dan percobaan scan tidak valid akan tampil di sini." />
             ) : (
               <DataTable
                 caption="Audit logs"
                 columns={[
-                  { key: "action", header: "Action" },
-                  { key: "actor", header: "Actor" },
+                  { key: "action", header: "Aksi" },
+                  { key: "actor", header: "Pelaku" },
                   { key: "detail", header: "Detail" },
-                  { key: "time", header: "Time" }
+                  { key: "time", header: "Waktu" }
                 ]}
                 rows={auditLogs.map((item) => ({
                   id: item.id,

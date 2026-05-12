@@ -4,7 +4,7 @@
 
 Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
 
-The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 6.5. Phase 6 completed employee-facing simplification, scanner token clarification, recent history repair, employee self-service tabs, and mobile typography/spacing polish. Known limitations remain around persistence hardening, manager scoping, shift assignment, selfie storage finalization, payslip data, and very narrow mobile QA with production-like data.
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 7.5. Phase 7 added organization structure foundation, the request approval state machine (API), and the complete manager dashboard UI. Known limitations remain around persistence hardening, manager department-scoping, approval timeline UI, shift assignment, selfie storage finalization, payslip data, and very narrow mobile QA with production-like data.
 
 ## B. Fixed product decisions
 
@@ -34,13 +34,17 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Phase 6.3: employee self-service tabs for Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, and Profil.
 - Phase 6.4: mobile typography, spacing, wrapping, and dense surface polish.
 - Phase 6.5: final Phase 6 QA documentation, roadmap, and handoff refresh.
+- Phase 7.1: departments schema foundation and nullable profile organization metadata.
+- Phase 7.3: `approval_steps` table and multi-step approval schema.
+- Phase 7.4: request approval state machine in API services (create, manager step, HR step, reject, timeline).
+- Phase 7.5: manager dashboard UI — scoped nav, Beranda/Tim Saya/Presensi Tim/Pengajuan/Profil pages, step-aware status labels, manager approval message, demo stub corrected.
 
 ## D. Routes/pages
 
 Main post-login pages currently surfaced through the app shell:
 
 - Admin dashboard: summary stats, recent activity, quick actions.
-- Manager home/team view: lighter operational summary, team roster, exception review, approvals, reports.
+- Manager dashboard: Beranda (team stats, recent activity, quick actions), Tim Saya (team roster), Presensi Tim (per-member attendance grid), Pengajuan (two-step approval queue + banner), Profil (identity + permissions panels).
 - Employee attendance page: simplified check-in/check-out, current validation state, and attendance history.
 - Employee Pengajuan tab: request submit/list/detail/cancel flow using the existing approval request model.
 - Employee Jadwal tab: lightweight assigned-shift/upcoming schedule view from currently available summary/dashboard data.
@@ -61,7 +65,7 @@ Main post-login pages currently surfaced through the app shell:
 - Admin/HR:
   full MVP operations surface including dashboard, team, attendance, requests, locations, reports, and profile.
 - Manager:
-  limited operational approver. Can access home, team, attendance, requests, reports, and profile. Not treated as full HR admin.
+  limited operational approver. Nav: home, team, attendance, requests, profile only. Reports, scanner, and locations are not accessible.
 - Employee:
   Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, and Profil.
 - Scanner/Kiosk:
@@ -69,8 +73,9 @@ Main post-login pages currently surfaced through the app shell:
 
 Manager scoping behavior:
 
-- Current limitation: manager visibility is still too broad and behaves closer to org-wide operational access than true department/team segmentation.
-- Department-level manager segmentation should be implemented later if the data model is extended cleanly.
+- Nav enforced via `roleNavigation["manager"]` in `appShellState.ts`; `toAppSection` guard rejects unlisted sections.
+- Manager approval is step 1 only: Setujui advances request to `pending_hr`, not to `approved`. Action message: "Pengajuan diteruskan ke HR untuk keputusan final."
+- Current limitation: team roster and attendance data are not department-segmented — manager sees org-wide data bounded by approval step ownership only.
 
 Known role/access limitation:
 
@@ -136,7 +141,7 @@ Behavior:
 - Exception review:
   admin/manager can approve, reject, or request correction with notes.
 - Approval requests:
-  employee submits request, reviewer approves/rejects, employee can cancel pending items.
+  employee submits request; if employee has `manager_id`, manager reviews first (step 1), then HR finalizes (step 2); otherwise goes directly to HR. Manager approve → `pending_hr`. HR approve → `approved`. Any reject → `rejected` with `adminNote` visible to employee. Request cards show step-aware `workflowStatus` labels.
 - Employee Pengajuan:
   employee accesses the existing request submit/list/detail/cancel flow from a dedicated self-service tab.
 - Shift assignment:
@@ -212,8 +217,8 @@ Concise manual checklist:
 - Real device fingerprinting is out of MVP scope.
 - Face recognition is out of MVP scope.
 - Full payroll processing is out of MVP scope.
-- Department-level manager segmentation is not completed.
-- Manager team scoping is still broader than intended.
+- Manager department-segmentation is not completed; team/attendance data is org-wide bounded by approval step ownership only.
+- Approval UI timeline/step-history panel is not built; only the current status label is shown per request card.
 - Shift assignment workflow is not completed in post-login UI/API.
 - Employee Jadwal is lightweight and depends on limited schedule data.
 - Employee Slip Gaji is lightweight/read-only and has no real payslip source yet.

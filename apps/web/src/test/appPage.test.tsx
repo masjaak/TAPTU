@@ -53,8 +53,8 @@ describe("AppPage", () => {
     apiMocks.fetchRequests.mockResolvedValue([]);
     apiMocks.fetchRequestDetail.mockResolvedValue(null);
     apiMocks.fetchEmployeeList.mockResolvedValue([
-      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", position: "Field Officer", employeeCode: "EMP-001", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: null, managerName: null, todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
     ]);
     apiMocks.fetchWorkLocations.mockResolvedValue([
       { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
@@ -135,10 +135,10 @@ describe("AppPage", () => {
 
     renderRoute("/app");
 
-    expect(await screen.findByText(/today attendance summary/i)).toBeTruthy();
-    expect(screen.getByText("Pending approvals")).toBeTruthy();
+    expect(await screen.findByText(/ringkasan kehadiran hari ini/i)).toBeTruthy();
+    expect(screen.getByText("Menunggu approval")).toBeTruthy();
     expect(screen.getByText("Anisa Rahma")).toBeTruthy();
-    expect(screen.getByText("Quick actions")).toBeTruthy();
+    expect(screen.getByText(/aksi cepat/i)).toBeTruthy();
   });
 
   it("routes employee users into the self-service home workspace", async () => {
@@ -1195,12 +1195,117 @@ function setupAdminSession() {
   });
 }
 
+describe("HR/Admin dashboard Indonesian labels", () => {
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("admin dashboard shows Indonesian stat labels instead of English", async () => {
+    setupAdminSession();
+    renderRoute("/app");
+
+    expect(await screen.findByText("Hadir hari ini")).toBeTruthy();
+    expect(screen.getAllByText("Terlambat").length).toBeGreaterThan(0);
+    expect(screen.getByText("Belum hadir")).toBeTruthy();
+    expect(screen.getByText("Menunggu approval")).toBeTruthy();
+    expect(screen.getByText("Perlu review")).toBeTruthy();
+    expect(screen.queryByText("Present today")).toBeNull();
+    expect(screen.queryByText("Pending approvals")).toBeNull();
+    expect(screen.queryByText("Need review")).toBeNull();
+  });
+
+  it("admin dashboard quick actions have production copy and no English placeholder", async () => {
+    setupAdminSession();
+    renderRoute("/app");
+
+    await screen.findAllByText("Hadir hari ini");
+    expect(screen.queryByText(/lanjutkan dari shell yang sama/i)).toBeNull();
+    expect(screen.queryByText("Open")).toBeNull();
+    expect(screen.getAllByText(/tambah, ubah, dan pantau data karyawan/i).length).toBeGreaterThan(0);
+  });
+
+  it("admin dashboard panel eyebrows use Indonesian text", async () => {
+    setupAdminSession();
+    renderRoute("/app");
+
+    await screen.findAllByText("Hadir hari ini");
+    expect(screen.queryByText(/today attendance summary/i)).toBeNull();
+    expect(screen.queryByText("Quick actions")).toBeNull();
+    expect(screen.getAllByText(/aksi cepat/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/ringkasan kehadiran hari ini/i).length).toBeGreaterThan(0);
+  });
+
+  it("admin attendance table columns use Indonesian headers", async () => {
+    setupAdminSession();
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 10, checkedInToday: 8, onTimeToday: 7, lateToday: 1,
+      pendingRequests: 2, absentToday: 2, exceptionCount: 1,
+      recentActivity: [
+        { id: "act-01", employeeName: "Anisa Rahma", event: "Butuh review", time: "08:24", status: "Terlambat", detail: "GPS rendah" }
+      ]
+    });
+    renderRoute("/app");
+
+    await screen.findByText("Anisa Rahma");
+    expect(screen.getByText("Karyawan")).toBeTruthy();
+    expect(screen.getByText("Kejadian")).toBeTruthy();
+    expect(screen.getByText("Waktu")).toBeTruthy();
+    expect(screen.queryByText("Employee")).toBeNull();
+    expect(screen.queryByText("Event")).toBeNull();
+    expect(screen.queryByText(/^Time$/)).toBeNull();
+  });
+
+  it("team workspace exception action buttons use Indonesian labels", async () => {
+    setupAdminSession();
+    apiMocks.fetchExceptionQueue.mockResolvedValue([
+      { id: "exc-01", employeeName: "Budi Santoso", exceptionType: "Di luar radius", reason: "GPS tidak akurat", status: "Need Review" }
+    ]);
+    renderRoute("/app/team");
+
+    expect(await screen.findByRole("button", { name: /setujui/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /tolak/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /minta koreksi/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^approve$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^reject$/i })).toBeNull();
+  });
+
+  it("team workspace validation badge shows Terverifikasi not Verified", async () => {
+    setupAdminSession();
+    renderRoute("/app/team");
+
+    await screen.findAllByText("Fikri Maulana");
+    expect(screen.getAllByText("Terverifikasi").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Verified")).toBeNull();
+  });
+
+  it("team workspace exception types panel shows Indonesian names", async () => {
+    setupAdminSession();
+    renderRoute("/app/team");
+
+    await screen.findAllByText("Fikri Maulana");
+    expect(screen.getAllByText("Di luar radius").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("QR tidak valid").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("QR kedaluwarsa").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Selfie tidak ada").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Outside radius")).toBeNull();
+    expect(screen.queryByText("Invalid QR")).toBeNull();
+  });
+});
+
 describe("Phase 4: Employee list", () => {
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
   it("renders employee search input in team workspace", async () => {
     setupAdminSession();
     renderRoute("/app/team");
 
-    expect(await screen.findByPlaceholderText(/cari nama atau email/i)).toBeTruthy();
+    expect((await screen.findAllByPlaceholderText(/cari nama atau email/i)).length).toBeGreaterThan(0);
   });
 
   it("renders employee names in team workspace", async () => {
@@ -1212,9 +1317,29 @@ describe("Phase 4: Employee list", () => {
     const anisaElements = screen.getAllByText("Anisa Rahma");
     expect(anisaElements.length).toBeGreaterThan(0);
   });
+
+  it("renders department and manager fields in team workspace", async () => {
+    setupAdminSession();
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: null, managerName: null, todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    renderRoute("/app/team");
+
+    expect((await screen.findAllByText("Operations")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Raka Saputra").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Belum ditetapkan").length).toBeGreaterThan(0);
+  });
 });
 
 describe("Phase 4: Location management", () => {
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
   it("renders tambah lokasi button in locations workspace for admin", async () => {
     setupAdminSession();
     renderRoute("/app/locations");
@@ -1232,6 +1357,31 @@ describe("Phase 4: Location management", () => {
 });
 
 describe("Phase 4: Reports workspace", () => {
+  beforeEach(() => {
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchRequests.mockResolvedValue([]);
+    apiMocks.fetchRequestDetail.mockResolvedValue(null);
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([
+      { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+    ]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.refreshScannerToken.mockResolvedValue({ token: "T", expiresInSeconds: 30, scansToday: 0, locationName: "L" });
+    apiMocks.exportReportCsv.mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
   it("renders export CSV button in reports workspace", async () => {
     setupAdminSession();
     renderRoute("/app/reports");
@@ -1256,6 +1406,47 @@ describe("Phase 4: Reports workspace", () => {
     const elements = await screen.findAllByText("Fikri Maulana");
     expect(elements.length).toBeGreaterThan(0);
   });
+
+  it("reports workspace flag badges use Indonesian labels", async () => {
+    setupAdminSession();
+    renderRoute("/app/reports");
+
+    await screen.findAllByText("Fikri Maulana");
+    expect(screen.queryByText("Late")).toBeNull();
+    expect(screen.queryByText("Exception")).toBeNull();
+    expect(screen.queryByText("Device")).toBeNull();
+    expect(screen.getAllByText("Selfie").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Perangkat").length).toBeGreaterThan(0);
+  });
+
+  it("reports workspace validation badge shows Terverifikasi not Verified or Review", async () => {
+    setupAdminSession();
+    renderRoute("/app/reports");
+
+    await screen.findAllByText("Fikri Maulana");
+    expect(screen.getAllByText("Terverifikasi").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Verified")).toBeNull();
+    expect(screen.queryByText("Review")).toBeNull();
+  });
+
+  it("reports workspace audit trail columns use Indonesian headers", async () => {
+    setupAdminSession();
+    apiMocks.fetchAuditLogs.mockResolvedValue([
+      { id: "audit-01", action: "Setujui", actorName: "Nadia", actorRole: "admin", detail: "Menyetujui izin sakit", createdAt: "2026-05-12T09:00:00.000Z" }
+    ]);
+    renderRoute("/app/reports");
+
+    fireEvent.click((await screen.findAllByRole("button", { name: /lihat audit trail/i }))[0]);
+    expect(await screen.findAllByText(/jejak kehadiran|jejak audit/i)).toBeTruthy();
+
+    await waitFor(
+      () => expect(screen.queryAllByText("Aksi").length).toBeGreaterThan(0),
+      { timeout: 6000 }
+    );
+    expect(screen.queryByText("Action")).toBeNull();
+    expect(screen.queryByText("Actor")).toBeNull();
+    expect(screen.queryByText(/^Time$/)).toBeNull();
+  }, 15000);
 
   it("profile page uses shortened placeholder text without 'dari backend' wording", async () => {
     localStorage.setItem(
@@ -1302,6 +1493,11 @@ describe("Phase 4: Reports workspace", () => {
         validationReasons: [],
         createdAt: "2026-05-02T08:00:00.000Z",
         updatedAt: "2026-05-02T08:00:00.000Z"
+      },
+      profile: {
+        departmentName: null,
+        managerName: null,
+        position: null
       }
     });
 
@@ -1310,6 +1506,260 @@ describe("Phase 4: Reports workspace", () => {
     expect((await screen.findAllByText("Fikri Maulana")).length).toBeGreaterThan(0);
 
     expect(screen.queryByText(/dari backend/i)).toBeNull();
-    expect(screen.getAllByText(/^Belum tersedia$/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Belum ditetapkan$/).length).toBeGreaterThan(0);
+  });
+});
+
+function setupManagerSession() {
+  localStorage.setItem(
+    "taptu-session",
+    JSON.stringify({
+      token: "demo:manager",
+      user: {
+        id: "usr-manager-01",
+        fullName: "Raka Saputra",
+        email: "manager@taptu.app",
+        organizationName: "TAPTU HQ",
+        role: "manager"
+      }
+    })
+  );
+  apiMocks.getDashboard.mockResolvedValue({
+    greeting: "Halo, Raka Saputra",
+    stats: [],
+    schedule: [],
+    attendance: [],
+    attendanceState: "idle",
+    requests: []
+  });
+  apiMocks.fetchAdminOverview.mockResolvedValue({
+    totalEmployees: 15,
+    checkedInToday: 12,
+    onTimeToday: 10,
+    lateToday: 2,
+    pendingRequests: 3,
+    absentToday: 1,
+    exceptionCount: 1,
+    recentActivity: [
+      { id: "act-01", employeeName: "Fikri Maulana", event: "Check-in", time: "08:03", status: "Tepat waktu", detail: "Shift Pagi" }
+    ]
+  });
+}
+
+describe("Manager dashboard", () => {
+  beforeEach(() => {
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchRequests.mockResolvedValue([]);
+    apiMocks.fetchRequestDetail.mockResolvedValue(null);
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.refreshScannerToken.mockResolvedValue({ token: "T", expiresInSeconds: 30, scansToday: 0, locationName: "L" });
+    apiMocks.exportReportCsv.mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("manager home shows team stat cards with Indonesian labels", async () => {
+    setupManagerSession();
+    renderRoute("/app");
+
+    expect(await screen.findByText("Hadir hari ini")).toBeTruthy();
+    expect(screen.getAllByText("Terlambat").length).toBeGreaterThan(0);
+    expect(screen.getByText("Belum hadir")).toBeTruthy();
+    expect(screen.getByText("Menunggu approval")).toBeTruthy();
+    expect(screen.queryByText(/supervisor view masih dibatasi/i)).toBeNull();
+  });
+
+  it("manager home shows recent team activity with employee names", async () => {
+    setupManagerSession();
+    renderRoute("/app");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.getByText(/kehadiran tim hari ini/i)).toBeTruthy();
+  });
+
+  it("manager home shows quick action panel for Pengajuan and Tim", async () => {
+    setupManagerSession();
+    renderRoute("/app");
+
+    await screen.findByText("Hadir hari ini");
+    expect(screen.getAllByText(/aksi cepat/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /review pengajuan/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /tim saya/i })).toBeTruthy();
+  });
+
+  it("manager navigation does not include Laporan or Lokasi", async () => {
+    setupManagerSession();
+    renderRoute("/app");
+
+    await screen.findByText("Hadir hari ini");
+    expect(screen.queryByRole("button", { name: /^laporan$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^lokasi$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^scanner$/i })).toBeNull();
+  });
+
+  it("manager Tim page shows Tim Saya eyebrow not Daftar Karyawan", async () => {
+    setupManagerSession();
+    renderRoute("/app/team");
+
+    await screen.findAllByText("Fikri Maulana");
+    expect(screen.getAllByText(/tim saya/i).length).toBeGreaterThan(0);
+  });
+
+  it("manager Presensi Tim page shows team attendance overview", async () => {
+    setupManagerSession();
+    renderRoute("/app/attendance");
+
+    expect((await screen.findAllByText(/presensi tim/i)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/hadir hari ini/i).length).toBeGreaterThan(0);
+  });
+
+  it("manager Pengajuan shows two-step approval explanation banner", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-01", category: "Izin", title: "Izin sakit", status: "Menunggu", detail: "Demam tinggi.", startDate: "2026-05-13", endDate: "2026-05-13" }
+      ]
+    });
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 3, absentToday: 1, exceptionCount: 1, recentActivity: []
+    });
+    renderRoute("/app/requests");
+
+    await screen.findByText(/izin sakit/i);
+    expect(screen.getByText(/setujui/i)).toBeTruthy();
+    expect(screen.getByText(/approval anda akan diteruskan ke hr/i)).toBeTruthy();
+  });
+
+  it("manager profile shows identity section not a generic empty state", async () => {
+    setupManagerSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Raka Saputra")).toBeTruthy();
+    expect(screen.queryByText(/profil admin/i)).toBeNull();
+    expect(screen.getByText(/identitas/i)).toBeTruthy();
+  });
+
+  it("request card renders workflowStatus as step-aware Indonesian label", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-01", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" },
+        { id: "req-02", title: "Cuti tahunan", status: "Menunggu", detail: "Liburan.", workflowStatus: "approved_by_manager" },
+        { id: "req-03", title: "Dinas luar", status: "Menunggu", detail: "Perjalanan.", workflowStatus: "pending_hr" },
+        { id: "req-04", title: "Izin mendadak", status: "Ditolak", detail: "Batal.", workflowStatus: "cancelled" }
+      ]
+    });
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 4, absentToday: 1, exceptionCount: 0, recentActivity: []
+    });
+    renderRoute("/app/requests");
+
+    await screen.findByText("Izin sakit");
+    expect(screen.getByText("Menunggu Manager")).toBeTruthy();
+    expect(screen.getByText("Disetujui Manager")).toBeTruthy();
+    expect(screen.getByText("Menunggu HR")).toBeTruthy();
+    expect(screen.getByText("Dibatalkan")).toBeTruthy();
+  });
+
+  it("manager Setujui shows Diteruskan ke HR action message not Pengajuan disetujui", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-10", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" }
+      ]
+    });
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 1, absentToday: 0, exceptionCount: 0, recentActivity: []
+    });
+    apiMocks.approveRequest.mockResolvedValue({
+      request: { id: "req-10", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_hr", statusLabel: "Menunggu HR" }
+    });
+    renderRoute("/app/requests");
+
+    await screen.findByText("Izin sakit");
+    fireEvent.click(screen.getByRole("button", { name: /setujui/i }));
+
+    await screen.findByText(/pengajuan diteruskan ke hr/i);
+  });
+
+  it("employee sees adminNote catatan reviewer on rejected request", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: { id: "usr-emp-01", fullName: "Fikri Maulana", email: "emp@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-20", title: "Izin keperluan keluarga", status: "Ditolak", detail: "Urusan mendadak.", adminNote: "Kuota izin bulan ini sudah penuh.", workflowStatus: "rejected" }
+      ]
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      currentAttendanceState: "idle",
+      todayRecord: null,
+      activeCheckIn: null,
+      pendingCheckIn: null,
+      recentLogs: []
+    });
+    renderRoute("/app/requests");
+
+    await screen.findByText("Izin keperluan keluarga");
+    expect(screen.getByText(/kuota izin bulan ini sudah penuh/i)).toBeTruthy();
+    expect(screen.getByText(/catatan reviewer/i)).toBeTruthy();
   });
 });

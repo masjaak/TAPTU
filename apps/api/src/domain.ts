@@ -1,4 +1,8 @@
 import type {
+  ApprovalFinalStatus,
+  ApprovalStepItem,
+  ApprovalStepStatus,
+  ApprovalWorkflowStatus,
   ApprovalRequestType,
   AttendanceActivityItem,
   AttendanceExceptionItem,
@@ -22,6 +26,9 @@ import type {
 export type AttendanceMode = "QR" | "GPS" | "Selfie" | "Manual";
 export type AttendanceFlowState = AttendanceState;
 export type RequestFlowStatus = "Menunggu" | "Disetujui" | "Ditolak";
+export type RequestApprovalStepStatus = ApprovalStepStatus;
+export type RequestApprovalFinalStatus = ApprovalFinalStatus;
+export type RequestApprovalWorkflowStatus = ApprovalWorkflowStatus;
 
 export interface AttendanceRecord {
   id?: string;
@@ -62,7 +69,15 @@ export interface RequestRecord {
   reviewedBy?: string;
   reviewedAt?: string;
   createdAt: string;
+  currentStep?: number | null;
+  finalStatus?: RequestApprovalFinalStatus | null;
+  workflowStatus?: RequestApprovalWorkflowStatus;
+  statusLabel?: string;
+  completedAt?: string | null;
+  approvalSteps?: ApprovalStepItem[];
 }
+
+export type ApprovalStepPlanItem = Pick<ApprovalStepItem, "requestId" | "stepOrder" | "approverRole" | "approverId" | "status">;
 
 export interface ScannerScanRecord {
   id: string;
@@ -416,6 +431,46 @@ function canApproveRequest(role: UserRole, category: ApprovalRequestType) {
   return false;
 }
 
+export function createApprovalStepPlan(requestId: string, managerId?: string | null): ApprovalStepPlanItem[] {
+  if (!managerId) {
+    return [{
+      requestId,
+      stepOrder: 1,
+      approverRole: "hr",
+      status: "pending"
+    }];
+  }
+
+  return [
+    {
+      requestId,
+      stepOrder: 1,
+      approverRole: "manager",
+      approverId: managerId,
+      status: "pending"
+    },
+    {
+      requestId,
+      stepOrder: 2,
+      approverRole: "hr",
+      status: "pending"
+    }
+  ];
+}
+
+export function getApprovalStatusLabel(status: RequestApprovalWorkflowStatus) {
+  const labels: Record<RequestApprovalWorkflowStatus, string> = {
+    pending_manager: "Menunggu Manager",
+    approved_by_manager: "Disetujui Manager",
+    pending_hr: "Menunggu HR",
+    approved: "Disetujui",
+    rejected: "Ditolak",
+    cancelled: "Dibatalkan"
+  };
+
+  return labels[status];
+}
+
 export function reduceRequests(requests: RequestRecord[], event: RequestEvent): RequestRecord[] {
   if (event.type === "CREATE") {
     return [event.request, ...requests];
@@ -616,7 +671,15 @@ export function computeEmployeeSummary(store: DemoStore, userId: string) {
     pendingRequests,
     currentAttendanceState: currentAttendance.state,
     assignedShift: DEFAULT_SHIFT,
-    todayRecord: toSharedAttendanceRecord(currentAttendance)
+    todayRecord: toSharedAttendanceRecord(currentAttendance),
+    profile: {
+      departmentId: null,
+      departmentName: null,
+      managerId: null,
+      managerName: null,
+      position: null,
+      employeeCode: null
+    }
   };
 }
 
@@ -833,7 +896,18 @@ export function createInitialStore(): DemoStore {
 
 export function computeEmployeeList(
   store: DemoStore,
-  rawUsers: Array<{ id: string; fullName: string; email: string; role: UserRole }>
+  rawUsers: Array<{
+    id: string;
+    fullName: string;
+    email: string;
+    role: UserRole;
+    departmentId?: string | null;
+    departmentName?: string | null;
+    managerId?: string | null;
+    managerName?: string | null;
+    position?: string | null;
+    employeeCode?: string | null;
+  }>
 ): EmployeeListItem[] {
   return rawUsers
     .filter((user) => user.role === "employee" || user.role === "manager")
@@ -863,6 +937,12 @@ export function computeEmployeeList(
         fullName: user.fullName,
         email: user.email,
         role: user.role,
+        departmentId: user.departmentId ?? null,
+        departmentName: user.departmentName ?? null,
+        managerId: user.managerId ?? null,
+        managerName: user.managerName ?? null,
+        position: user.position ?? null,
+        employeeCode: user.employeeCode ?? null,
         todayStatus,
         checkInTime,
         validationStatus,

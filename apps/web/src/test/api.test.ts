@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchEmployeeSummary, getDashboard, login } from "../lib/api";
+import { approveRequest, fetchEmployeeSummary, getDashboard, login } from "../lib/api";
 
 describe("api client", () => {
   afterEach(() => {
@@ -114,5 +114,40 @@ describe("demo mode dashboard", () => {
     const result = await getDashboard("demo:manager");
     expect(result.greeting).toContain("Raka");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("demo mode approveRequest — step-aware transitions", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("manager approve returns pending_hr workflow status — not final approved", async () => {
+    const result = await approveRequest("demo:manager", "req-01", "Disetujui");
+    expect(result.request.workflowStatus).toBe("pending_hr");
+    expect(result.request.statusLabel).toBe("Menunggu HR");
+    expect(result.request.status).toBe("Menunggu");
+  });
+
+  it("admin approve returns approved workflow status", async () => {
+    const result = await approveRequest("demo:admin", "req-02", "Disetujui");
+    expect(result.request.workflowStatus).toBe("approved");
+    expect(result.request.statusLabel).toBe("Disetujui");
+    expect(result.request.status).toBe("Disetujui");
+  });
+
+  it("manager reject returns rejected workflow status with adminNote preserved", async () => {
+    const result = await approveRequest("demo:manager", "req-03", "Ditolak", "Kuota bulan ini penuh.");
+    expect(result.request.workflowStatus).toBe("rejected");
+    expect(result.request.statusLabel).toBe("Ditolak");
+    expect(result.request.status).toBe("Ditolak");
+    expect(result.request.adminNote).toBe("Kuota bulan ini penuh.");
+  });
+
+  it("admin reject returns rejected workflow status", async () => {
+    const result = await approveRequest("demo:admin", "req-04", "Ditolak", "Tidak sesuai prosedur.");
+    expect(result.request.workflowStatus).toBe("rejected");
+    expect(result.request.status).toBe("Ditolak");
+    expect(result.request.adminNote).toBe("Tidak sesuai prosedur.");
   });
 });

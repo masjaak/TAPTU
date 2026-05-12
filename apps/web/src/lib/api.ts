@@ -155,8 +155,24 @@ export async function createRequest(
 
 export async function approveRequest(token: string, id: string, status: "Disetujui" | "Ditolak", adminNote?: string) {
   if (isDemoToken(token)) {
+    const role = token.split(":")[1];
+    const isRejection = status === "Ditolak";
+    const isManagerRole = role === "manager";
+
+    const workflowStatus = isRejection ? "rejected"
+      : isManagerRole ? "pending_hr"
+      : "approved";
+
+    const statusLabel = isRejection ? "Ditolak"
+      : isManagerRole ? "Menunggu HR"
+      : "Disetujui";
+
+    const resolvedStatus: "Menunggu" | "Disetujui" | "Ditolak" = isRejection ? "Ditolak"
+      : isManagerRole ? "Menunggu"
+      : "Disetujui";
+
     const response: RequestActionResponse = {
-      request: { id, title: "Demo request", status, detail: "Demo approval.", adminNote }
+      request: { id, title: "Demo request", status: resolvedStatus, detail: "Demo approval.", adminNote, workflowStatus, statusLabel }
     };
     return Promise.resolve(response);
   }

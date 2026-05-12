@@ -1,7 +1,7 @@
 import type { SupabaseAdmin } from "./supabase";
 import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord } from "./domain";
-import type { AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, UserRole } from "@taptu/shared";
-import { createInitialStore } from "./domain";
+import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, EmployeeListItem, EmployeeSummary, LeaveRequestItem, UserRole } from "@taptu/shared";
+import { createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain";
 
 /**
  * Full relational Supabase adapter.
@@ -23,6 +23,31 @@ function isUuid(value: string | undefined | null): value is string {
 
 function toNullableUuid(value: string | undefined | null) {
   return isUuid(value) ? value : null;
+}
+
+type ProfileStructureRelation = { name?: string | null; full_name?: string | null } | null;
+
+type ProfileStructureRow = {
+  department_id?: string | null;
+  manager_id?: string | null;
+  position?: string | null;
+  employee_code?: string | null;
+  departments?: ProfileStructureRelation | ProfileStructureRelation[];
+  manager?: ProfileStructureRelation | ProfileStructureRelation[];
+};
+
+function readProfileStructure(row: ProfileStructureRow | null | undefined) {
+  const department = firstRelation(row?.departments);
+  const manager = firstRelation(row?.manager);
+
+  return {
+    departmentId: row?.department_id ?? null,
+    departmentName: department?.name ?? null,
+    managerId: row?.manager_id ?? null,
+    managerName: manager?.full_name ?? null,
+    position: row?.position ?? null,
+    employeeCode: row?.employee_code ?? null
+  };
 }
 
 // ─── Auth ───────────────────────────────────────────────────
@@ -99,7 +124,7 @@ export async function supabaseSignIn(
   // Fetch profile for role/org info
   const { data: profile } = await sb
     .from("profiles")
-    .select("full_name, role, organization_id, organizations(name)")
+    .select("full_name, role, organization_id, department_id, manager_id, position, employee_code, organizations(name), departments(name), manager:profiles!profiles_manager_id_fkey(full_name)")
     .eq("id", data.user.id)
     .single();
 
@@ -115,7 +140,8 @@ export async function supabaseSignIn(
       fullName: profile?.full_name ?? "",
       email: data.user.email ?? email,
       role: (profile?.role as UserRole) ?? "employee",
-      organizationName: orgName
+      organizationName: orgName,
+      ...readProfileStructure(profile)
     },
     accessToken: data.session.access_token
   };
@@ -127,7 +153,7 @@ export async function supabaseGetProfile(
 ): Promise<AuthUser | null> {
   const { data: profile } = await sb
     .from("profiles")
-    .select("id, full_name, email, role, organization_id, organizations(name)")
+    .select("id, full_name, email, role, organization_id, department_id, manager_id, position, employee_code, organizations(name), departments(name), manager:profiles!profiles_manager_id_fkey(full_name)")
     .eq("id", userId)
     .single();
 
@@ -144,7 +170,8 @@ export async function supabaseGetProfile(
     fullName: profile.full_name,
     email: profile.email,
     role: profile.role as UserRole,
-    organizationName: orgName
+    organizationName: orgName,
+    ...readProfileStructure(profile)
   };
 }
 
@@ -508,57 +535,49 @@ export async function supabaseGetAttendanceReportRows(
 
 // ─── Requests ───────────────────────────────────────────────
 
-export async function supabaseGetRequests(
-  sb: SupabaseAdmin,
-  userId: string,
-  isAdmin: boolean,
-  organizationId?: string
-) {
-  if (isAdmin && organizationId) {
-    // Admin sees all requests from org members
-    const { data: orgUsers } = await sb
-      .from("profiles")
-      .select("id, full_name")
-      .eq("organization_id", organizationId);
+type ApprovalRequestRow = Record<string, any>;
+type ApprovalStepRow = Record<string, any>;
 
-    const userIds = (orgUsers ?? []).map((u) => u.id);
-    const userMap = new Map((orgUsers ?? []).map((u) => [u.id, u.full_name]));
-
-    const { data, error } = await sb
-      .from("approval_requests")
-      .select("*")
-      .in("employee_id", userIds)
-      .order("created_at", { ascending: false });
-
-    if (error) throw new Error(`Failed to fetch requests: ${error.message}`);
-
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      requester: userMap.get(row.employee_id) ?? undefined,
-      category: row.request_type,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      title: row.title,
-      detail: row.reason,
-      status: row.status as "Menunggu" | "Disetujui" | "Ditolak",
-      adminNote: row.admin_note ?? undefined,
-      createdAt: row.created_at,
-      reviewedBy: undefined,
-      reviewedAt: row.reviewed_at ?? undefined
-    }));
-  }
-
-  // Employee sees own requests
-  const { data, error } = await sb
-    .from("approval_requests")
-    .select("*")
-    .eq("employee_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error(`Failed to fetch requests: ${error.message}`);
-
-  return (data ?? []).map((row) => ({
+function toApprovalStepItem(row: ApprovalStepRow): ApprovalStepItem {
+  return {
     id: row.id,
+    requestId: row.request_id,
+    stepOrder: row.step_order,
+    approverRole: row.approver_role,
+    approverId: row.approver_id ?? null,
+    status: row.status,
+    note: row.note ?? null,
+    reviewedAt: row.reviewed_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function getRequestWorkflowStatus(row: ApprovalRequestRow, steps: ApprovalStepItem[] = []): ApprovalWorkflowStatus {
+  if (row.final_status === "cancelled") return "cancelled";
+  if (row.final_status === "rejected" || row.status === "Ditolak" || steps.some((step) => step.status === "rejected")) return "rejected";
+  if (row.final_status === "approved" || row.status === "Disetujui") return "approved";
+
+  const managerStep = steps.find((step) => step.approverRole === "manager");
+  const hrStep = steps.find((step) => step.approverRole === "hr");
+  const currentStep = steps.find((step) => step.stepOrder === (row.current_step ?? 1));
+
+  if (currentStep?.approverRole === "manager" && currentStep.status === "pending") return "pending_manager";
+  if (currentStep?.approverRole === "hr" && currentStep.status === "pending") return "pending_hr";
+  if (managerStep?.status === "approved" && hrStep?.status === "pending") return "pending_hr";
+  if (managerStep?.status === "pending") return "pending_manager";
+  if (managerStep?.status === "approved") return "approved_by_manager";
+  if (hrStep?.status === "pending") return "pending_hr";
+
+  return "pending_hr";
+}
+
+function toLeaveRequestItem(row: ApprovalRequestRow, requester?: string, steps: ApprovalStepItem[] = []): LeaveRequestItem {
+  const workflowStatus = getRequestWorkflowStatus(row, steps);
+
+  return {
+    id: row.id,
+    requester,
     category: row.request_type,
     startDate: row.start_date,
     endDate: row.end_date,
@@ -567,8 +586,201 @@ export async function supabaseGetRequests(
     status: row.status as "Menunggu" | "Disetujui" | "Ditolak",
     adminNote: row.admin_note ?? undefined,
     createdAt: row.created_at,
-    reviewedAt: row.reviewed_at ?? undefined
+    reviewedBy: undefined,
+    reviewedAt: row.reviewed_at ?? undefined,
+    currentStep: row.current_step ?? null,
+    finalStatus: row.final_status ?? null,
+    workflowStatus,
+    statusLabel: getApprovalStatusLabel(workflowStatus),
+    completedAt: row.completed_at ?? null,
+    approvalSteps: steps
+  };
+}
+
+async function getApprovalStepsByRequestIds(sb: SupabaseAdmin, requestIds: string[]) {
+  if (requestIds.length === 0) return new Map<string, ApprovalStepItem[]>();
+
+  const { data, error } = await sb
+    .from("approval_steps")
+    .select("*")
+    .in("request_id", requestIds)
+    .order("step_order", { ascending: true });
+
+  if (error) throw new Error(`Failed to fetch approval steps: ${error.message}`);
+
+  const byRequestId = new Map<string, ApprovalStepItem[]>();
+  for (const row of data ?? []) {
+    const step = toApprovalStepItem(row);
+    byRequestId.set(step.requestId, [...(byRequestId.get(step.requestId) ?? []), step]);
+  }
+
+  return byRequestId;
+}
+
+async function getApprovalStepsForRequest(sb: SupabaseAdmin, requestId: string) {
+  const { data, error } = await sb
+    .from("approval_steps")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("step_order", { ascending: true });
+
+  if (error) throw new Error(`Failed to fetch approval steps: ${error.message}`);
+
+  return (data ?? []).map(toApprovalStepItem);
+}
+
+export async function getEmployeeRequests(
+  sb: SupabaseAdmin,
+  userId: string
+) {
+  const { data, error } = await sb
+    .from("approval_requests")
+    .select("*")
+    .eq("employee_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Failed to fetch requests: ${error.message}`);
+
+  const rows = data ?? [];
+  const stepsByRequestId = await getApprovalStepsByRequestIds(sb, rows.map((row) => row.id));
+
+  return rows.map((row) => toLeaveRequestItem(row, undefined, stepsByRequestId.get(row.id) ?? []));
+}
+
+export async function getAdminApprovalRequests(
+  sb: SupabaseAdmin,
+  organizationId: string
+) {
+  const { data: orgUsers } = await sb
+    .from("profiles")
+    .select("id, full_name")
+    .eq("organization_id", organizationId);
+
+  const userIds = (orgUsers ?? []).map((u) => u.id);
+  const userMap = new Map((orgUsers ?? []).map((u) => [u.id, u.full_name]));
+  if (userIds.length === 0) return [];
+
+  const { data, error } = await sb
+    .from("approval_requests")
+    .select("*")
+    .in("employee_id", userIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Failed to fetch requests: ${error.message}`);
+
+  const rows = data ?? [];
+  const stepsByRequestId = await getApprovalStepsByRequestIds(sb, rows.map((row) => row.id));
+
+  return rows.map((row) => toLeaveRequestItem(row, userMap.get(row.employee_id) ?? undefined, stepsByRequestId.get(row.id) ?? []));
+}
+
+export async function getManagerApprovalRequests(
+  sb: SupabaseAdmin,
+  managerId: string
+) {
+  const { data: steps, error: stepsError } = await sb
+    .from("approval_steps")
+    .select("request_id")
+    .eq("approver_role", "manager")
+    .eq("approver_id", managerId);
+
+  if (stepsError) throw new Error(`Failed to fetch manager approval steps: ${stepsError.message}`);
+
+  const requestIds = [...new Set((steps ?? []).map((step) => step.request_id))];
+  if (requestIds.length === 0) return [];
+
+  const { data, error } = await sb
+    .from("approval_requests")
+    .select("*, profiles(full_name)")
+    .in("id", requestIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Failed to fetch manager requests: ${error.message}`);
+
+  const rows = data ?? [];
+  const stepsByRequestId = await getApprovalStepsByRequestIds(sb, rows.map((row) => row.id));
+
+  return rows.map((row) => {
+    const profileData = row.profiles as Record<string, string> | null;
+    return toLeaveRequestItem(row, profileData?.full_name ?? undefined, stepsByRequestId.get(row.id) ?? []);
+  });
+}
+
+export async function supabaseGetRequests(
+  sb: SupabaseAdmin,
+  userId: string,
+  isAdmin: boolean,
+  organizationId?: string
+) {
+  if (isAdmin && organizationId) {
+    return getAdminApprovalRequests(sb, organizationId);
+  }
+
+  return getEmployeeRequests(sb, userId);
+}
+
+export async function createEmployeeRequest(
+  sb: SupabaseAdmin,
+  userId: string,
+  payload: {
+    category: RequestRecord["category"];
+    startDate: string;
+    endDate: string;
+    title: string;
+    detail: string;
+  }
+) {
+  const { data: profile, error: profileError } = await sb
+    .from("profiles")
+    .select("manager_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(`Failed to fetch employee manager: ${profileError.message}`);
+  }
+
+  const { data, error } = await sb
+    .from("approval_requests")
+    .insert({
+      employee_id: userId,
+      request_type: payload.category,
+      start_date: payload.startDate,
+      end_date: payload.endDate,
+      title: payload.title,
+      reason: payload.detail,
+      status: "Menunggu",
+      current_step: 1,
+      final_status: "pending"
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create request: ${error?.message}`);
+  }
+
+  const steps = createApprovalStepPlan(data.id, profile?.manager_id ?? null).map((step) => ({
+    request_id: step.requestId,
+    step_order: step.stepOrder,
+    approver_role: step.approverRole,
+    approver_id: step.approverId ?? null,
+    status: step.status
   }));
+  const { error: stepsError } = await sb.from("approval_steps").insert(steps);
+
+  if (stepsError) {
+    throw new Error(`Failed to create request approval steps: ${stepsError.message}`);
+  }
+
+  return toLeaveRequestItem(data, undefined, steps.map((step) => toApprovalStepItem({
+    id: undefined,
+    request_id: step.request_id,
+    step_order: step.step_order,
+    approver_role: step.approver_role,
+    approver_id: step.approver_id,
+    status: step.status
+  })));
 }
 
 export async function supabaseCreateRequest(
@@ -582,34 +794,7 @@ export async function supabaseCreateRequest(
     detail: string;
   }
 ) {
-  const { data, error } = await sb
-    .from("approval_requests")
-    .insert({
-      employee_id: userId,
-      request_type: payload.category,
-      start_date: payload.startDate,
-      end_date: payload.endDate,
-      title: payload.title,
-      reason: payload.detail,
-      status: "Menunggu"
-    })
-    .select()
-    .single();
-
-  if (error || !data) {
-    throw new Error(`Failed to create request: ${error?.message}`);
-  }
-
-  return {
-    id: data.id,
-    category: data.request_type,
-    startDate: data.start_date,
-    endDate: data.end_date,
-    title: data.title,
-    detail: data.reason,
-    status: data.status as "Menunggu" | "Disetujui" | "Ditolak",
-    createdAt: data.created_at
-  };
+  return createEmployeeRequest(sb, userId, payload);
 }
 
 export async function supabaseGetRequestById(
@@ -630,19 +815,179 @@ export async function supabaseGetRequestById(
   if (!isAdmin && data.employee_id !== userId) return null;
 
   const profileData = data.profiles as Record<string, string> | null;
+  const steps = await getApprovalStepsForRequest(sb, requestId);
+
+  return toLeaveRequestItem(data, profileData?.full_name ?? undefined, steps);
+}
+
+async function getApprovalRequestWithSteps(sb: SupabaseAdmin, requestId: string) {
+  const { data, error } = await sb
+    .from("approval_requests")
+    .select("*, profiles(full_name)")
+    .eq("id", requestId)
+    .single();
+
+  if (error || !data) return null;
 
   return {
-    id: data.id,
-    requester: profileData?.full_name ?? undefined,
-    category: data.request_type,
-    startDate: data.start_date,
-    endDate: data.end_date,
-    title: data.title,
-    detail: data.reason,
-    status: data.status as "Menunggu" | "Disetujui" | "Ditolak",
-    adminNote: data.admin_note ?? undefined,
-    reviewedAt: data.reviewed_at ?? undefined
+    request: data,
+    steps: await getApprovalStepsForRequest(sb, requestId)
   };
+}
+
+function canReviewStep(step: ApprovalStepItem, actor: { id: string; role: UserRole }) {
+  if (step.approverRole === "manager") {
+    return actor.role === "manager" && step.approverId === actor.id;
+  }
+
+  if (step.approverRole === "hr") {
+    return actor.role === "admin" || actor.role === "superadmin";
+  }
+
+  return false;
+}
+
+async function markApprovalStep(
+  sb: SupabaseAdmin,
+  stepId: string,
+  status: "approved" | "rejected",
+  note: string | undefined,
+  reviewedAt: string
+) {
+  const { error } = await sb
+    .from("approval_steps")
+    .update({ status, note: note ?? null, reviewed_at: reviewedAt, updated_at: reviewedAt })
+    .eq("id", stepId)
+    .select();
+
+  if (error) {
+    throw new Error(`Failed to update approval step: ${error.message}`);
+  }
+}
+
+async function updateApprovalRequestAfterStep(
+  sb: SupabaseAdmin,
+  requestId: string,
+  payload: Record<string, unknown>
+) {
+  const { data, error } = await sb
+    .from("approval_requests")
+    .update(payload)
+    .eq("id", requestId)
+    .select("*, profiles(full_name)")
+    .single();
+
+  if (error || !data) return null;
+
+  const profileData = data.profiles as Record<string, string> | null;
+  const steps = await getApprovalStepsForRequest(sb, requestId);
+
+  return toLeaveRequestItem(data, profileData?.full_name ?? undefined, steps);
+}
+
+async function updateLegacySingleStepRequest(
+  sb: SupabaseAdmin,
+  requestId: string,
+  actor: { id: string; role: UserRole; note?: string; reviewedAt?: string },
+  status: "Disetujui" | "Ditolak"
+) {
+  if (actor.role !== "admin" && actor.role !== "superadmin") return null;
+
+  const finalStatus = status === "Disetujui" ? "approved" : "rejected";
+  const reviewedAt = actor.reviewedAt ?? new Date().toISOString();
+
+  return updateApprovalRequestAfterStep(sb, requestId, {
+    status,
+    final_status: finalStatus,
+    completed_at: reviewedAt,
+    admin_note: actor.note ?? null,
+    reviewed_by: actor.id,
+    reviewed_at: reviewedAt
+  });
+}
+
+export async function approveRequestStep(
+  sb: SupabaseAdmin,
+  requestId: string,
+  actor: { id: string; role: UserRole; note?: string; reviewedAt?: string }
+) {
+  const current = await getApprovalRequestWithSteps(sb, requestId);
+  if (!current) return null;
+
+  const reviewedAt = actor.reviewedAt ?? new Date().toISOString();
+  const steps = current.steps;
+  if (steps.length === 0) {
+    return updateLegacySingleStepRequest(sb, requestId, actor, "Disetujui");
+  }
+
+  const currentStepOrder = current.request.current_step ?? 1;
+  const step = steps.find((item) => item.stepOrder === currentStepOrder && item.status === "pending");
+  if (!step || !canReviewStep(step, actor)) return null;
+
+  if (step.approverRole === "hr") {
+    const previousStepsApproved = steps
+      .filter((item) => item.stepOrder < step.stepOrder)
+      .every((item) => item.status === "approved");
+    if (!previousStepsApproved) return null;
+  }
+
+  await markApprovalStep(sb, step.id!, "approved", actor.note, reviewedAt);
+
+  const nextStep = steps.find((item) => item.stepOrder > step.stepOrder && item.status === "pending");
+  if (nextStep) {
+    return updateApprovalRequestAfterStep(sb, requestId, {
+      status: "Menunggu",
+      current_step: nextStep.stepOrder,
+      final_status: "pending",
+      admin_note: actor.note ?? current.request.admin_note ?? null
+    });
+  }
+
+  return updateApprovalRequestAfterStep(sb, requestId, {
+    status: "Disetujui",
+    final_status: "approved",
+    completed_at: reviewedAt,
+    admin_note: actor.note ?? null,
+    reviewed_by: actor.id,
+    reviewed_at: reviewedAt
+  });
+}
+
+export async function rejectRequestStep(
+  sb: SupabaseAdmin,
+  requestId: string,
+  actor: { id: string; role: UserRole; note?: string; reviewedAt?: string }
+) {
+  const current = await getApprovalRequestWithSteps(sb, requestId);
+  if (!current) return null;
+
+  const reviewedAt = actor.reviewedAt ?? new Date().toISOString();
+  const steps = current.steps;
+  if (steps.length === 0) {
+    return updateLegacySingleStepRequest(sb, requestId, actor, "Ditolak");
+  }
+
+  const currentStepOrder = current.request.current_step ?? 1;
+  const step = steps.find((item) => item.stepOrder === currentStepOrder && item.status === "pending");
+  if (!step || !canReviewStep(step, actor)) return null;
+
+  await markApprovalStep(sb, step.id!, "rejected", actor.note, reviewedAt);
+
+  return updateApprovalRequestAfterStep(sb, requestId, {
+    status: "Ditolak",
+    final_status: "rejected",
+    completed_at: reviewedAt,
+    admin_note: actor.note ?? null,
+    reviewed_by: actor.id,
+    reviewed_at: reviewedAt
+  });
+}
+
+export async function getRequestApprovalTimeline(
+  sb: SupabaseAdmin,
+  requestId: string
+) {
+  return getApprovalStepsForRequest(sb, requestId);
 }
 
 export async function supabaseUpdateRequestStatus(
@@ -651,30 +996,15 @@ export async function supabaseUpdateRequestStatus(
   status: "Disetujui" | "Ditolak",
   adminNote?: string
 ) {
-  const { data, error } = await sb
-    .from("approval_requests")
-    .update({ status, admin_note: adminNote ?? null, reviewed_at: new Date().toISOString() })
-    .eq("id", requestId)
-    .eq("status", "Menunggu") // only pending can be changed
-    .select("*, profiles(full_name)")
-    .single();
-
-  if (error || !data) return null;
-
-  const profileData = data.profiles as Record<string, string> | null;
-
-  return {
-    id: data.id,
-    requester: profileData?.full_name ?? undefined,
-    category: data.request_type,
-    startDate: data.start_date,
-    endDate: data.end_date,
-    title: data.title,
-    detail: data.reason,
-    status: data.status as "Menunggu" | "Disetujui" | "Ditolak",
-    adminNote: data.admin_note ?? undefined,
-    reviewedAt: data.reviewed_at ?? undefined
+  const actor = {
+    id: "legacy-admin",
+    role: "admin" as UserRole,
+    note: adminNote
   };
+
+  return status === "Disetujui"
+    ? approveRequestStep(sb, requestId, actor)
+    : rejectRequestStep(sb, requestId, actor);
 }
 
 export async function supabaseDeleteRequest(
@@ -763,12 +1093,68 @@ export async function supabaseGetAdminOverview(
   };
 }
 
+export async function supabaseGetEmployeeList(
+  sb: SupabaseAdmin,
+  organizationId: string
+): Promise<EmployeeListItem[]> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: profiles, error: profilesError } = await sb
+    .from("profiles")
+    .select("id, full_name, email, role, department_id, manager_id, position, employee_code, departments(name), manager:profiles!profiles_manager_id_fkey(full_name)")
+    .eq("organization_id", organizationId)
+    .in("role", ["employee", "manager"]);
+
+  if (profilesError) {
+    throw new Error(`Failed to fetch employees: ${profilesError.message}`);
+  }
+
+  const employeeIds = (profiles ?? []).map((profile) => profile.id);
+  if (employeeIds.length === 0) return [];
+
+  const { data: attendance, error: attendanceError } = await sb
+    .from("attendance_records")
+    .select("employee_id, state, status, check_in_time, validation_status, shift_id, work_locations(name)")
+    .eq("attendance_date", today)
+    .in("employee_id", employeeIds);
+
+  if (attendanceError) {
+    throw new Error(`Failed to fetch employee attendance: ${attendanceError.message}`);
+  }
+
+  const attendanceByEmployeeId = new Map((attendance ?? []).map((record) => [record.employee_id, record]));
+
+  return (profiles ?? []).map((profile) => {
+    const record = attendanceByEmployeeId.get(profile.id);
+    let todayStatus: EmployeeListItem["todayStatus"] = "absent";
+
+    if (record?.state === "checked_in" || record?.state === "checked_out") {
+      todayStatus = record.status === "Terlambat" ? "late" : "present";
+    }
+
+    const workLocation = firstRelation(record?.work_locations);
+
+    return {
+      id: profile.id,
+      fullName: profile.full_name,
+      email: profile.email,
+      role: profile.role as UserRole,
+      ...readProfileStructure(profile),
+      todayStatus,
+      checkInTime: record?.check_in_time ? new Date(record.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : undefined,
+      validationStatus: record?.validation_status as EmployeeListItem["validationStatus"] | undefined,
+      shiftName: record?.shift_id ?? undefined,
+      locationName: workLocation?.name ?? undefined
+    };
+  });
+}
+
 // ─── Employee summary ───────────────────────────────────────
 
 export async function supabaseGetEmployeeSummary(
   sb: SupabaseAdmin,
   userId: string
-) {
+): Promise<EmployeeSummary> {
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: history } = await sb
@@ -800,6 +1186,12 @@ export async function supabaseGetEmployeeSummary(
     .eq("attendance_date", today)
     .maybeSingle();
 
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("department_id, manager_id, position, employee_code, departments(name), manager:profiles!profiles_manager_id_fkey(full_name)")
+    .eq("id", userId)
+    .maybeSingle();
+
   return {
     totalDays: attended.length,
     onTimeDays: onTime.length,
@@ -828,7 +1220,8 @@ export async function supabaseGetEmployeeSummary(
       deviceId: todayRecord?.device_id ?? undefined,
       createdAt: todayRecord?.created_at ?? `${today}T00:00:00.000Z`,
       updatedAt: todayRecord?.updated_at ?? `${today}T00:00:00.000Z`
-    }
+    },
+    profile: readProfileStructure(profile)
   };
 }
 

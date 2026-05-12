@@ -64,12 +64,20 @@ import {
   supabaseUpsertAttendance,
   supabaseGetAttendanceHistory,
   supabaseGetAllAttendanceHistory,
+  getAdminApprovalRequests,
+  getEmployeeRequests,
+  getManagerApprovalRequests,
+  createEmployeeRequest,
+  approveRequestStep,
+  rejectRequestStep,
+  getRequestApprovalTimeline,
   supabaseGetRequests,
   supabaseCreateRequest,
   supabaseGetRequestById,
   supabaseUpdateRequestStatus,
   supabaseDeleteRequest,
   supabaseGetAdminOverview,
+  supabaseGetEmployeeList,
   supabaseGetEmployeeSummary,
   supabaseGetExceptions,
   supabaseGetAuditLogs,
@@ -1050,9 +1058,13 @@ app.get("/api/requests", async (req, res) => {
   if (!user) return;
 
   if (useSupabase && sb) {
-    const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
-    const organizationId = isAdmin ? await getOrganizationIdForUser(user.id) : undefined;
-    const items = await supabaseGetRequests(sb, user.id, isAdmin, organizationId ?? undefined);
+    const organizationId = user.role === "admin" || user.role === "superadmin" ? await getOrganizationIdForUser(user.id) : undefined;
+    const items =
+      user.role === "admin" || user.role === "superadmin"
+        ? organizationId ? await getAdminApprovalRequests(sb, organizationId) : []
+        : user.role === "manager"
+          ? await getManagerApprovalRequests(sb, user.id)
+          : await getEmployeeRequests(sb, user.id);
     return res.json(items);
   }
 
@@ -1075,9 +1087,6 @@ app.get("/api/requests/:id", async (req, res) => {
     const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
     const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin);
     if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
-    if (user.role === "manager" && item.category && !["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(item.category)) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
     return res.json(item);
   }
 
@@ -1090,6 +1099,22 @@ app.get("/api/requests/:id", async (req, res) => {
   return res.json(buildRequestItem(request, users.find((entry) => entry.id === request.userId)?.fullName));
 });
 
+app.get("/api/requests/:id/approval-timeline", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+
+  if (useSupabase && sb) {
+    const isReviewer = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
+    const item = await supabaseGetRequestById(sb, req.params.id, user.id, isReviewer);
+    if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+
+    const timeline = await getRequestApprovalTimeline(sb, req.params.id);
+    return res.json(timeline);
+  }
+
+  return res.json([]);
+});
+
 app.post("/api/requests", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
@@ -1098,7 +1123,7 @@ app.post("/api/requests", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: "Judul atau detail pengajuan belum valid." });
 
   if (useSupabase && sb) {
-    const created = await supabaseCreateRequest(sb, user.id, parsed.data);
+    const created = await createEmployeeRequest(sb, user.id, parsed.data);
     return res.status(201).json({ request: created });
   }
 
@@ -1148,7 +1173,10 @@ app.get("/api/admin/requests", async (req, res) => {
 
   if (useSupabase && sb) {
     const organizationId = await getOrganizationIdForUser(user.id);
-    const items = await supabaseGetRequests(sb, user.id, true, organizationId ?? undefined);
+    const items =
+      user.role === "manager"
+        ? await getManagerApprovalRequests(sb, user.id)
+        : organizationId ? await getAdminApprovalRequests(sb, organizationId) : [];
     return res.json(items);
   }
 
@@ -1164,14 +1192,15 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: "Status approval tidak valid." });
 
   if (useSupabase && sb) {
-    if (user.role === "manager") {
-      const existing = await supabaseGetRequestById(sb, req.params.id, user.id, true);
-      if (!existing || !existing.category || !["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(existing.category)) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-    }
-    const updated = await supabaseUpdateRequestStatus(sb, req.params.id, parsed.data.status, parsed.data.adminNote);
-    if (!updated) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
+    const actionContext = {
+      id: user.id,
+      role: user.role,
+      note: parsed.data.adminNote
+    };
+    const updated = parsed.data.status === "Disetujui"
+      ? await approveRequestStep(sb, req.params.id, actionContext)
+      : await rejectRequestStep(sb, req.params.id, actionContext);
+    if (!updated) return res.status(409).json({ message: "Step approval tidak tersedia untuk role ini." });
     await supabaseCreateAuditLog(
       sb,
       createAuditLog(
@@ -1402,6 +1431,12 @@ app.get("/api/admin/employees", async (req, res) => {
   if (!user) return;
   if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") {
     return res.status(403).json({ message: "Forbidden" });
+  }
+
+  if (useSupabase && sb) {
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (!organizationId) return res.json([]);
+    return res.json(await supabaseGetEmployeeList(sb, organizationId));
   }
 
   const employeeUsers = users.filter((u) => u.role === "employee" || u.role === "manager");

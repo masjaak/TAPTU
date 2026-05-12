@@ -50,7 +50,6 @@ describe("app shell state", () => {
       "team",
       "attendance",
       "requests",
-      "reports",
       "profile"
     ]);
   });

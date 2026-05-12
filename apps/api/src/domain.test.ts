@@ -10,6 +10,7 @@ import {
   computeEmployeeSummary,
   createAttendanceException,
   createAuditLog,
+  createApprovalStepPlan,
   createCheckInRecord,
   createInitialStore,
   createShiftRecord,
@@ -255,6 +256,39 @@ describe("request state machine", () => {
 
     expect(next[0].status).toBe("Menunggu");
   });
+
+  it("creates an assigned manager then HR approval step plan when employee has a manager", () => {
+    const steps = createApprovalStepPlan("req-777", "usr-manager-01");
+
+    expect(steps).toEqual([
+      {
+        requestId: "req-777",
+        stepOrder: 1,
+        approverRole: "manager",
+        approverId: "usr-manager-01",
+        status: "pending"
+      },
+      {
+        requestId: "req-777",
+        stepOrder: 2,
+        approverRole: "hr",
+        status: "pending"
+      }
+    ]);
+  });
+
+  it("creates only an HR approval step when employee has no manager", () => {
+    const steps = createApprovalStepPlan("req-888", null);
+
+    expect(steps).toEqual([
+      {
+        requestId: "req-888",
+        stepOrder: 1,
+        approverRole: "hr",
+        status: "pending"
+      }
+    ]);
+  });
 });
 
 describe("exceptions and audit", () => {
@@ -329,6 +363,35 @@ describe("computeEmployeeList", () => {
     const result = computeEmployeeList(store, users);
     expect(result).toHaveLength(1);
     expect(result[0].todayStatus).toBe("absent");
+  });
+
+  it("returns nullable organization structure fields for team rows", () => {
+    const store = createInitialStore();
+    const users = [
+      {
+        id: "usr-employee-01",
+        fullName: "Fikri Maulana",
+        email: "employee@taptu.app",
+        role: "employee" as UserRole,
+        departmentId: "dep-ops",
+        departmentName: "Operations",
+        managerId: "usr-manager-01",
+        managerName: "Raka Saputra",
+        position: "Field Officer",
+        employeeCode: "EMP-001"
+      }
+    ];
+
+    const result = computeEmployeeList(store, users);
+
+    expect(result[0]).toMatchObject({
+      departmentId: "dep-ops",
+      departmentName: "Operations",
+      managerId: "usr-manager-01",
+      managerName: "Raka Saputra",
+      position: "Field Officer",
+      employeeCode: "EMP-001"
+    });
   });
 
   it("returns present for checked-in employee", () => {

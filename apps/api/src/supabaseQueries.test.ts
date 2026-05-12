@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { AttendanceRecord } from "./domain";
 import type { SupabaseAdmin } from "./supabase";
 import {
+  approveRequestStep,
+  createEmployeeRequest,
+  rejectRequestStep,
   supabaseBuildAttendanceReportRows,
   supabaseCreateCheckInRecord,
+  supabaseCreateRequest,
   supabaseGetAttendanceHistory,
   supabaseUpdateCheckOutRecord
 } from "./supabaseQueries";
@@ -253,5 +257,440 @@ describe("Supabase attendance queries", () => {
       selfieProof: false,
       deviceValidated: true
     });
+  });
+});
+
+describe("Supabase request approvals", () => {
+  it("creates assigned manager and HR approval_steps for new approval_requests", async () => {
+    const insertedSteps: Array<Record<string, unknown>> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    async maybeSingle() {
+                      return { data: { manager_id: "usr-manager-01" }, error: null };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+
+        if (table === "approval_requests") {
+          return {
+            insert(payload: Record<string, unknown>) {
+              expect(payload).toMatchObject({
+                employee_id: "usr-employee-01",
+                request_type: "Cuti",
+                status: "Menunggu",
+                current_step: 1
+              });
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id: "req-777",
+                          ...payload,
+                          created_at: "2026-05-12T08:00:00.000Z"
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+
+        expect(table).toBe("approval_steps");
+        return {
+          insert(payload: Array<Record<string, unknown>>) {
+            insertedSteps.push(...payload);
+            return Promise.resolve({ error: null });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const created = await createEmployeeRequest(sb, "usr-employee-01", {
+      category: "Cuti",
+      startDate: "2026-05-14",
+      endDate: "2026-05-15",
+      title: "Cuti tahunan",
+      detail: "Cuti dua hari."
+    });
+
+    expect(created.id).toBe("req-777");
+    expect(insertedSteps).toEqual([
+      {
+        request_id: "req-777",
+        step_order: 1,
+        approver_role: "manager",
+        approver_id: "usr-manager-01",
+        status: "pending"
+      },
+      {
+        request_id: "req-777",
+        step_order: 2,
+        approver_role: "hr",
+        approver_id: null,
+        status: "pending"
+      }
+    ]);
+  });
+
+  it("manager approval advances request to HR without finalizing", async () => {
+    const updatedSteps: Array<Record<string, unknown>> = [];
+    const updatedRequests: Array<Record<string, unknown>> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "approval_requests") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id: "req-777",
+                          employee_id: "usr-employee-01",
+                          request_type: "Cuti",
+                          start_date: "2026-05-14",
+                          end_date: "2026-05-15",
+                          title: "Cuti tahunan",
+                          reason: "Cuti dua hari.",
+                          status: "Menunggu",
+                          current_step: 1,
+                          final_status: "pending",
+                          created_at: "2026-05-12T08:00:00.000Z",
+                          profiles: { full_name: "Fikri Maulana" }
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            },
+            update(payload: Record<string, unknown>) {
+              updatedRequests.push(payload);
+              return {
+                eq() {
+                  return {
+                    select() {
+                      return {
+                        async single() {
+                          return {
+                            data: {
+                              id: "req-777",
+                              employee_id: "usr-employee-01",
+                              request_type: "Cuti",
+                              start_date: "2026-05-14",
+                              end_date: "2026-05-15",
+                              title: "Cuti tahunan",
+                              reason: "Cuti dua hari.",
+                              status: "Menunggu",
+                              current_step: 2,
+                              final_status: "pending",
+                              created_at: "2026-05-12T08:00:00.000Z",
+                              profiles: { full_name: "Fikri Maulana" }
+                            },
+                            error: null
+                          };
+                        }
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+
+        expect(table).toBe("approval_steps");
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  order() {
+                    return Promise.resolve({
+                      data: [
+                        { id: "step-manager", request_id: "req-777", step_order: 1, approver_role: "manager", approver_id: "usr-manager-01", status: "pending", note: null, reviewed_at: null },
+                        { id: "step-hr", request_id: "req-777", step_order: 2, approver_role: "hr", approver_id: null, status: "pending", note: null, reviewed_at: null }
+                      ],
+                      error: null
+                    });
+                  }
+                };
+              }
+            };
+          },
+          update(payload: Record<string, unknown>) {
+            updatedSteps.push(payload);
+            return {
+              eq() {
+                return {
+                  async select() {
+                    return { data: [], error: null };
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await approveRequestStep(sb, "req-777", {
+      id: "usr-manager-01",
+      role: "manager",
+      note: "Approved by manager",
+      reviewedAt: "2026-05-12T09:00:00.000Z"
+    });
+
+    expect(result?.status).toBe("Menunggu");
+    expect(result?.workflowStatus).toBe("pending_hr");
+    expect(updatedSteps[0]).toMatchObject({ status: "approved", note: "Approved by manager" });
+    expect(updatedRequests[0]).toMatchObject({ status: "Menunggu", current_step: 2, final_status: "pending" });
+  });
+
+  it("HR approval finalizes a request after manager approval", async () => {
+    const updatedRequests: Array<Record<string, unknown>> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "approval_requests") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id: "req-777",
+                          employee_id: "usr-employee-01",
+                          request_type: "Cuti",
+                          start_date: "2026-05-14",
+                          end_date: "2026-05-15",
+                          title: "Cuti tahunan",
+                          reason: "Cuti dua hari.",
+                          status: "Menunggu",
+                          current_step: 2,
+                          final_status: "pending",
+                          created_at: "2026-05-12T08:00:00.000Z",
+                          profiles: { full_name: "Fikri Maulana" }
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            },
+            update(payload: Record<string, unknown>) {
+              updatedRequests.push(payload);
+              return {
+                eq() {
+                  return {
+                    select() {
+                      return {
+                        async single() {
+                          return {
+                            data: {
+                              id: "req-777",
+                              employee_id: "usr-employee-01",
+                              request_type: "Cuti",
+                              start_date: "2026-05-14",
+                              end_date: "2026-05-15",
+                              title: "Cuti tahunan",
+                              reason: "Cuti dua hari.",
+                              status: "Disetujui",
+                              current_step: 2,
+                              final_status: "approved",
+                              completed_at: "2026-05-12T10:00:00.000Z",
+                              created_at: "2026-05-12T08:00:00.000Z",
+                              profiles: { full_name: "Fikri Maulana" }
+                            },
+                            error: null
+                          };
+                        }
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+
+        expect(table).toBe("approval_steps");
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  order() {
+                    return Promise.resolve({
+                      data: [
+                        { id: "step-manager", request_id: "req-777", step_order: 1, approver_role: "manager", approver_id: "usr-manager-01", status: "approved", note: "OK", reviewed_at: "2026-05-12T09:00:00.000Z" },
+                        { id: "step-hr", request_id: "req-777", step_order: 2, approver_role: "hr", approver_id: null, status: "pending", note: null, reviewed_at: null }
+                      ],
+                      error: null
+                    });
+                  }
+                };
+              }
+            };
+          },
+          update() {
+            return {
+              eq() {
+                return {
+                  async select() {
+                    return { data: [], error: null };
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await approveRequestStep(sb, "req-777", {
+      id: "usr-admin-01",
+      role: "admin",
+      note: "Final approval",
+      reviewedAt: "2026-05-12T10:00:00.000Z"
+    });
+
+    expect(result?.status).toBe("Disetujui");
+    expect(result?.workflowStatus).toBe("approved");
+    expect(updatedRequests[0]).toMatchObject({ status: "Disetujui", final_status: "approved" });
+  });
+
+  it("manager rejection finalizes request as rejected", async () => {
+    const updatedRequests: Array<Record<string, unknown>> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "approval_requests") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id: "req-777",
+                          employee_id: "usr-employee-01",
+                          request_type: "Cuti",
+                          start_date: "2026-05-14",
+                          end_date: "2026-05-15",
+                          title: "Cuti tahunan",
+                          reason: "Cuti dua hari.",
+                          status: "Menunggu",
+                          current_step: 1,
+                          final_status: "pending",
+                          created_at: "2026-05-12T08:00:00.000Z",
+                          profiles: { full_name: "Fikri Maulana" }
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            },
+            update(payload: Record<string, unknown>) {
+              updatedRequests.push(payload);
+              return {
+                eq() {
+                  return {
+                    select() {
+                      return {
+                        async single() {
+                          return {
+                            data: {
+                              id: "req-777",
+                              employee_id: "usr-employee-01",
+                              request_type: "Cuti",
+                              start_date: "2026-05-14",
+                              end_date: "2026-05-15",
+                              title: "Cuti tahunan",
+                              reason: "Cuti dua hari.",
+                              status: "Ditolak",
+                              current_step: 1,
+                              final_status: "rejected",
+                              completed_at: "2026-05-12T09:00:00.000Z",
+                              created_at: "2026-05-12T08:00:00.000Z",
+                              profiles: { full_name: "Fikri Maulana" }
+                            },
+                            error: null
+                          };
+                        }
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+
+        expect(table).toBe("approval_steps");
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  order() {
+                    return Promise.resolve({
+                      data: [
+                        { id: "step-manager", request_id: "req-777", step_order: 1, approver_role: "manager", approver_id: "usr-manager-01", status: "pending", note: null, reviewed_at: null },
+                        { id: "step-hr", request_id: "req-777", step_order: 2, approver_role: "hr", approver_id: null, status: "pending", note: null, reviewed_at: null }
+                      ],
+                      error: null
+                    });
+                  }
+                };
+              }
+            };
+          },
+          update() {
+            return {
+              eq() {
+                return {
+                  async select() {
+                    return { data: [], error: null };
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await rejectRequestStep(sb, "req-777", {
+      id: "usr-manager-01",
+      role: "manager",
+      note: "Rejected by manager",
+      reviewedAt: "2026-05-12T09:00:00.000Z"
+    });
+
+    expect(result?.status).toBe("Ditolak");
+    expect(result?.workflowStatus).toBe("rejected");
+    expect(updatedRequests[0]).toMatchObject({ status: "Ditolak", final_status: "rejected" });
   });
 });
