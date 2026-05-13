@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
@@ -1220,6 +1220,31 @@ function setupAdminSession() {
     exceptionCount: 1,
     recentActivity: []
   });
+  apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+  apiMocks.fetchRequests.mockResolvedValue([]);
+  apiMocks.fetchManagerRequests.mockResolvedValue([]);
+  apiMocks.fetchRequestDetail.mockResolvedValue(null);
+  apiMocks.fetchEmployeeList.mockResolvedValue([
+    { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", position: "Field Officer", employeeCode: "EMP-001", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+    { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: null, managerName: null, todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+  ]);
+  apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
+  apiMocks.fetchExceptionQueue.mockResolvedValue([
+    { id: "exc-01", attendanceRecordId: "att-demo-02", employeeId: "usr-employee-02", employeeName: "Anisa Rahma", exceptionType: "Di luar radius", reason: "GPS tidak akurat", status: "Need Review", createdAt: "2026-05-14T08:24:00.000Z" }
+  ]);
+  apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+  apiMocks.fetchWorkLocations.mockResolvedValue([
+    { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
+  ]);
+  apiMocks.fetchShifts.mockResolvedValue([
+    { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
+  ]);
+  apiMocks.fetchReportRows.mockResolvedValue([
+    { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+  ]);
+  apiMocks.fetchAuditLogs.mockResolvedValue([]);
+  apiMocks.refreshScannerToken.mockResolvedValue({ token: "HDR-31A-7XZ", expiresInSeconds: 30, scansToday: 124, locationName: "Gerbang Utama" });
+  apiMocks.exportReportCsv.mockImplementation(() => undefined);
 }
 
 describe("HR/Admin dashboard Indonesian labels", () => {
@@ -1236,11 +1261,50 @@ describe("HR/Admin dashboard Indonesian labels", () => {
     expect(await screen.findByText("Hadir hari ini")).toBeTruthy();
     expect(screen.getAllByText("Terlambat").length).toBeGreaterThan(0);
     expect(screen.getByText("Belum hadir")).toBeTruthy();
-    expect(screen.getByText("Menunggu approval")).toBeTruthy();
+    expect(screen.getByText("Menunggu Manager")).toBeTruthy();
+    expect(screen.getByText("Menunggu HR")).toBeTruthy();
     expect(screen.getByText("Perlu review")).toBeTruthy();
     expect(screen.queryByText("Present today")).toBeNull();
     expect(screen.queryByText("Pending approvals")).toBeNull();
     expect(screen.queryByText("Need review")).toBeNull();
+  });
+
+  it("admin Beranda splits approval counts by manager and HR workflow stage", async () => {
+    setupAdminSession();
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Nadia Putri",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-manager", title: "Izin menunggu manager", status: "Menunggu", detail: "Belum direview manager.", workflowStatus: "pending_manager" },
+        { id: "req-hr", title: "Izin menunggu HR", status: "Menunggu", detail: "Sudah masuk antrean HR.", workflowStatus: "pending_hr" },
+        { id: "req-approved-manager", title: "Cuti sudah disetujui manager", status: "Menunggu", detail: "Manager sudah menyetujui.", workflowStatus: "approved_by_manager" },
+        { id: "req-rejected", title: "Izin ditolak", status: "Ditolak", detail: "Tidak memenuhi syarat.", workflowStatus: "rejected" }
+      ]
+    });
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 10,
+      checkedInToday: 8,
+      onTimeToday: 7,
+      lateToday: 1,
+      pendingRequests: 99,
+      absentToday: 2,
+      exceptionCount: 4,
+      recentActivity: []
+    });
+
+    renderRoute("/app");
+
+    const managerCard = (await screen.findByText("Menunggu Manager")).closest("article");
+    const hrCard = screen.getByText("Menunggu HR").closest("article");
+    const reviewCard = screen.getByText("Perlu review").closest("article");
+
+    expect(within(managerCard!).getByText("1")).toBeTruthy();
+    expect(within(hrCard!).getByText("2")).toBeTruthy();
+    expect(within(reviewCard!).getByText("4")).toBeTruthy();
+    expect(screen.queryByText("99")).toBeNull();
   });
 
   it("admin dashboard quick actions have production copy and no English placeholder", async () => {
@@ -1264,6 +1328,26 @@ describe("HR/Admin dashboard Indonesian labels", () => {
     expect(screen.getAllByText(/ringkasan kehadiran hari ini/i).length).toBeGreaterThan(0);
   });
 
+  it("admin profile shows HR identity and access summary", async () => {
+    setupAdminSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Nadia Putri")).toBeTruthy();
+    expect(screen.getByText("admin@taptu.app")).toBeTruthy();
+    expect(screen.getAllByText("Admin HR").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("TAPTU HQ").length).toBeGreaterThan(0);
+    expect(screen.getByText("Semua divisi / organisasi")).toBeTruthy();
+    expect(screen.getByText("Melihat semua karyawan")).toBeTruthy();
+    expect(screen.getByText("Meninjau presensi organisasi")).toBeTruthy();
+    expect(screen.getByText("Final approval pengajuan")).toBeTruthy();
+    expect(screen.getByText("Meninjau pengecualian")).toBeTruthy();
+    expect(screen.getByText("Mengelola lokasi dan shift")).toBeTruthy();
+    expect(screen.getByText("Export laporan")).toBeTruthy();
+    expect(screen.getByText("Keamanan akun")).toBeTruthy();
+    expect(screen.queryByText(/ringkasan profil admin akan tersedia/i)).toBeNull();
+    expect(screen.queryByText(/superadmin settings/i)).toBeNull();
+  });
+
   it("admin attendance table columns use Indonesian headers", async () => {
     setupAdminSession();
     apiMocks.fetchAdminOverview.mockResolvedValue({
@@ -1282,6 +1366,80 @@ describe("HR/Admin dashboard Indonesian labels", () => {
     expect(screen.queryByText("Employee")).toBeNull();
     expect(screen.queryByText("Event")).toBeNull();
     expect(screen.queryByText(/^Time$/)).toBeNull();
+  });
+
+  it("admin Pengajuan only shows final approval actions for requests waiting on HR", async () => {
+    setupAdminSession();
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Nadia Putri",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-manager", title: "Izin menunggu manager", status: "Menunggu", detail: "Belum direview manager.", workflowStatus: "pending_manager" },
+        { id: "req-hr", title: "Izin menunggu HR", status: "Menunggu", detail: "Sudah masuk antrean HR.", workflowStatus: "pending_hr" },
+        { id: "req-approved-manager", title: "Cuti sudah disetujui manager", status: "Menunggu", detail: "Manager sudah menyetujui.", workflowStatus: "approved_by_manager", adminNote: "Manager: OK untuk cuti." },
+        { id: "req-rejected", title: "Izin ditolak", status: "Ditolak", detail: "Tidak memenuhi syarat.", workflowStatus: "rejected", adminNote: "Dokumen tidak lengkap." }
+      ]
+    });
+
+    renderRoute("/app/requests");
+
+    const pendingManagerCard = (await screen.findByText("Izin menunggu manager")).closest("article");
+    const pendingHrCard = screen.getByText("Izin menunggu HR").closest("article");
+    const approvedByManagerCard = screen.getByText("Cuti sudah disetujui manager").closest("article");
+    const rejectedCard = screen.getByText("Izin ditolak").closest("article");
+
+    expect(pendingManagerCard).toBeTruthy();
+    expect(pendingHrCard).toBeTruthy();
+    expect(approvedByManagerCard).toBeTruthy();
+    expect(rejectedCard).toBeTruthy();
+
+    expect(within(pendingManagerCard!).getByText("Menunggu Manager")).toBeTruthy();
+    expect(within(pendingManagerCard!).queryByRole("button", { name: /setujui/i })).toBeNull();
+    expect(within(pendingManagerCard!).queryByRole("button", { name: /tolak/i })).toBeNull();
+
+    expect(within(pendingHrCard!).getByText("Menunggu HR")).toBeTruthy();
+    expect(within(pendingHrCard!).getByRole("button", { name: /setujui/i })).toBeTruthy();
+    expect(within(pendingHrCard!).getByRole("button", { name: /tolak/i })).toBeTruthy();
+
+    expect(within(approvedByManagerCard!).getByText("Disetujui Manager")).toBeTruthy();
+    expect(within(approvedByManagerCard!).getByText(/manager: ok untuk cuti/i)).toBeTruthy();
+    expect(within(approvedByManagerCard!).getByRole("button", { name: /setujui/i })).toBeTruthy();
+    expect(within(approvedByManagerCard!).getByRole("button", { name: /tolak/i })).toBeTruthy();
+
+    expect(within(rejectedCard!).getByText("Ditolak")).toBeTruthy();
+    expect(within(rejectedCard!).getByText(/dokumen tidak lengkap/i)).toBeTruthy();
+    expect(within(rejectedCard!).queryByRole("button", { name: /setujui/i })).toBeNull();
+    expect(within(rejectedCard!).queryByRole("button", { name: /tolak/i })).toBeNull();
+  });
+
+  it("admin Presensi loads organization-wide attendance instead of dashboard self history", async () => {
+    setupAdminSession();
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Nadia Putri",
+      stats: [],
+      schedule: [],
+      attendance: [
+        { id: "self-att-01", day: "Hari ini", status: "Tepat waktu", time: "07:59", method: "Manual" }
+      ],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchReportRows.mockResolvedValue([
+      { id: "org-att-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
+      { id: "org-att-02", employeeName: "Anisa Rahma", employeeId: "usr-employee-02", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:24:00.000Z", status: "Terlambat", validationStatus: "needs_review", validationReasons: ["Di luar radius"], isLate: true, hasException: true, selfieProof: false, deviceValidated: true }
+    ]);
+
+    renderRoute("/app/attendance");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.getByText("Anisa Rahma")).toBeTruthy();
+    expect(screen.queryByText("07:59")).toBeNull();
+    expect(apiMocks.fetchReportRows).toHaveBeenCalledWith("demo:admin");
+    expect(apiMocks.fetchAttendanceHistoryByFilter).not.toHaveBeenCalled();
+    expect(apiMocks.fetchManagerEmployeeList).not.toHaveBeenCalled();
   });
 
   it("team workspace exception action buttons use Indonesian labels", async () => {

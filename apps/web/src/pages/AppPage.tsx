@@ -163,6 +163,25 @@ function getWorkflowStatusLabel(workflowStatus?: string): string | undefined {
   return workflowStatus ? WORKFLOW_STATUS_LABELS[workflowStatus] : undefined;
 }
 
+function canShowApprovalActionsForRequest(role: UserRole, workflowStatus?: string): boolean {
+  if (role === "admin" || role === "superadmin") {
+    return workflowStatus === undefined || workflowStatus === "pending_hr" || workflowStatus === "approved_by_manager";
+  }
+
+  if (role === "manager") {
+    return workflowStatus === undefined || workflowStatus === "pending_manager";
+  }
+
+  return false;
+}
+
+function countApprovalStages(items: LeaveRequestItem[]) {
+  return {
+    waitingManager: items.filter((item) => item.workflowStatus === "pending_manager").length,
+    waitingHr: items.filter((item) => item.workflowStatus === "pending_hr" || item.workflowStatus === "approved_by_manager").length
+  };
+}
+
 function profileValue(value?: string | null) {
   return value && value.trim() !== "" ? value : EMPTY_PROFILE_VALUE;
 }
@@ -339,6 +358,7 @@ export function AppPage() {
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [workLocations, setWorkLocations] = useState<WorkLocationItem[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
+  const [adminAttendanceRows, setAdminAttendanceRows] = useState<AttendanceReportRow[]>([]);
   const [reportRows, setReportRows] = useState<AttendanceReportRow[]>([]);
   const [reportFilters, setReportFilters] = useState<{ dateFrom: string; dateTo: string; employeeId: string; status: string }>({
     dateFrom: "",
@@ -358,6 +378,8 @@ export function AppPage() {
   const [adminOverviewError, setAdminOverviewError] = useState<string | null>(null);
   const [attendanceHistoryLoaded, setAttendanceHistoryLoaded] = useState(false);
   const [attendanceHistoryError, setAttendanceHistoryError] = useState<string | null>(null);
+  const [adminAttendanceLoaded, setAdminAttendanceLoaded] = useState(false);
+  const [adminAttendanceError, setAdminAttendanceError] = useState<string | null>(null);
   const [employeeSummaryLoaded, setEmployeeSummaryLoaded] = useState(false);
   const [employeeSummaryError, setEmployeeSummaryError] = useState<string | null>(null);
   const [scannerLoaded, setScannerLoaded] = useState(false);
@@ -422,7 +444,9 @@ export function AppPage() {
         setGreeting(data.greeting);
         setStats(data.stats);
         setSchedule(data.schedule);
-        setAttendance(normalizeAttendanceHistoryItems(data.attendance));
+        if (!isAdmin) {
+          setAttendance(normalizeAttendanceHistoryItems(data.attendance));
+        }
         setAttendanceState(data.attendanceState ?? "idle");
         if (!isManager) {
           setRequests(data.requests);
@@ -482,6 +506,19 @@ export function AppPage() {
         .catch((error) => {
           setEmployeeSummaryLoaded(true);
           setEmployeeSummaryError(error instanceof Error ? error.message : "Status absensi pribadi gagal dimuat.");
+        });
+    }
+
+    if (tab === "attendance" && isAdmin && !adminAttendanceLoaded) {
+      setAdminAttendanceError(null);
+      fetchReportRows(session.token)
+        .then((rows) => {
+          setAdminAttendanceRows(rows);
+          setAdminAttendanceLoaded(true);
+        })
+        .catch((error) => {
+          setAdminAttendanceLoaded(true);
+          setAdminAttendanceError(error instanceof Error ? error.message : "Presensi organisasi gagal dimuat.");
         });
     }
 
@@ -591,7 +628,7 @@ export function AppPage() {
           setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
         });
     }
-  }, [adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
+  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -1249,14 +1286,16 @@ export function AppPage() {
       { key: "reports", label: "Buka laporan", icon: FileClock, description: "Unduh rekap kehadiran dan audit trail." },
       { key: "locations", label: "Atur lokasi", icon: MapPinned, description: "Kelola lokasi dan shift kerja karyawan." }
     ] as const;
+    const approvalStages = countApprovalStages(requests);
 
     return (
       <>
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard label="Hadir hari ini" value={String(adminOverview.checkedInToday)} detail={`${adminOverview.onTimeToday} tepat waktu`} />
           <StatCard label="Terlambat" value={String(adminOverview.lateToday)} detail="Perlu follow-up supervisor" />
           <StatCard label="Belum hadir" value={String(adminOverview.absentToday)} detail={`Dari ${adminOverview.totalEmployees} karyawan`} />
-          <StatCard label="Menunggu approval" value={String(adminOverview.pendingRequests)} detail="Izin dan cuti menunggu keputusan" />
+          <StatCard label="Menunggu Manager" value={String(approvalStages.waitingManager)} detail="Tahap persetujuan manager" />
+          <StatCard label="Menunggu HR" value={String(approvalStages.waitingHr)} detail="Siap keputusan final HR" />
           <StatCard label="Perlu review" value={String(adminOverview.exceptionCount)} detail="Validasi lokasi atau perangkat" />
         </section>
 
@@ -2086,23 +2125,38 @@ export function AppPage() {
 
     return (
       <Panel eyebrow="Presensi tim" title="Monitor kehadiran tanpa membuka laporan penuh">
-        {attendance.length === 0 ? (
+        {!adminAttendanceLoaded ? (
+          <LoadingState label="Memuat presensi organisasi" />
+        ) : adminAttendanceError ? (
+          <ErrorState title="Presensi organisasi belum tersedia" description={`${adminAttendanceError} Coba muat ulang tab Presensi.`} />
+        ) : adminAttendanceRows.length === 0 ? (
           <EmptyState title="Belum ada data absensi" description="Clock-in tim akan muncul di sini saat data mulai masuk." />
         ) : (
           <DataTable
             caption="Daftar absensi"
             columns={[
-              { key: "day", header: "Hari" },
-              { key: "time", header: "Waktu" },
-              { key: "method", header: "Metode" },
-              { key: "status", header: "Status" }
+              { key: "employee", header: "Karyawan" },
+              { key: "date", header: "Tanggal" },
+              { key: "checkin", header: "Check-in" },
+              { key: "status", header: "Status" },
+              { key: "validation", header: "Validasi" }
             ]}
-            rows={attendance.map((item) => ({
-              id: item.id ?? `${item.day}-${item.time}`,
-              day: item.day,
-              time: item.time,
-              method: item.method,
-              status: <StatusBadge tone={item.status === "Terlambat" ? "warning" : item.status === "Belum check-in" ? "neutral" : "success"}>{item.status}</StatusBadge>
+            rows={adminAttendanceRows.map((row) => ({
+              id: row.id,
+              employee: (
+                <div>
+                  <p className="font-semibold text-[#111827]">{row.employeeName}</p>
+                  <p className="mt-1 text-xs font-semibold text-[#667085]">{row.workLocationName}</p>
+                </div>
+              ),
+              date: row.date,
+              checkin: row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--",
+              status: <StatusBadge tone={row.status === "Terlambat" ? "warning" : row.status === "Belum check-in" ? "neutral" : row.status === "Izin" ? "info" : "success"}>{row.status}</StatusBadge>,
+              validation: (
+                <StatusBadge tone={row.validationStatus === "verified" ? "success" : row.validationStatus === "needs_review" ? "warning" : row.validationStatus === "blocked" || row.validationStatus === "rejected" ? "danger" : "neutral"}>
+                  {row.validationStatus === "verified" ? "Terverifikasi" : row.validationStatus === "needs_review" ? "Perlu review" : row.validationStatus}
+                </StatusBadge>
+              )
             }))}
           />
         )}
@@ -2636,6 +2690,7 @@ export function AppPage() {
                 const statusTone = ws === "rejected" || item.status === "Ditolak" ? "danger"
                   : ws === "approved" || item.status === "Disetujui" ? "success"
                   : "warning";
+                const canApproveRequest = Boolean(item.id) && canShowApprovalActionsForRequest(currentSession.user.role, ws);
                 return (
                   <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_2px_12px_rgba(20,24,31,0.05)]">
                     <div className="flex flex-col gap-2">
@@ -2656,7 +2711,7 @@ export function AppPage() {
                         <p className="text-xs font-semibold text-[#667085]">Catatan reviewer: {item.adminNote}</p>
                       ) : null}
                     </div>
-                    {(isAdmin || isManager) && item.id ? (
+                    {canApproveRequest ? (
                       <div className="mt-4">
                         <FormInput
                           label="Catatan approval"
@@ -2677,7 +2732,7 @@ export function AppPage() {
                     ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
                       <SecondaryButton onClick={() => item.id && openRequestDetail(item.id)}>Detail</SecondaryButton>
-                      {(isAdmin || isManager) && item.id ? (
+                      {canApproveRequest ? (
                         <>
                           <PrimaryButton onClick={() => handleApproval(item.id!, "Disetujui")} disabled={busyAction === `Disetujui-${item.id}`}>
                             Setujui
@@ -2708,9 +2763,66 @@ export function AppPage() {
 
     if (isAdmin) {
       return (
-        <Panel eyebrow="Profil" title="Profil akun">
-          <EmptyState title="Profil admin" description="Ringkasan profil admin akan tersedia pada fase berikutnya." />
-        </Panel>
+        <section className="grid gap-5 lg:grid-cols-2">
+          <Panel eyebrow="Profil" title="Profil akun HR">
+            <dl className="grid gap-4">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Nama</dt>
+                <dd className="mt-1 break-words text-[13px] font-medium text-[#111827]">{profileValue(user.fullName)}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Email</dt>
+                <dd className="mt-1 break-words text-[13px] font-medium text-[#111827]">{profileValue(user.email)}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Role</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">Admin HR</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Organization</dt>
+                <dd className="mt-1 break-words text-[13px] font-medium text-[#111827]">{profileValue(user.organizationName)}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Access scope</dt>
+                <dd className="mt-1 text-[13px] font-medium text-[#111827]">Semua divisi / organisasi</dd>
+              </div>
+            </dl>
+          </Panel>
+
+          <Panel eyebrow="Hak akses" title="Ringkasan izin HR">
+            <div className="grid gap-3">
+              {[
+                "Melihat semua karyawan",
+                "Meninjau presensi organisasi",
+                "Final approval pengajuan",
+                "Meninjau pengecualian",
+                "Mengelola lokasi dan shift",
+                "Export laporan"
+              ].map((label) => (
+                <div key={label} className="flex items-center justify-between gap-3 rounded-[16px] border border-[#edf0f5] bg-[#f9fafc] px-3.5 py-2.5">
+                  <p className="min-w-0 break-words text-[13px] font-medium text-[#111827]">{label}</p>
+                  <StatusBadge tone="success">Aktif</StatusBadge>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel eyebrow="Keamanan akun" title="Status akses">
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Metode login</dt>
+                <dd className="mt-1 text-[13px] text-[#111827]">Email dan password</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Last login</dt>
+                <dd className="mt-1 text-[13px] text-[#111827]">Belum tersedia</dd>
+              </div>
+            </dl>
+            <SecondaryButton className="mt-4 w-full sm:w-auto" onClick={() => setChangePasswordOpen(true)}>
+              Ganti password
+            </SecondaryButton>
+          </Panel>
+        </section>
       );
     }
 
