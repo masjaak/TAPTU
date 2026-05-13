@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   approveRequest,
   fetchEmployeeSummary,
+  fetchEmployeeList,
+  fetchReportRows,
   fetchManagerEmployeeList,
   fetchManagerExceptionQueue,
   fetchManagerOverview,
@@ -188,5 +190,49 @@ describe("manager scoped API client", () => {
     expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/admin/employees", expect.any(Object));
     expect(fetchSpy).toHaveBeenNthCalledWith(3, "/api/admin/exceptions", expect.any(Object));
     expect(fetchSpy).toHaveBeenNthCalledWith(4, "/api/admin/requests", expect.any(Object));
+  });
+});
+
+describe("HR filter API client", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends HR employee filter query params without changing manager endpoints", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await fetchEmployeeList("token:admin", {
+      search: "fikri",
+      departmentId: "dep-ops",
+      status: "late"
+    });
+    await fetchManagerEmployeeList("token:manager");
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "/api/admin/employees?search=fikri&departmentId=dep-ops&status=late",
+      expect.any(Object)
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/admin/employees", expect.any(Object));
+  });
+
+  it("sends HR report department and status filters in the query string", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await fetchReportRows("token:admin", {
+      dateFrom: "2026-05-01",
+      dateTo: "2026-05-14",
+      departmentId: "dep-ops",
+      status: "needs_review"
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/admin/reports?dateFrom=2026-05-01&dateTo=2026-05-14&departmentId=dep-ops&status=needs_review",
+      expect.any(Object)
+    );
   });
 });

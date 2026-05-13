@@ -106,6 +106,22 @@ import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
 const requestCategories = ["Izin", "Cuti", "Sakit", "Koreksi Absensi", "Lupa Check-in/out"] as const;
+const employeeStatusFilters = [
+  { value: "", label: "Semua status" },
+  { value: "present", label: "Hadir" },
+  { value: "late", label: "Terlambat" },
+  { value: "absent", label: "Belum hadir" },
+  { value: "leave", label: "Izin" }
+] as const;
+const reportStatusFilters = [
+  { value: "", label: "Semua status" },
+  { value: "Tepat waktu", label: "Hadir" },
+  { value: "Terlambat", label: "Terlambat" },
+  { value: "Belum check-in", label: "Belum hadir" },
+  { value: "needs_review", label: "Perlu review" },
+  { value: "Selesai", label: "Selesai" },
+  { value: "Izin", label: "Izin" }
+] as const;
 type EmployeeCheckInMode = "qr" | "face";
 type EmployeeCheckInFlowState = "idle" | "qr_scanned" | "face_captured" | "confirmation" | "submitting" | "success";
 type CapturedSelfie = {
@@ -356,14 +372,17 @@ export function AppPage() {
 
   const [employeeList, setEmployeeList] = useState<EmployeeListItem[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeDepartmentFilter, setEmployeeDepartmentFilter] = useState("");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState("");
   const [workLocations, setWorkLocations] = useState<WorkLocationItem[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [adminAttendanceRows, setAdminAttendanceRows] = useState<AttendanceReportRow[]>([]);
   const [reportRows, setReportRows] = useState<AttendanceReportRow[]>([]);
-  const [reportFilters, setReportFilters] = useState<{ dateFrom: string; dateTo: string; employeeId: string; status: string }>({
+  const [reportFilters, setReportFilters] = useState<{ dateFrom: string; dateTo: string; employeeId: string; departmentId: string; status: string }>({
     dateFrom: "",
     dateTo: "",
     employeeId: "",
+    departmentId: "",
     status: ""
   });
   const [reportLoaded, setReportLoaded] = useState(false);
@@ -569,7 +588,7 @@ export function AppPage() {
         });
     }
 
-    if ((tab === "team" || tab === "exceptions" || (tab === "attendance" && isManager)) && (isAdmin || isManager) && !employeeListLoaded) {
+    if ((tab === "team" || tab === "exceptions" || (tab === "reports" && isAdmin) || (tab === "attendance" && isManager)) && (isAdmin || isManager) && !employeeListLoaded) {
       const loadEmployees = isManager ? fetchManagerEmployeeList : fetchEmployeeList;
       setEmployeeListError(null);
       loadEmployees(session.token)
@@ -648,6 +667,16 @@ export function AppPage() {
 
     return () => window.clearInterval(timer);
   }, [scannerMeta, tab]);
+
+  const departmentOptions = useMemo(() => {
+    const unique = new Map<string, string>();
+    employeeList.forEach((employee) => {
+      if (employee.departmentId && employee.departmentName) {
+        unique.set(employee.departmentId, employee.departmentName);
+      }
+    });
+    return Array.from(unique, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employeeList]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -1149,6 +1178,7 @@ export function AppPage() {
         dateFrom: reportFilters.dateFrom || undefined,
         dateTo: reportFilters.dateTo || undefined,
         employeeId: reportFilters.employeeId || undefined,
+        departmentId: reportFilters.departmentId || undefined,
         status: reportFilters.status || undefined
       });
       setReportRows(rows);
@@ -3080,13 +3110,26 @@ export function AppPage() {
   }
 
   function renderTeamWorkspace() {
-    const filteredEmployees = employeeList.filter((emp) =>
-      employeeSearch === "" ||
-      emp.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-      emp.email.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-      (emp.departmentName ?? "").toLowerCase().includes(employeeSearch.toLowerCase()) ||
-      (emp.managerName ?? "").toLowerCase().includes(employeeSearch.toLowerCase())
-    );
+    const normalizedEmployeeSearch = employeeSearch.trim().toLowerCase();
+    const filteredEmployees = employeeList.filter((emp) => {
+      if (!isManager && employeeDepartmentFilter && emp.departmentId !== employeeDepartmentFilter) {
+        return false;
+      }
+
+      if (!isManager && employeeStatusFilter && emp.todayStatus !== employeeStatusFilter) {
+        return false;
+      }
+
+      if (!normalizedEmployeeSearch) return true;
+
+      return [
+        emp.fullName,
+        emp.email,
+        emp.employeeCode ?? "",
+        isManager ? emp.departmentName ?? "" : "",
+        isManager ? emp.managerName ?? "" : ""
+      ].some((value) => value.toLowerCase().includes(normalizedEmployeeSearch));
+    });
 
     const managerColumns = [
       { key: "name", header: "Karyawan" },
@@ -3118,19 +3161,46 @@ export function AppPage() {
           />
         ) : null}
         <Panel eyebrow={isManager ? "Supervisi" : "Daftar karyawan"} title={isManager ? "Anggota tim Anda" : "Daftar karyawan aktif"}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative max-w-sm flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8495]" />
-              <input
-                type="text"
-                aria-label={isManager ? "Cari anggota tim berdasarkan nama atau email" : "Cari karyawan berdasarkan nama atau email"}
-                placeholder={isManager ? "Cari nama, email, atau departemen..." : "Cari nama atau email..."}
-                value={employeeSearch}
-                onChange={(e) => setEmployeeSearch(e.target.value)}
-                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] py-3 pl-10 pr-4 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
-              />
+          <div data-testid="team-filter-strip" className="mb-4 rounded-[18px] border border-[#edf0f5] bg-[#f6f8fb] p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8495]" />
+                <input
+                  type="text"
+                  aria-label={isManager ? "Cari anggota tim berdasarkan nama atau email" : "Cari karyawan"}
+                  placeholder={isManager ? "Cari nama, email, atau departemen..." : "Cari nama, email, atau kode karyawan..."}
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e2e7f0] bg-white py-2.5 pl-9 pr-3 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10"
+                />
+              </div>
+              {!isManager ? (
+                <>
+                  <select
+                    aria-label="Divisi / Departemen"
+                    value={employeeDepartmentFilter}
+                    onChange={(e) => setEmployeeDepartmentFilter(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e2e7f0] bg-white py-2.5 pl-3 pr-8 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10 sm:w-48"
+                  >
+                    <option value="">Semua divisi</option>
+                    {departmentOptions.map((department) => (
+                      <option key={department.id} value={department.id}>{department.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Status hari ini"
+                    value={employeeStatusFilter}
+                    onChange={(e) => setEmployeeStatusFilter(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e2e7f0] bg-white py-2.5 pl-3 pr-8 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10 sm:w-40"
+                  >
+                    {employeeStatusFilters.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
             </div>
-            <div className="flex min-w-0 flex-wrap gap-2">
+            <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
               {(["present", "late", "absent", "leave"] as const).map((filter) => {
                 const countMap = {
                   present: employeeList.filter((e) => e.todayStatus === "present").length,
@@ -3140,7 +3210,7 @@ export function AppPage() {
                 };
                 const labelMap = { present: "Hadir", late: "Terlambat", absent: "Belum hadir", leave: "Izin" };
                 return (
-                  <span key={filter} className="rounded-full border border-[#edf0f5] bg-white px-3 py-1.5 text-xs font-bold text-[#596172]">
+                  <span key={filter} className="rounded-full border border-[#edf0f5] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#596172]">
                     {labelMap[filter]}: {countMap[filter]}
                   </span>
                 );
@@ -3499,8 +3569,6 @@ export function AppPage() {
   }
 
   function renderReportsWorkspace() {
-    const statusOptions = ["", "Tepat waktu", "Terlambat", "Belum check-in", "Selesai", "Izin"];
-
     const validationTone = (status: string): "success" | "warning" | "danger" | "neutral" => {
       if (status === "verified") return "success";
       if (status === "needs_review") return "warning";
@@ -3511,14 +3579,56 @@ export function AppPage() {
     return (
       <div className="grid gap-5">
         <Panel eyebrow="Filter laporan" title="Filter laporan kehadiran">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <FormInput label="Dari tanggal" type="date" value={reportFilters.dateFrom} onChange={(e) => setReportFilters((c) => ({ ...c, dateFrom: e.target.value }))} />
-            <FormInput label="Sampai tanggal" type="date" value={reportFilters.dateTo} onChange={(e) => setReportFilters((c) => ({ ...c, dateTo: e.target.value }))} />
-            <SelectInput label="Status absensi" value={reportFilters.status} onChange={(e) => setReportFilters((c) => ({ ...c, status: e.target.value }))}>
-              {statusOptions.map((opt) => <option key={opt} value={opt}>{opt || "Semua status"}</option>)}
-            </SelectInput>
-            <div className="flex items-end gap-2">
-              <PrimaryButton className="flex-1" onClick={handleApplyReportFilters} disabled={busyAction === "report-filter"}>
+          <div data-testid="report-filter-strip" className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[130px] flex-1">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Dari</span>
+              <input
+                type="date"
+                aria-label="Dari tanggal"
+                value={reportFilters.dateFrom}
+                onChange={(e) => setReportFilters((c) => ({ ...c, dateFrom: e.target.value }))}
+                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
+              />
+            </div>
+            <div className="min-w-[130px] flex-1">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Sampai</span>
+              <input
+                type="date"
+                aria-label="Sampai tanggal"
+                value={reportFilters.dateTo}
+                onChange={(e) => setReportFilters((c) => ({ ...c, dateTo: e.target.value }))}
+                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
+              />
+            </div>
+            <div className="min-w-[150px] flex-1">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Divisi</span>
+              <select
+                aria-label="Divisi / Departemen"
+                value={reportFilters.departmentId}
+                onChange={(e) => setReportFilters((c) => ({ ...c, departmentId: e.target.value }))}
+                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
+              >
+                <option value="">Semua divisi</option>
+                {departmentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[150px] flex-1">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Status</span>
+              <select
+                aria-label="Status absensi"
+                value={reportFilters.status}
+                onChange={(e) => setReportFilters((c) => ({ ...c, status: e.target.value }))}
+                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
+              >
+                {reportStatusFilters.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-shrink-0 self-end">
+              <PrimaryButton onClick={handleApplyReportFilters} disabled={busyAction === "report-filter"}>
                 {busyAction === "report-filter" ? "Memfilter..." : "Terapkan filter"}
               </PrimaryButton>
             </div>
@@ -3529,7 +3639,7 @@ export function AppPage() {
         <Panel eyebrow="Laporan kehadiran" title="Rekap kehadiran validasi">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm leading-6 text-[#596172]">
-              {reportRows.length} baris data{reportFilters.status || reportFilters.dateFrom ? " (filter aktif)" : ""}.
+              {reportRows.length} baris data{reportFilters.status || reportFilters.dateFrom || reportFilters.departmentId ? " (filter aktif)" : ""}.
               Laporan mencakup status validasi, lokasi, perangkat, dan selfie proof.
             </p>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">

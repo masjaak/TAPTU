@@ -460,6 +460,23 @@ describe("buildAttendanceReportRows", () => {
     const lateRow = rows.find((r) => r.employeeId === "usr-employee-02");
     expect(lateRow?.isLate).toBe(true);
   });
+
+  it("filters rows by department and review status without narrowing defaults", () => {
+    const store = createInitialStore();
+    const dir = { "usr-employee-01": "Fikri Maulana", "usr-employee-02": "Anisa Rahma", "usr-employee-03": "Leo Pratama" };
+    const departments = {
+      "usr-employee-01": { departmentId: "dep-ops", departmentName: "Operations" },
+      "usr-employee-02": { departmentId: "dep-sales", departmentName: "Sales" },
+      "usr-employee-03": { departmentId: "dep-ops", departmentName: "Operations" }
+    };
+
+    const defaultRows = buildAttendanceReportRows(store, dir, {}, departments);
+    const filteredRows = buildAttendanceReportRows(store, dir, { departmentId: "dep-sales", status: "needs_review" }, departments);
+
+    expect(defaultRows.length).toBeGreaterThan(filteredRows.length);
+    expect(filteredRows.map((row) => row.employeeId)).toEqual(["usr-employee-02"]);
+    expect(filteredRows[0]).toMatchObject({ departmentId: "dep-sales", departmentName: "Sales", validationStatus: "needs_review" });
+  });
 });
 
 describe("generateCsvFromRows", () => {

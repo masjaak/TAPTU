@@ -952,6 +952,40 @@ export function computeEmployeeList(
     });
 }
 
+export type EmployeeListFilters = {
+  search?: string;
+  departmentId?: string;
+  status?: string;
+};
+
+export function applyEmployeeListFilters(items: EmployeeListItem[], filters?: EmployeeListFilters): EmployeeListItem[] {
+  if (!filters) return items;
+
+  const search = filters.search?.trim().toLowerCase();
+
+  return items.filter((item) => {
+    if (search) {
+      const matchesSearch = [
+        item.fullName,
+        item.email,
+        item.employeeCode ?? ""
+      ].some((value) => value.toLowerCase().includes(search));
+
+      if (!matchesSearch) return false;
+    }
+
+    if (filters.departmentId && item.departmentId !== filters.departmentId) {
+      return false;
+    }
+
+    if (filters.status && item.todayStatus !== filters.status) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export function createShiftRecord(data: {
   name: string;
   startTime: string;
@@ -1016,16 +1050,20 @@ export function toWorkLocationModel(item: WorkLocationItem): WorkLocation {
 export function buildAttendanceReportRows(
   store: DemoStore,
   userDirectory: Record<string, string>,
-  filters?: AttendanceReportFilters
+  filters?: AttendanceReportFilters,
+  userDepartments: Record<string, { departmentId?: string | null; departmentName?: string | null }> = {}
 ): AttendanceReportRow[] {
   const today = new Date().toISOString().slice(0, 10);
   const rows: AttendanceReportRow[] = [];
 
   for (const [userId, record] of Object.entries(store.attendance)) {
     const employeeName = userDirectory[userId] ?? "Employee";
+    const department = userDepartments[userId] ?? {};
 
     if (filters?.employeeId && filters.employeeId !== userId) continue;
-    if (filters?.status && record.status !== filters.status) continue;
+    if (filters?.departmentId && department.departmentId !== filters.departmentId) continue;
+    if (filters?.status === "needs_review" && record.validationStatus !== "needs_review") continue;
+    if (filters?.status && filters.status !== "needs_review" && record.status !== filters.status) continue;
 
     const hasException = store.exceptions.some((e) => e.attendanceRecordId === record.id && (e.status === "Need Review" || e.status === "Request Correction"));
     const approvedLeave = store.requests.find((r) => r.userId === userId && r.status === "Disetujui" && (r.category === "Izin" || r.category === "Cuti" || r.category === "Sakit"));
@@ -1034,6 +1072,8 @@ export function buildAttendanceReportRows(
       id: record.id ?? `report-${userId}`,
       employeeName,
       employeeId: userId,
+      departmentId: department.departmentId ?? null,
+      departmentName: department.departmentName ?? null,
       date: today,
       shiftName: record.shiftName,
       workLocationName: record.locationName,
@@ -1055,15 +1095,21 @@ export function buildAttendanceReportRows(
 
   for (const histItem of store.attendanceHistory) {
     if (histItem.day === "Hari ini") continue;
+    if (filters?.departmentId) continue;
     if (filters?.status && histItem.status !== filters.status) continue;
 
     const alreadyCovered = rows.some((r) => r.id === histItem.id);
     if (alreadyCovered) continue;
 
+    const userId = Object.keys(store.attendance)[0] ?? "unknown";
+    const department = userDepartments[userId] ?? {};
+
     rows.push({
       id: histItem.id ?? `hist-${histItem.day}`,
-      employeeName: userDirectory[Object.keys(store.attendance)[0]] ?? "Employee",
-      employeeId: Object.keys(store.attendance)[0] ?? "unknown",
+      employeeName: userDirectory[userId] ?? "Employee",
+      employeeId: userId,
+      departmentId: department.departmentId ?? null,
+      departmentName: department.departmentName ?? null,
       date: histItem.day,
       shiftName: DEFAULT_SHIFT.name,
       workLocationName: DEFAULT_LOCATION.name,

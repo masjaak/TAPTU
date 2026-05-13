@@ -163,7 +163,7 @@ describe("AppPage", () => {
     renderRoute("/app");
 
     expect(await screen.findByText(/ringkasan kehadiran hari ini/i)).toBeTruthy();
-    expect(screen.getByText("Menunggu approval")).toBeTruthy();
+    expect(await screen.findByText("Menunggu HR")).toBeTruthy();
     expect(screen.getByText("Anisa Rahma")).toBeTruthy();
     expect(screen.getByText(/aksi cepat/i)).toBeTruthy();
   });
@@ -1490,7 +1490,7 @@ describe("Phase 4: Employee list", () => {
     setupAdminSession();
     renderRoute("/app/team");
 
-    expect((await screen.findAllByPlaceholderText(/cari nama atau email/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByPlaceholderText(/cari nama/i)).length).toBeGreaterThan(0);
   });
 
   it("renders employee names in team workspace", async () => {
@@ -1588,6 +1588,28 @@ describe("Phase 4: Reports workspace", () => {
 
     expect(await screen.findByText(/terapkan filter/i)).toBeTruthy();
     expect((await screen.findAllByText(/filter laporan kehadiran/i)).length).toBeGreaterThan(0);
+  });
+
+  it("applies HR report date, division, and status filters", async () => {
+    setupAdminSession();
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-sales", departmentName: "Sales", todayStatus: "late" }
+    ]);
+    renderRoute("/app/reports");
+
+    fireEvent.change(await screen.findByLabelText("Dari tanggal"), { target: { value: "2026-05-01" } });
+    fireEvent.change(screen.getByLabelText("Sampai tanggal"), { target: { value: "2026-05-14" } });
+    fireEvent.change(screen.getByLabelText("Divisi / Departemen"), { target: { value: "dep-sales" } });
+    fireEvent.change(screen.getByLabelText("Status absensi"), { target: { value: "needs_review" } });
+    fireEvent.click(screen.getByRole("button", { name: /terapkan filter/i }));
+
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenLastCalledWith("demo:admin", {
+      dateFrom: "2026-05-01",
+      dateTo: "2026-05-14",
+      departmentId: "dep-sales",
+      status: "needs_review"
+    }));
   });
 
   it("renders attendance report table with employee data", async () => {
@@ -1698,6 +1720,65 @@ describe("Phase 4: Reports workspace", () => {
 
     expect(screen.queryByText(/dari backend/i)).toBeNull();
     expect(screen.getAllByText(/^Belum ditetapkan$/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("HR team filters", () => {
+  beforeEach(() => {
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    setupAdminSession();
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("keeps HR team organization-wide by default and filters by search, division, and status", async () => {
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", employeeCode: "EMP-001", departmentId: "dep-ops", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", employeeCode: "EMP-002", departmentId: "dep-sales", departmentName: "Sales", managerName: null, todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.getAllByText("Anisa Rahma").length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("Cari karyawan"), { target: { value: "EMP-002" } });
+    fireEvent.change(screen.getByLabelText("Divisi / Departemen"), { target: { value: "dep-sales" } });
+    fireEvent.change(screen.getByLabelText("Status hari ini"), { target: { value: "late" } });
+
+    await waitFor(() => expect(screen.queryByText("Fikri Maulana")).toBeNull());
+    expect(screen.getAllByText("Anisa Rahma").length).toBeGreaterThan(0);
+  });
+
+  it("shows only the default division option when no departments exist", async () => {
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: null, todayStatus: "present" }
+    ]);
+
+    renderRoute("/app/team");
+
+    const divisionSelect = await screen.findByLabelText("Divisi / Departemen");
+    const options = within(divisionSelect).getAllByRole("option");
+
+    expect(options.map((option) => option.textContent)).toEqual(["Semua divisi"]);
+    expect(screen.getByText("Fikri Maulana")).toBeTruthy();
+  });
+
+  it("does not show HR global filters on the manager team page", async () => {
+    setupManagerSession();
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", todayStatus: "present" }
+    ]);
+
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.queryByLabelText("Divisi / Departemen")).toBeNull();
+    expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledWith("demo:manager");
   });
 });
 
@@ -2115,5 +2196,76 @@ describe("Manager dashboard", () => {
     await screen.findByText("Izin keperluan keluarga");
     expect(screen.getByText(/kuota izin bulan ini sudah penuh/i)).toBeTruthy();
     expect(screen.getByText(/catatan reviewer/i)).toBeTruthy();
+  });
+});
+
+describe("HR filter bar UI polish", () => {
+  beforeEach(() => {
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    setupAdminSession();
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+    apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 5, checkedInToday: 3, onTimeToday: 2, lateToday: 1, pendingRequests: 0, absentToday: 2, exceptionCount: 0, recentActivity: [] });
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified" },
+      { id: "e2", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-sales", departmentName: "Sales", todayStatus: "late", checkInTime: "08:31", validationStatus: "needs_review" }
+    ]);
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("HR Tim filter bar shows status count badges for present, late, absent, and leave", async () => {
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.getAllByText(/^hadir:/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^terlambat:/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^belum hadir:/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^izin:/i).length).toBeGreaterThan(0);
+  });
+
+  it("HR Tim filter strip is rendered as a compact container", async () => {
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.getByTestId("team-filter-strip")).toBeTruthy();
+  });
+
+  it("HR Laporan filter strip is rendered as a compact container", async () => {
+    renderRoute("/app/reports");
+
+    expect(await screen.findByText(/terapkan filter/i)).toBeTruthy();
+    expect(screen.getByTestId("report-filter-strip")).toBeTruthy();
+  });
+
+  it("HR Tim filter bar renders search and both filter controls accessible", async () => {
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.getByLabelText("Cari karyawan")).toBeTruthy();
+    expect(screen.getByLabelText("Divisi / Departemen")).toBeTruthy();
+    expect(screen.getByLabelText("Status hari ini")).toBeTruthy();
+  });
+
+  it("HR Laporan filter bar renders all four filter fields and apply button", async () => {
+    apiMocks.fetchReportRows.mockResolvedValue([
+      { id: "r1", employeeName: "Fikri Maulana", employeeId: "e1", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+    ]);
+    renderRoute("/app/reports");
+
+    expect(await screen.findByLabelText("Dari tanggal")).toBeTruthy();
+    expect(screen.getByLabelText("Sampai tanggal")).toBeTruthy();
+    expect(screen.getByLabelText("Divisi / Departemen")).toBeTruthy();
+    expect(screen.getByLabelText("Status absensi")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /terapkan filter/i })).toBeTruthy();
   });
 });

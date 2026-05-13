@@ -337,6 +337,8 @@ export interface AttendanceReportRow {
   id: string;
   employeeName: string;
   employeeId: string;
+  departmentId?: string | null;
+  departmentName?: string | null;
   date: string;
   shiftName: string;
   workLocationName: string;
@@ -359,6 +361,7 @@ export interface AttendanceReportFilters {
   dateFrom?: string;
   dateTo?: string;
   employeeId?: string;
+  departmentId?: string;
   shiftId?: string;
   locationId?: string;
   status?: string;

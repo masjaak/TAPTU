@@ -28,6 +28,7 @@ import type {
 } from "@taptu/shared";
 import {
   appendScannerAttempt,
+  applyEmployeeListFilters,
   buildAttendanceReportRows,
   calculateDistanceMeters,
   computeAdminOverview,
@@ -1488,20 +1489,26 @@ app.get("/api/admin/employees", async (req, res) => {
     return res.status(403).json({ message: "Forbidden" });
   }
 
+  const employeeFilters = user.role === "manager" ? undefined : {
+    search: typeof req.query.search === "string" ? req.query.search : undefined,
+    departmentId: typeof req.query.departmentId === "string" ? req.query.departmentId : undefined,
+    status: typeof req.query.status === "string" ? req.query.status : undefined
+  };
+
   if (useSupabase && sb) {
     const organizationId = await getOrganizationIdForUser(user.id);
     if (!organizationId) return res.json([]);
     return res.json(
       user.role === "manager"
         ? await supabaseGetManagerEmployeeList(sb, organizationId, user.id)
-        : await supabaseGetEmployeeList(sb, organizationId)
+        : await supabaseGetEmployeeList(sb, organizationId, employeeFilters)
     );
   }
 
   const employeeUsers = user.role === "manager"
     ? users.filter((u) => u.role === "employee" && u.managerId === user.id)
     : users.filter((u) => u.role === "employee" || u.role === "manager");
-  const list = computeEmployeeList(store, employeeUsers);
+  const list = applyEmployeeListFilters(computeEmployeeList(store, employeeUsers), employeeFilters);
   return res.json(list);
 });
 
@@ -1636,6 +1643,7 @@ app.get("/api/admin/reports", async (req, res) => {
     dateFrom: typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined,
     dateTo: typeof req.query.dateTo === "string" ? req.query.dateTo : undefined,
     employeeId: typeof req.query.employeeId === "string" ? req.query.employeeId : undefined,
+    departmentId: typeof req.query.departmentId === "string" ? req.query.departmentId : undefined,
     status: typeof req.query.status === "string" ? req.query.status : undefined
   };
 
@@ -1643,7 +1651,12 @@ app.get("/api/admin/reports", async (req, res) => {
   const rows =
     useSupabase && sb && organizationId
       ? await supabaseGetAttendanceReportRows(sb, organizationId, filters)
-      : buildAttendanceReportRows(store, Object.fromEntries(users.map((u) => [u.id, u.fullName])), filters);
+      : buildAttendanceReportRows(
+          store,
+          Object.fromEntries(users.map((u) => [u.id, u.fullName])),
+          filters,
+          Object.fromEntries(users.map((u) => [u.id, { departmentId: u.departmentId, departmentName: u.departmentName }]))
+        );
 
   if (req.query.format === "csv") {
     const csv = generateCsvFromRows(rows);

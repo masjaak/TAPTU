@@ -278,9 +278,14 @@ export async function fetchAuditLogs(token: string) {
   return requestJson<AuditLogItem[]>("/admin/audit-logs", {}, token);
 }
 
-export async function fetchEmployeeList(token: string): Promise<EmployeeListItem[]> {
+export async function fetchEmployeeList(token: string, filters?: { search?: string; departmentId?: string; status?: string }): Promise<EmployeeListItem[]> {
   if (isDemoToken(token)) return Promise.resolve(getDemoEmployeeList());
-  return requestJson<EmployeeListItem[]>("/admin/employees", {}, token);
+  const params = new URLSearchParams();
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.departmentId) params.set("departmentId", filters.departmentId);
+  if (filters?.status) params.set("status", filters.status);
+  const query = params.toString();
+  return requestJson<EmployeeListItem[]>(`/admin/employees${query ? `?${query}` : ""}`, {}, token);
 }
 
 export async function fetchManagerEmployeeList(token: string): Promise<EmployeeListItem[]> {
@@ -336,7 +341,7 @@ export async function updateShift(token: string, id: string, patch: Partial<Shif
   return requestJson<ShiftRecord>(`/admin/shifts/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
 }
 
-export async function fetchReportRows(token: string, filters?: { dateFrom?: string; dateTo?: string; employeeId?: string; status?: string }): Promise<AttendanceReportRow[]> {
+export async function fetchReportRows(token: string, filters?: { dateFrom?: string; dateTo?: string; employeeId?: string; departmentId?: string; status?: string }): Promise<AttendanceReportRow[]> {
   if (isDemoToken(token)) {
     const rows = getDemoReportRows();
     if (filters?.status) return Promise.resolve(rows.filter((r) => r.status === filters.status));
@@ -347,6 +352,7 @@ export async function fetchReportRows(token: string, filters?: { dateFrom?: stri
   if (filters?.dateFrom) params.set("dateFrom", filters.dateFrom);
   if (filters?.dateTo) params.set("dateTo", filters.dateTo);
   if (filters?.employeeId) params.set("employeeId", filters.employeeId);
+  if (filters?.departmentId) params.set("departmentId", filters.departmentId);
   if (filters?.status) params.set("status", filters.status);
   const query = params.toString();
   return requestJson<AttendanceReportRow[]>(`/admin/reports${query ? `?${query}` : ""}`, {}, token);

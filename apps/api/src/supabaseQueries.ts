@@ -1,7 +1,7 @@
 import type { SupabaseAdmin } from "./supabase";
-import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord } from "./domain";
+import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord, EmployeeListFilters } from "./domain";
 import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, EmployeeListItem, EmployeeSummary, LeaveRequestItem, UserRole } from "@taptu/shared";
-import { createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain";
+import { applyEmployeeListFilters, createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain";
 
 /**
  * Full relational Supabase adapter.
@@ -495,7 +495,7 @@ type SupabaseAttendanceReportRow = {
   location_lng: number | null;
   selfie_url: string | null;
   device_id: string | null;
-  profiles?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+  profiles?: { full_name?: string | null; department_id?: string | null; departments?: ProfileStructureRelation | ProfileStructureRelation[] } | { full_name?: string | null; department_id?: string | null; departments?: ProfileStructureRelation | ProfileStructureRelation[] }[] | null;
   work_locations?: { name?: string | null } | { name?: string | null }[] | null;
   attendance_exceptions?: Array<{ status?: string | null }> | null;
 };
@@ -518,6 +518,8 @@ export function supabaseBuildAttendanceReportRows(rows: SupabaseAttendanceReport
       id: row.id,
       employeeName: profile?.full_name ?? "Employee",
       employeeId: row.employee_id,
+      departmentId: profile?.department_id ?? null,
+      departmentName: firstRelation(profile?.departments)?.name ?? null,
       date: row.attendance_date,
       shiftName: row.shift_id ?? "shift-pagi",
       workLocationName: workLocation?.name ?? DEFAULT_LOCATION.name,
@@ -543,10 +545,14 @@ export async function supabaseGetAttendanceReportRows(
   organizationId: string,
   filters: AttendanceReportFilters = {}
 ): Promise<AttendanceReportRow[]> {
-  const { data: orgUsers, error: usersError } = await sb
+  let usersQuery = sb
     .from("profiles")
     .select("id")
     .eq("organization_id", organizationId);
+
+  if (filters.departmentId) usersQuery = usersQuery.eq("department_id", filters.departmentId);
+
+  const { data: orgUsers, error: usersError } = await usersQuery;
 
   if (usersError) {
     throw new Error(`Failed to fetch report employees: ${usersError.message}`);
@@ -557,7 +563,7 @@ export async function supabaseGetAttendanceReportRows(
 
   let query = sb
     .from("attendance_records")
-    .select("*, profiles(full_name), work_locations(name), attendance_exceptions(status)")
+    .select("*, profiles(full_name, department_id, departments(name)), work_locations(name), attendance_exceptions(status)")
     .in("employee_id", userIds)
     .order("attendance_date", { ascending: false })
     .limit(500);
@@ -565,7 +571,11 @@ export async function supabaseGetAttendanceReportRows(
   if (filters.dateFrom) query = query.gte("attendance_date", filters.dateFrom);
   if (filters.dateTo) query = query.lte("attendance_date", filters.dateTo);
   if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
-  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.status === "needs_review") {
+    query = query.eq("validation_status", "needs_review");
+  } else if (filters.status) {
+    query = query.eq("status", filters.status);
+  }
 
   const { data, error } = await query;
   if (error) {
@@ -1301,7 +1311,8 @@ async function getEmployeeListForProfiles(
 
 export async function supabaseGetEmployeeList(
   sb: SupabaseAdmin,
-  organizationId: string
+  organizationId: string,
+  filters?: EmployeeListFilters
 ): Promise<EmployeeListItem[]> {
   const { data: profiles, error: profilesError } = await sb
     .from("profiles")
@@ -1313,7 +1324,8 @@ export async function supabaseGetEmployeeList(
     throw new Error(`Failed to fetch employees: ${profilesError.message}`);
   }
 
-  return getEmployeeListForProfiles(sb, (profiles ?? []) as ProfileStructureRow[]);
+  const items = await getEmployeeListForProfiles(sb, (profiles ?? []) as ProfileStructureRow[]);
+  return applyEmployeeListFilters(items, filters);
 }
 
 export async function supabaseGetManagerEmployeeList(
