@@ -80,3 +80,43 @@
 - `appShellState.test.ts`: manager nav test updated to include `exceptions`. Two new tests added for manager label overrides and admin label preservation.
 - `appPage.test.tsx`: 4 existing manager tests updated to match new copy. New assertions for pending approvals panel and exceptions panel on home.
 - Final result: **141 tests passing**, 0 failures.
+
+## Phase 8.4 – HR Divisi & Penempatan UI
+
+### Data source
+
+- No new API or schema changes. Division data is derived from `employeeList` via a new `divisiList` useMemo in `AppPage.tsx`.
+- `divisiList` groups employees by `departmentId`/`departmentName`, computes `memberCount` and `managerName` (unique manager names across employees in each department).
+
+### UI added — HR Tim workspace
+
+- New `<div data-testid="divisi-penempatan-section">` panel added to `renderTeamWorkspace`, below the exception queue section, visible only for admin/HR (`!isManager`).
+- Panel title: "Divisi & Penempatan", eyebrow: "Struktur tim".
+- Yellow TODO banner: notes that create/edit/assign manager/reassign employee actions require backend API — marked for Codex.
+- Empty state: "Belum ada divisi" when no employees have `departmentId` set.
+- Division table columns: Divisi, Manager, Jumlah anggota, Status, Aksi.
+  - Manager column: shows `managerName` or "Belum ditetapkan" if none.
+  - Member count: `{n} anggota`.
+  - Status: always shows "Aktif" badge (no active/inactive field in current schema; derived from having members).
+  - Aksi: "Lihat anggota" (connected — sets `employeeDepartmentFilter` to filter the employee table above); "Edit" (disabled); "Atur manager" (disabled).
+- Each row has `data-testid="divisi-row-{departmentId}"` for test targeting.
+- Manager role: section is not rendered (`!isManager` guard).
+
+### What is read-only / not connected
+
+- "Edit" button: disabled. Needs `PATCH /departments/:id` (name, description).
+- "Atur manager" button: disabled. Needs `PATCH /departments/:id` with `managerId`.
+- Create new division: not implemented. Needs `POST /departments`.
+- Employee department reassignment: read-only field in existing employee table. Needs `PATCH /employees/:id` with `departmentId`.
+
+### Backend tasks for Codex
+
+1. `POST /departments` — create division with name, optional managerId.
+2. `PATCH /departments/:id` — edit name; assign/remove manager.
+3. `PATCH /employees/:id` — reassign employee to department.
+4. `GET /departments` — dedicated endpoint so division list is not dependent on fetching the full employee list.
+
+### Tests
+
+- `appPage.test.tsx`: new `describe("HR Divisi & Penempatan")` block with 6 tests covering: section renders, empty state, row data (name/manager/count), Lihat anggota filter, manager role exclusion, disabled Edit buttons.
+- Final result: **162 tests passing**, 0 failures.

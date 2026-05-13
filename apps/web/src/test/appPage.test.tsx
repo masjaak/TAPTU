@@ -2269,3 +2269,151 @@ describe("HR filter bar UI polish", () => {
     expect(screen.getByRole("button", { name: /terapkan filter/i })).toBeTruthy();
   });
 });
+
+describe("HR Divisi & Penempatan", () => {
+  function setupAdminWithDepartments() {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:admin",
+        user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", role: "admin", organizationName: "TAPTU HQ" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+    apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 3, checkedInToday: 1, onTimeToday: 1, lateToday: 1, pendingRequests: 0, absentToday: 1, exceptionCount: 0, recentActivity: [] });
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      {
+        id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee",
+        departmentId: "dep-ops", departmentName: "Operations",
+        managerId: "mgr-1", managerName: "Raka Saputra",
+        todayStatus: "present", validationStatus: "verified"
+      },
+      {
+        id: "e2", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee",
+        departmentId: "dep-ops", departmentName: "Operations",
+        managerId: "mgr-1", managerName: "Raka Saputra",
+        todayStatus: "late", validationStatus: "needs_review"
+      },
+      {
+        id: "e3", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee",
+        departmentId: "dep-fnb", departmentName: "F&B Service",
+        managerId: null, managerName: null,
+        todayStatus: "absent", validationStatus: null
+      }
+    ]);
+  }
+
+  beforeEach(() => {
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("renders Divisi & Penempatan section in HR Tim workspace", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/team");
+
+    expect(await screen.findByTestId("divisi-penempatan-section")).toBeTruthy();
+    expect(screen.getByText(/divisi & penempatan/i)).toBeTruthy();
+  });
+
+  it("shows empty state when no employees have department data", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:admin",
+        user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", role: "admin", organizationName: "TAPTU HQ" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+    apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 1, checkedInToday: 0, onTimeToday: 0, lateToday: 0, pendingRequests: 0, absentToday: 1, exceptionCount: 0, recentActivity: [] });
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: null, departmentName: null, todayStatus: "present" }
+    ]);
+    renderRoute("/app/team");
+
+    await screen.findByTestId("divisi-penempatan-section");
+    expect(screen.getByText(/belum ada divisi/i)).toBeTruthy();
+    expect(screen.getByText(/tambahkan divisi/i)).toBeTruthy();
+  });
+
+  it("shows division names, member counts, and manager names per row", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/team");
+
+    const opsRow = await screen.findByTestId("divisi-row-dep-ops");
+    const fnbRow = screen.getByTestId("divisi-row-dep-fnb");
+
+    expect(within(opsRow).getByText("Operations")).toBeTruthy();
+    expect(within(opsRow).getByText("Raka Saputra")).toBeTruthy();
+    expect(within(opsRow).getByText(/2 anggota/i)).toBeTruthy();
+    expect(within(fnbRow).getByText("F&B Service")).toBeTruthy();
+    expect(within(fnbRow).getByText(/belum ditetapkan/i)).toBeTruthy();
+    expect(within(fnbRow).getByText(/1 anggota/i)).toBeTruthy();
+  });
+
+  it("Lihat anggota button filters the employee table to that division", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/team");
+
+    const fnbRow = await screen.findByTestId("divisi-row-dep-fnb");
+    fireEvent.click(within(fnbRow).getByRole("button", { name: /lihat anggota/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Budi Santoso")).toBeTruthy();
+      expect(screen.queryByText("Fikri Maulana")).toBeNull();
+      expect(screen.queryByText("Anisa Rahma")).toBeNull();
+    });
+  });
+
+  it("does not render Divisi & Penempatan section for manager role", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-mgr-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", organizationName: "TAPTU HQ" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+    apiMocks.fetchManagerOverview.mockResolvedValue({ totalEmployees: 0, checkedInToday: 0, onTimeToday: 0, lateToday: 0, pendingRequests: 0, absentToday: 0, exceptionCount: 0, recentActivity: [] });
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
+    apiMocks.fetchManagerRequests.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    renderRoute("/app/team");
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("divisi-penempatan-section")).toBeNull();
+    });
+  });
+
+  it("Edit and Atur manager buttons are disabled indicating backend requirement", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/team");
+
+    await screen.findByTestId("divisi-penempatan-section");
+    const editButtons = screen.getAllByRole("button", { name: /edit divisi/i });
+    expect(editButtons.length).toBeGreaterThan(0);
+    editButtons.forEach((btn) => expect((btn as HTMLButtonElement).disabled).toBe(true));
+  });
+});

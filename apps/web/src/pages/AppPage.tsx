@@ -678,6 +678,26 @@ export function AppPage() {
     return Array.from(unique, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [employeeList]);
 
+  const divisiList = useMemo(() => {
+    const map = new Map<string, { name: string; employees: EmployeeListItem[] }>();
+    employeeList.forEach((emp) => {
+      if (!emp.departmentId || !emp.departmentName) return;
+      if (!map.has(emp.departmentId)) {
+        map.set(emp.departmentId, { name: emp.departmentName, employees: [] });
+      }
+      map.get(emp.departmentId)!.employees.push(emp);
+    });
+    return Array.from(map, ([id, data]) => {
+      const uniqueManagers = [...new Set(data.employees.map((e) => e.managerName).filter(Boolean))];
+      return {
+        id,
+        name: data.name,
+        memberCount: data.employees.length,
+        managerName: uniqueManagers.length > 0 ? uniqueManagers.join(", ") : null
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employeeList]);
+
   if (!session) {
     return <Navigate to="/login" replace />;
   }
@@ -3259,6 +3279,80 @@ export function AppPage() {
             />
           )}
         </Panel>
+
+        {!isManager ? (
+          <div data-testid="divisi-penempatan-section">
+            <Panel eyebrow="Struktur tim" title="Divisi & Penempatan">
+              <div className="mb-4 rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
+                {/* TODO(backend): sambungkan ke department API — buat divisi, edit nama, atur manager, dan ubah penempatan karyawan */}
+                Data divisi berasal dari informasi departemen karyawan saat ini. Buat divisi baru, edit nama, atur manager, dan ubah penempatan karyawan membutuhkan API backend — tandai untuk Codex.
+              </div>
+              {divisiList.length === 0 ? (
+                <EmptyState
+                  title="Belum ada divisi"
+                  description="Tambahkan divisi agar HR dapat mengelompokkan karyawan dan menetapkan manager."
+                />
+              ) : (
+                <div className="overflow-hidden rounded-[20px] border border-[#edf0f5] sm:rounded-[24px]">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[600px] divide-y divide-[#edf0f5] bg-white sm:min-w-full">
+                      <caption className="sr-only">Daftar divisi organisasi</caption>
+                      <thead className="bg-[#f9fafc]">
+                        <tr>
+                          {(["Divisi", "Manager", "Jumlah anggota", "Status", "Aksi"] as const).map((header) => (
+                            <th key={header} scope="col" className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#667085]">{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#edf0f5]">
+                        {divisiList.map((div) => (
+                          <tr key={div.id} data-testid={`divisi-row-${div.id}`}>
+                            <td className="max-w-[200px] break-words px-4 py-3.5 text-sm font-semibold text-[#111827]">{div.name}</td>
+                            <td className="px-4 py-3.5 text-sm text-[#596172]">
+                              {div.managerName ?? <span className="text-[#9aa3b2]">Belum ditetapkan</span>}
+                            </td>
+                            <td className="px-4 py-3.5 text-sm text-[#111827]">{div.memberCount} anggota</td>
+                            <td className="px-4 py-3.5 text-sm">
+                              <StatusBadge tone="success">Aktif</StatusBadge>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEmployeeDepartmentFilter(div.id)}
+                                  className="rounded-lg border border-[#1769ff] px-2.5 py-1 text-xs font-semibold text-[#1769ff] transition hover:bg-[#f0f5ff]"
+                                >
+                                  Lihat anggota
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled
+                                  aria-label="Edit divisi"
+                                  title="Membutuhkan backend API"
+                                  className="cursor-not-allowed rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#9aa3b2]"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled
+                                  title="Membutuhkan backend API"
+                                  className="cursor-not-allowed rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#9aa3b2]"
+                                >
+                                  Atur manager
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </div>
+        ) : null}
 
         {isManager ? null : (
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">

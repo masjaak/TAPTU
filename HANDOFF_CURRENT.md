@@ -10,7 +10,8 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 - Phase 7.4 implemented request approval state machine: employee creation, optional manager step, HR final step, rejection finalization, backward-compatible status labels.
 - Phase 7.5 shipped initial manager dashboard: role-scoped nav, Beranda with team stats, Tim Saya, Presensi Tim, Pengajuan with two-step banner, Profil. 132 tests passing.
 - Phase 8.1 wired manager-scoped data: `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
-- Phase 8.3 completed Manager Dashboard UX polish: nav updated to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, manager-specific request queue, rebuilt home with team status panels, refined team and attendance views, manager permission summary in Profil. **141 tests passing.**
+- Phase 8.3 completed Manager Dashboard UX polish: nav updated to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, manager-specific request queue, rebuilt home with team status panels, refined team and attendance views, manager permission summary in Profil. 141 tests passing.
+- Phase 8.4 added HR Divisi & Penempatan UI: division overview table in HR Tim workspace derived from existing `employeeList` data. Shows division name, manager, member count, status. "Lihat anggota" filters the employee table. Edit/Atur manager disabled with backend TODO notice. Manager role does not see this section. **162 tests passing.**
 
 ## Fixed decisions
 
