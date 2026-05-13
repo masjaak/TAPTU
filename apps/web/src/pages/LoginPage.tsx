@@ -63,6 +63,7 @@ export function LoginPage() {
             <div className="mt-5 space-y-3 text-sm text-white/60">
               <p><span className="font-bold text-white/80">Superadmin</span> - superadmin@taptu.app</p>
               <p><span className="font-bold text-white/80">Admin HR</span> - admin@taptu.app</p>
+              <p><span className="font-bold text-white/80">Manager</span> - manager@taptu.app</p>
               <p><span className="font-bold text-white/80">Karyawan</span> - employee@taptu.app</p>
               <p><span className="font-bold text-white/80">Scanner</span> - scanner@taptu.app</p>
               <p className="pt-2 text-white/30">Password semua akun: <span className="font-mono text-white/50">Taptu123!</span></p>

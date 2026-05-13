@@ -27,9 +27,17 @@ describe("login page", () => {
     expect(screen.getByLabelText(/^password$/i)).toBeTruthy();
   });
 
-  it("does not show demo accounts panel", () => {
+  it("shows demo accounts including manager in role order", () => {
     renderAt("/login");
-    expect(screen.queryByTestId("demo-accounts-panel")).toBeNull();
+    const demoAccounts = screen.getByText(/superadmin@taptu\.app/i).closest("div");
+    const demoAccountCopy = demoAccounts?.textContent ?? "";
+
+    expect(demoAccountCopy).toContain("Superadmin - superadmin@taptu.app");
+    expect(demoAccountCopy).toContain("Admin HR - admin@taptu.app");
+    expect(demoAccountCopy).toContain("Manager - manager@taptu.app");
+    expect(demoAccountCopy).toContain("Karyawan - employee@taptu.app");
+    expect(demoAccountCopy).toContain("Scanner - scanner@taptu.app");
+    expect(demoAccountCopy).toMatch(/Superadmin.*Admin HR.*Manager.*Karyawan.*Scanner/s);
   });
 
   it("has link to register superadmin account", () => {
