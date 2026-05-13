@@ -4,7 +4,7 @@
 
 Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
 
-The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 7.5. Phase 7 added organization structure foundation, the request approval state machine (API), and the complete manager dashboard UI. Known limitations remain around persistence hardening, manager department-scoping, approval timeline UI, shift assignment, selfie storage finalization, payslip data, and very narrow mobile QA with production-like data.
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 8.3. Phase 8 completed manager-scoped data wiring and Manager Dashboard UX polish (dedicated Pengecualian page, nav expanded to 6 items, all pages rebuilt with PageHeader and manager-specific copy). Known limitations remain around persistence hardening, manager department-scoping, approval timeline UI, shift assignment, selfie storage finalization, payslip data, and very narrow mobile QA with production-like data.
 
 ## B. Fixed product decisions
 
@@ -38,13 +38,15 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Phase 7.3: `approval_steps` table and multi-step approval schema.
 - Phase 7.4: request approval state machine in API services (create, manager step, HR step, reject, timeline).
 - Phase 7.5: manager dashboard UI — scoped nav, Beranda/Tim Saya/Presensi Tim/Pengajuan/Profil pages, step-aware status labels, manager approval message, demo stub corrected.
+- Phase 8.1: manager-scoped data APIs — `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
+- Phase 8.3: Manager Dashboard UX polish — nav expanded to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, rebuilt Beranda with team status panels, manager-specific Tim Saya and Presensi Tim, dedicated team approval queue in Pengajuan, manager permission summary in Profil. 141 tests passing.
 
 ## D. Routes/pages
 
 Main post-login pages currently surfaced through the app shell:
 
 - Admin dashboard: summary stats, recent activity, quick actions.
-- Manager dashboard: Beranda (team stats, recent activity, quick actions), Tim Saya (team roster), Presensi Tim (per-member attendance grid), Pengajuan (two-step approval queue + banner), Profil (identity + permissions panels).
+- Manager dashboard: Beranda (team stats, date context, pending approvals panel, exceptions panel), Tim Saya (team roster, manager-specific columns), Presensi Tim (per-member attendance grid), Pengajuan (team approval queue primary, self-request secondary), Pengecualian (team exception queue with Indonesian type labels and actions), Profil (identity + active/inactive permission summary).
 - Employee attendance page: simplified check-in/check-out, current validation state, and attendance history.
 - Employee Pengajuan tab: request submit/list/detail/cancel flow using the existing approval request model.
 - Employee Jadwal tab: lightweight assigned-shift/upcoming schedule view from currently available summary/dashboard data.

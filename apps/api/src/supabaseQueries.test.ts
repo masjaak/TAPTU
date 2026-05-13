@@ -10,6 +10,10 @@ import {
   supabaseCreateCheckInRecord,
   supabaseCreateRequest,
   supabaseGetAttendanceHistory,
+  supabaseGetEmployeeList,
+  supabaseGetManagerEmployeeList,
+  supabaseGetManagerExceptions,
+  supabaseGetManagerOverview,
   supabaseUpdateCheckOutRecord
 } from "./supabaseQueries";
 
@@ -256,6 +260,302 @@ describe("Supabase attendance queries", () => {
       checkOutTime: "2026-05-11T10:05:00.000Z",
       selfieProof: false,
       deviceValidated: true
+    });
+  });
+});
+
+describe("Supabase manager-scoped data access", () => {
+  it("manager employee list returns only employees assigned to the manager", async () => {
+    const filters: Array<[string, unknown]> = [];
+    const inFilters: Array<[string, unknown[]]> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() {
+              return this;
+            },
+            eq(column: string, value: unknown) {
+              filters.push([column, value]);
+              return this;
+            },
+            in(column: string, values: unknown[]) {
+              inFilters.push([column, values]);
+              return Promise.resolve({
+                data: [
+                  {
+                    id: "usr-employee-01",
+                    full_name: "Fikri Maulana",
+                    email: "fikri@taptu.app",
+                    role: "employee",
+                    department_id: null,
+                    manager_id: "usr-manager-01",
+                    position: null,
+                    employee_code: null,
+                    departments: null,
+                    manager: { full_name: "Raka Saputra" }
+                  }
+                ],
+                error: null
+              });
+            }
+          };
+        }
+
+        expect(table).toBe("attendance_records");
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in(column: string, values: unknown[]) {
+            expect(column).toBe("employee_id");
+            expect(values).toEqual(["usr-employee-01"]);
+            return Promise.resolve({
+              data: [
+                {
+                  employee_id: "usr-employee-01",
+                  state: "checked_in",
+                  status: "Tepat waktu",
+                  check_in_time: "2026-05-12T01:03:00.000Z",
+                  validation_status: "verified",
+                  shift_id: "shift-pagi",
+                  work_locations: { name: "Kantor Pusat" }
+                }
+              ],
+              error: null
+            });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseGetManagerEmployeeList(sb, "org-01", "usr-manager-01");
+
+    expect(filters).toContainEqual(["organization_id", "org-01"]);
+    expect(filters).toContainEqual(["manager_id", "usr-manager-01"]);
+    expect(inFilters).toContainEqual(["role", ["employee"]]);
+    expect(result.map((employee) => employee.id)).toEqual(["usr-employee-01"]);
+  });
+
+  it("admin employee list remains organization-wide", async () => {
+    const filters: Array<[string, unknown]> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() {
+              return this;
+            },
+            eq(column: string, value: unknown) {
+              filters.push([column, value]);
+              return this;
+            },
+            in() {
+              return Promise.resolve({
+                data: [
+                  {
+                    id: "usr-employee-01",
+                    full_name: "Fikri Maulana",
+                    email: "fikri@taptu.app",
+                    role: "employee",
+                    manager_id: "usr-manager-01"
+                  },
+                  {
+                    id: "usr-manager-01",
+                    full_name: "Raka Saputra",
+                    email: "manager@taptu.app",
+                    role: "manager",
+                    manager_id: null
+                  }
+                ],
+                error: null
+              });
+            }
+          };
+        }
+
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          in() {
+            return Promise.resolve({ data: [], error: null });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseGetEmployeeList(sb, "org-01");
+
+    expect(filters).toContainEqual(["organization_id", "org-01"]);
+    expect(filters).not.toContainEqual(["manager_id", "usr-manager-01"]);
+    expect(result.map((employee) => employee.id)).toEqual(["usr-employee-01", "usr-manager-01"]);
+  });
+
+  it("manager exceptions are scoped to employees assigned to the manager", async () => {
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() {
+              return this;
+            },
+            eq(column: string, value: unknown) {
+              expect([["organization_id", "org-01"], ["manager_id", "usr-manager-01"]]).toContainEqual([column, value]);
+              return this;
+            },
+            in(column: string, values: unknown[]) {
+              expect(column).toBe("role");
+              expect(values).toEqual(["employee"]);
+              return Promise.resolve({
+                data: [{ id: "usr-employee-01", full_name: "Fikri Maulana" }],
+                error: null
+              });
+            }
+          };
+        }
+
+        expect(table).toBe("attendance_exceptions");
+        return {
+          select() {
+            return this;
+          },
+          in(column: string, values: unknown[]) {
+            expect(column).toBe("employee_id");
+            expect(values).toEqual(["usr-employee-01"]);
+            return this;
+          },
+          order() {
+            return Promise.resolve({
+              data: [
+                {
+                  id: "exc-01",
+                  attendance_record_id: "att-01",
+                  employee_id: "usr-employee-01",
+                  exception_type: "Outside radius",
+                  reason: "Outside office radius.",
+                  status: "Need Review",
+                  created_at: "2026-05-12T08:00:00.000Z"
+                }
+              ],
+              error: null
+            });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseGetManagerExceptions(sb, "org-01", "usr-manager-01");
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ employeeId: "usr-employee-01", employeeName: "Fikri Maulana" });
+  });
+
+  it("manager overview uses manager-scoped employee ids instead of org-wide admin data", async () => {
+    const tables: string[] = [];
+    const sb = {
+      from(table: string) {
+        tables.push(table);
+        if (table === "profiles") {
+          return {
+            select() {
+              return this;
+            },
+            eq(column: string, value: unknown) {
+              expect([["organization_id", "org-01"], ["manager_id", "usr-manager-01"]]).toContainEqual([column, value]);
+              return this;
+            },
+            in(column: string, values: unknown[]) {
+              expect(column).toBe("role");
+              expect(values).toEqual(["employee"]);
+              return Promise.resolve({
+                data: [
+                  { id: "usr-employee-01", full_name: "Fikri Maulana" },
+                  { id: "usr-employee-02", full_name: "Anisa Rahma" }
+                ],
+                error: null
+              });
+            }
+          };
+        }
+
+        if (table === "attendance_records") {
+          return {
+            select() {
+              return this;
+            },
+            eq() {
+              return this;
+            },
+            in(column: string, values: unknown[]) {
+              expect(column).toBe("employee_id");
+              expect(values).toEqual(["usr-employee-01", "usr-employee-02"]);
+              return Promise.resolve({
+                data: [
+                  {
+                    employee_id: "usr-employee-01",
+                    state: "checked_in",
+                    status: "Tepat waktu",
+                    check_in_time: "2026-05-12T01:03:00.000Z",
+                    validation_status: "verified",
+                    validation_reasons: []
+                  }
+                ],
+                error: null
+              });
+            }
+          };
+        }
+
+        if (table === "approval_requests") {
+          return {
+            select() {
+              return this;
+            },
+            eq() {
+              return this;
+            },
+            in(column: string, values: unknown[]) {
+              expect(column).toBe("employee_id");
+              expect(values).toEqual(["usr-employee-01", "usr-employee-02"]);
+              return Promise.resolve({ count: 1, error: null });
+            }
+          };
+        }
+
+        expect(table).toBe("attendance_exceptions");
+        return {
+          select() {
+            return this;
+          },
+          in(column: string, values: unknown[]) {
+            if (column === "employee_id") {
+              expect(values).toEqual(["usr-employee-01", "usr-employee-02"]);
+            }
+            if (column === "status") {
+              expect(values).toEqual(["Need Review", "Request Correction"]);
+              return Promise.resolve({ count: 1, error: null });
+            }
+            return this;
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const overview = await supabaseGetManagerOverview(sb, "org-01", "usr-manager-01");
+
+    expect(tables).not.toEqual(["profiles"]);
+    expect(overview).toMatchObject({
+      totalEmployees: 2,
+      checkedInToday: 1,
+      pendingRequests: 1,
+      exceptionCount: 1
     });
   });
 });

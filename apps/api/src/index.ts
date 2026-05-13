@@ -66,7 +66,6 @@ import {
   supabaseGetAllAttendanceHistory,
   getAdminApprovalRequests,
   getEmployeeRequests,
-  getManagerApprovalRequests,
   createEmployeeRequest,
   approveRequestStep,
   rejectRequestStep,
@@ -77,9 +76,12 @@ import {
   supabaseUpdateRequestStatus,
   supabaseDeleteRequest,
   supabaseGetAdminOverview,
+  supabaseGetManagerOverview,
   supabaseGetEmployeeList,
+  supabaseGetManagerEmployeeList,
   supabaseGetEmployeeSummary,
   supabaseGetExceptions,
+  supabaseGetManagerExceptions,
   supabaseGetAuditLogs,
   supabaseGetScannerState,
   supabaseGetPrimaryWorkLocation,
@@ -87,7 +89,8 @@ import {
   supabaseRefreshScannerToken,
   supabaseReviewException,
   supabaseCreateAuditLog,
-  supabaseCreateAttendanceException
+  supabaseCreateAttendanceException,
+  supabaseGetManagerRequests
 } from "./supabaseQueries";
 
 const app = express();
@@ -652,7 +655,9 @@ app.get("/api/dashboard", async (req, res) => {
     const organizationId = isAdmin || user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
     const attendance = await supabaseGetAttendanceHistory(sb, user.id);
     const todayRecord = await supabaseGetTodayAttendance(sb, user.id);
-    const requests = await supabaseGetRequests(sb, user.id, isAdmin || user.role === "manager", organizationId ?? undefined);
+    const requests = user.role === "manager" && organizationId
+      ? await supabaseGetManagerRequests(sb, organizationId, user.id)
+      : await supabaseGetRequests(sb, user.id, isAdmin, organizationId ?? undefined);
     const scannerState = user.role === "scanner" ? await supabaseGetScannerState(sb) : null;
 
     const payload: DashboardPayload = {
@@ -1063,7 +1068,7 @@ app.get("/api/requests", async (req, res) => {
       user.role === "admin" || user.role === "superadmin"
         ? organizationId ? await getAdminApprovalRequests(sb, organizationId) : []
         : user.role === "manager"
-          ? await getManagerApprovalRequests(sb, user.id)
+          ? organizationId ? await supabaseGetManagerRequests(sb, organizationId, user.id) : []
           : await getEmployeeRequests(sb, user.id);
     return res.json(items);
   }
@@ -1085,7 +1090,8 @@ app.get("/api/requests/:id", async (req, res) => {
 
   if (useSupabase && sb) {
     const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
-    const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin);
+    const organizationId = user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
+    const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin, user.role, organizationId ?? undefined);
     if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
     return res.json(item);
   }
@@ -1105,7 +1111,8 @@ app.get("/api/requests/:id/approval-timeline", async (req, res) => {
 
   if (useSupabase && sb) {
     const isReviewer = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
-    const item = await supabaseGetRequestById(sb, req.params.id, user.id, isReviewer);
+    const organizationId = user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
+    const item = await supabaseGetRequestById(sb, req.params.id, user.id, isReviewer, user.role, organizationId ?? undefined);
     if (!item) return res.status(404).json({ message: "Pengajuan tidak ditemukan." });
 
     const timeline = await getRequestApprovalTimeline(sb, req.params.id);
@@ -1175,7 +1182,7 @@ app.get("/api/admin/requests", async (req, res) => {
     const organizationId = await getOrganizationIdForUser(user.id);
     const items =
       user.role === "manager"
-        ? await getManagerApprovalRequests(sb, user.id)
+        ? organizationId ? await supabaseGetManagerRequests(sb, organizationId, user.id) : []
         : organizationId ? await getAdminApprovalRequests(sb, organizationId) : [];
     return res.json(items);
   }
@@ -1246,20 +1253,50 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
 app.get("/api/admin/overview", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
-  if (user.role !== "admin" && user.role !== "superadmin") return res.status(403).json({ message: "Forbidden" });
+  if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") return res.status(403).json({ message: "Forbidden" });
 
   if (useSupabase && sb) {
     const organizationId = await getOrganizationIdForUser(user.id);
     if (organizationId) {
-      const overview = await supabaseGetAdminOverview(sb, organizationId);
+      const overview = user.role === "manager"
+        ? await supabaseGetManagerOverview(sb, organizationId, user.id)
+        : await supabaseGetAdminOverview(sb, organizationId);
       return res.json(overview);
+    }
+
+    if (user.role === "manager") {
+      return res.json({
+        totalEmployees: 0,
+        checkedInToday: 0,
+        onTimeToday: 0,
+        lateToday: 0,
+        pendingRequests: 0,
+        absentToday: 0,
+        exceptionCount: 0,
+        recentActivity: []
+      });
     }
   }
 
+  if (user.role === "manager") {
+    return res.json({
+      totalEmployees: 0,
+      checkedInToday: 0,
+      onTimeToday: 0,
+      lateToday: 0,
+      pendingRequests: 0,
+      absentToday: 0,
+      exceptionCount: 0,
+      recentActivity: []
+    });
+  }
+
+  const scopedUsers = users.filter((entry) => entry.role === "employee");
+
   const overview: AdminOverview = computeAdminOverview(
     store,
-    users.filter((entry) => entry.role === "employee").length,
-    Object.fromEntries(users.map((entry) => [entry.id, entry.fullName]))
+    scopedUsers.length,
+    Object.fromEntries(scopedUsers.map((entry) => [entry.id, entry.fullName]))
   );
   return res.json(overview);
 });
@@ -1287,7 +1324,16 @@ app.get("/api/admin/exceptions", async (req, res) => {
   if (useSupabase && sb) {
     const organizationId = await getOrganizationIdForUser(user.id);
     if (!organizationId) return res.json([]);
-    return res.json(await supabaseGetExceptions(sb, organizationId));
+    return res.json(
+      user.role === "manager"
+        ? await supabaseGetManagerExceptions(sb, organizationId, user.id)
+        : await supabaseGetExceptions(sb, organizationId)
+    );
+  }
+
+  if (user.role === "manager") {
+    const teamIds = users.filter((entry) => entry.role === "employee" && entry.managerId === user.id).map((entry) => entry.id);
+    return res.json(listExceptionItems().filter((item) => teamIds.includes(item.employeeId)));
   }
 
   return res.json(listExceptionItems());
@@ -1306,6 +1352,15 @@ app.patch("/api/admin/exceptions/:id", async (req, res) => {
   }
 
   if (useSupabase && sb) {
+    if (user.role === "manager") {
+      const organizationId = await getOrganizationIdForUser(user.id);
+      if (!organizationId) return res.status(404).json({ message: "Exception tidak ditemukan." });
+      const scopedExceptions = await supabaseGetManagerExceptions(sb, organizationId, user.id);
+      if (!scopedExceptions.some((item) => item.id === req.params.id)) {
+        return res.status(404).json({ message: "Exception tidak ditemukan." });
+      }
+    }
+
     const reviewed = await supabaseReviewException(sb, req.params.id, {
       status: parsed.data.status,
       adminNote: parsed.data.adminNote,
@@ -1436,10 +1491,16 @@ app.get("/api/admin/employees", async (req, res) => {
   if (useSupabase && sb) {
     const organizationId = await getOrganizationIdForUser(user.id);
     if (!organizationId) return res.json([]);
-    return res.json(await supabaseGetEmployeeList(sb, organizationId));
+    return res.json(
+      user.role === "manager"
+        ? await supabaseGetManagerEmployeeList(sb, organizationId, user.id)
+        : await supabaseGetEmployeeList(sb, organizationId)
+    );
   }
 
-  const employeeUsers = users.filter((u) => u.role === "employee" || u.role === "manager");
+  const employeeUsers = user.role === "manager"
+    ? users.filter((u) => u.role === "employee" && u.managerId === user.id)
+    : users.filter((u) => u.role === "employee" || u.role === "manager");
   const list = computeEmployeeList(store, employeeUsers);
   return res.json(list);
 });

@@ -7,16 +7,20 @@ import { AppPage } from "../pages/AppPage";
 const apiMocks = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   fetchAdminOverview: vi.fn(),
+  fetchManagerOverview: vi.fn(),
   fetchAttendanceHistoryByFilter: vi.fn(),
   fetchEmployeeList: vi.fn(),
+  fetchManagerEmployeeList: vi.fn(),
   fetchEmployeeSummary: vi.fn(),
   fetchRequestDetail: vi.fn(),
   fetchRequests: vi.fn(),
+  fetchManagerRequests: vi.fn(),
   fetchWorkLocations: vi.fn(),
   fetchShifts: vi.fn(),
   fetchReportRows: vi.fn(),
   fetchAuditLogs: vi.fn(),
   fetchExceptionQueue: vi.fn(),
+  fetchManagerExceptionQueue: vi.fn(),
   refreshScannerToken: vi.fn(),
   checkIn: vi.fn(),
   checkOut: vi.fn(),
@@ -49,13 +53,35 @@ function renderRoute(initialEntry: string) {
 describe("AppPage", () => {
   beforeEach(() => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 0,
+      checkedInToday: 0,
+      onTimeToday: 0,
+      lateToday: 0,
+      pendingRequests: 0,
+      absentToday: 0,
+      exceptionCount: 0,
+      recentActivity: []
+    });
+    apiMocks.fetchManagerOverview.mockResolvedValue({
+      totalEmployees: 0,
+      checkedInToday: 0,
+      onTimeToday: 0,
+      lateToday: 0,
+      pendingRequests: 0,
+      absentToday: 0,
+      exceptionCount: 0,
+      recentActivity: []
+    });
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
     apiMocks.fetchRequests.mockResolvedValue([]);
+    apiMocks.fetchManagerRequests.mockResolvedValue([]);
     apiMocks.fetchRequestDetail.mockResolvedValue(null);
     apiMocks.fetchEmployeeList.mockResolvedValue([
       { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", position: "Field Officer", employeeCode: "EMP-001", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
       { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: null, managerName: null, todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
     ]);
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
     apiMocks.fetchWorkLocations.mockResolvedValue([
       { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
     ]);
@@ -67,6 +93,7 @@ describe("AppPage", () => {
     ]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
     apiMocks.refreshScannerToken.mockResolvedValue({
       token: "HDR-31A-7XZ",
       expiresInSeconds: 30,
@@ -1361,9 +1388,14 @@ describe("Phase 4: Reports workspace", () => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset());
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
     apiMocks.fetchRequests.mockResolvedValue([]);
+    apiMocks.fetchManagerRequests.mockResolvedValue([]);
     apiMocks.fetchRequestDetail.mockResolvedValue(null);
     apiMocks.fetchEmployeeList.mockResolvedValue([
       { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
     ]);
     apiMocks.fetchWorkLocations.mockResolvedValue([]);
     apiMocks.fetchShifts.mockResolvedValue([]);
@@ -1372,6 +1404,7 @@ describe("Phase 4: Reports workspace", () => {
     ]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
     apiMocks.refreshScannerToken.mockResolvedValue({ token: "T", expiresInSeconds: 30, scansToday: 0, locationName: "L" });
     apiMocks.exportReportCsv.mockImplementation(() => undefined);
   });
@@ -1532,7 +1565,7 @@ function setupManagerSession() {
     attendanceState: "idle",
     requests: []
   });
-  apiMocks.fetchAdminOverview.mockResolvedValue({
+  apiMocks.fetchManagerOverview.mockResolvedValue({
     totalEmployees: 15,
     checkedInToday: 12,
     onTimeToday: 10,
@@ -1549,10 +1582,35 @@ function setupManagerSession() {
 describe("Manager dashboard", () => {
   beforeEach(() => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    apiMocks.fetchAdminOverview.mockResolvedValue({
+      totalEmployees: 0,
+      checkedInToday: 0,
+      onTimeToday: 0,
+      lateToday: 0,
+      pendingRequests: 0,
+      absentToday: 0,
+      exceptionCount: 0,
+      recentActivity: []
+    });
+    apiMocks.fetchManagerOverview.mockResolvedValue({
+      totalEmployees: 0,
+      checkedInToday: 0,
+      onTimeToday: 0,
+      lateToday: 0,
+      pendingRequests: 0,
+      absentToday: 0,
+      exceptionCount: 0,
+      recentActivity: []
+    });
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
     apiMocks.fetchRequests.mockResolvedValue([]);
+    apiMocks.fetchManagerRequests.mockResolvedValue([]);
     apiMocks.fetchRequestDetail.mockResolvedValue(null);
     apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([
       { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
       { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
     ]);
@@ -1561,6 +1619,7 @@ describe("Manager dashboard", () => {
     apiMocks.fetchReportRows.mockResolvedValue([]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
     apiMocks.refreshScannerToken.mockResolvedValue({ token: "T", expiresInSeconds: 30, scansToday: 0, locationName: "L" });
     apiMocks.exportReportCsv.mockImplementation(() => undefined);
   });
@@ -1582,22 +1641,32 @@ describe("Manager dashboard", () => {
     expect(screen.queryByText(/supervisor view masih dibatasi/i)).toBeNull();
   });
 
+  it("manager dashboard initial load uses manager scoped overview data", async () => {
+    setupManagerSession();
+    renderRoute("/app");
+
+    await screen.findByText("Hadir hari ini");
+
+    expect(apiMocks.fetchManagerOverview).toHaveBeenCalledWith("demo:manager");
+    expect(apiMocks.fetchAdminOverview).not.toHaveBeenCalled();
+  });
+
   it("manager home shows recent team activity with employee names", async () => {
     setupManagerSession();
     renderRoute("/app");
 
     expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
-    expect(screen.getByText(/kehadiran tim hari ini/i)).toBeTruthy();
+    expect(screen.getAllByText(/aktivitas tim hari ini/i).length).toBeGreaterThan(0);
   });
 
-  it("manager home shows quick action panel for Pengajuan and Tim", async () => {
+  it("manager home shows pending approvals and exceptions panels", async () => {
     setupManagerSession();
     renderRoute("/app");
 
     await screen.findByText("Hadir hari ini");
-    expect(screen.getAllByText(/aksi cepat/i).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /review pengajuan/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /tim saya/i })).toBeTruthy();
+    expect(screen.getAllByText(/pengajuan menunggu/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/pengecualian validasi/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /tim saya/i }).length).toBeGreaterThan(0);
   });
 
   it("manager navigation does not include Laporan or Lokasi", async () => {
@@ -1618,12 +1687,70 @@ describe("Manager dashboard", () => {
     expect(screen.getAllByText(/tim saya/i).length).toBeGreaterThan(0);
   });
 
+  it("does not render dummy employees for an empty manager team", async () => {
+    setupManagerSession();
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Belum ada anggota tim")).toBeTruthy();
+    expect(screen.getByText("Karyawan akan muncul setelah HR menetapkan Anda sebagai manager.")).toBeTruthy();
+    expect(screen.queryByText("Fikri Maulana")).toBeNull();
+    expect(screen.queryByText("Anisa Rahma")).toBeNull();
+    expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledWith("demo:manager");
+    expect(apiMocks.fetchEmployeeList).not.toHaveBeenCalled();
+  });
+
   it("manager Presensi Tim page shows team attendance overview", async () => {
     setupManagerSession();
     renderRoute("/app/attendance");
 
     expect((await screen.findAllByText(/presensi tim/i)).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/hadir hari ini/i).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/^hadir$/i)).length).toBeGreaterThan(0);
+  });
+
+  it("manager Presensi Tim page shows empty attendance state when team is empty", async () => {
+    setupManagerSession();
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
+
+    renderRoute("/app/attendance");
+
+    expect(await screen.findByText("Belum ada presensi tim")).toBeTruthy();
+    expect(screen.getByText("Data akan muncul setelah anggota tim melakukan check-in.")).toBeTruthy();
+  });
+
+  it("manager Pengajuan loads manager scoped requests and ignores dashboard-wide requests", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-org-wide", category: "Izin", title: "Pengajuan organisasi", status: "Menunggu", detail: "Tidak boleh tampil.", startDate: "2026-05-13", endDate: "2026-05-13" }
+      ]
+    });
+    apiMocks.fetchManagerRequests.mockResolvedValue([
+      { id: "req-01", category: "Izin", title: "Izin sakit", status: "Menunggu", detail: "Demam tinggi.", startDate: "2026-05-13", endDate: "2026-05-13", workflowStatus: "pending_manager" }
+    ]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 3, absentToday: 1, exceptionCount: 1, recentActivity: []
+    });
+    renderRoute("/app/requests");
+
+    await waitFor(() => expect(apiMocks.fetchManagerRequests).toHaveBeenCalledWith("demo:manager"));
+    expect(await screen.findByText(/izin sakit/i)).toBeTruthy();
+    expect(screen.queryByText(/pengajuan organisasi/i)).toBeNull();
+    expect(apiMocks.fetchRequests).not.toHaveBeenCalled();
   });
 
   it("manager Pengajuan shows two-step approval explanation banner", async () => {
@@ -1640,11 +1767,12 @@ describe("Manager dashboard", () => {
       schedule: [],
       attendance: [],
       attendanceState: "idle",
-      requests: [
-        { id: "req-01", category: "Izin", title: "Izin sakit", status: "Menunggu", detail: "Demam tinggi.", startDate: "2026-05-13", endDate: "2026-05-13" }
-      ]
+      requests: []
     });
-    apiMocks.fetchAdminOverview.mockResolvedValue({
+    apiMocks.fetchManagerRequests.mockResolvedValue([
+      { id: "req-01", category: "Izin", title: "Izin sakit", status: "Menunggu", detail: "Demam tinggi.", startDate: "2026-05-13", endDate: "2026-05-13", workflowStatus: "pending_manager" }
+    ]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
       totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
       pendingRequests: 3, absentToday: 1, exceptionCount: 1, recentActivity: []
     });
@@ -1652,7 +1780,73 @@ describe("Manager dashboard", () => {
 
     await screen.findByText(/izin sakit/i);
     expect(screen.getByText(/setujui/i)).toBeTruthy();
-    expect(screen.getByText(/approval anda akan diteruskan ke hr/i)).toBeTruthy();
+    expect(screen.getByText(/persetujuan anda adalah langkah pertama/i)).toBeTruthy();
+  });
+
+  it("manager requests preserve workflowStatus labels from manager scoped data", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchManagerRequests.mockResolvedValue([
+      { id: "req-01", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" },
+      { id: "req-02", title: "Cuti tahunan", status: "Menunggu", detail: "Liburan.", workflowStatus: "approved_by_manager" },
+      { id: "req-03", title: "Dinas luar", status: "Menunggu", detail: "Perjalanan.", workflowStatus: "pending_hr" },
+      { id: "req-04", title: "Izin mendadak", status: "Ditolak", detail: "Batal.", workflowStatus: "cancelled" },
+      { id: "req-05", title: "Izin khusus", status: "Menunggu", detail: "Butuh label.", workflowStatus: "pending_hr", statusLabel: "Menunggu HR Payroll" }
+    ]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 5, absentToday: 1, exceptionCount: 0, recentActivity: []
+    });
+    renderRoute("/app/requests");
+
+    await screen.findByText("Izin sakit");
+    expect(screen.getByText("Menunggu Manager")).toBeTruthy();
+    expect(screen.getByText("Disetujui Manager")).toBeTruthy();
+    expect(screen.getByText("Menunggu HR")).toBeTruthy();
+    expect(screen.getByText("Dibatalkan")).toBeTruthy();
+    expect(screen.getByText("Menunggu HR Payroll")).toBeTruthy();
+  });
+
+  it("manager Pengajuan shows safe empty state when manager scoped requests are empty", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [
+        { id: "req-org-wide", category: "Izin", title: "Pengajuan organisasi", status: "Menunggu", detail: "Tidak boleh tampil." }
+      ]
+    });
+    apiMocks.fetchManagerRequests.mockResolvedValue([]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 3, absentToday: 1, exceptionCount: 1, recentActivity: []
+    });
+    renderRoute("/app/requests");
+
+    expect(await screen.findByText("Belum ada pengajuan tim")).toBeTruthy();
+    expect(screen.queryByText(/pengajuan organisasi/i)).toBeNull();
   });
 
   it("manager profile shows identity section not a generic empty state", async () => {
@@ -1678,14 +1872,15 @@ describe("Manager dashboard", () => {
       schedule: [],
       attendance: [],
       attendanceState: "idle",
-      requests: [
-        { id: "req-01", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" },
-        { id: "req-02", title: "Cuti tahunan", status: "Menunggu", detail: "Liburan.", workflowStatus: "approved_by_manager" },
-        { id: "req-03", title: "Dinas luar", status: "Menunggu", detail: "Perjalanan.", workflowStatus: "pending_hr" },
-        { id: "req-04", title: "Izin mendadak", status: "Ditolak", detail: "Batal.", workflowStatus: "cancelled" }
-      ]
+      requests: []
     });
-    apiMocks.fetchAdminOverview.mockResolvedValue({
+    apiMocks.fetchManagerRequests.mockResolvedValue([
+      { id: "req-01", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" },
+      { id: "req-02", title: "Cuti tahunan", status: "Menunggu", detail: "Liburan.", workflowStatus: "approved_by_manager" },
+      { id: "req-03", title: "Dinas luar", status: "Menunggu", detail: "Perjalanan.", workflowStatus: "pending_hr" },
+      { id: "req-04", title: "Izin mendadak", status: "Ditolak", detail: "Batal.", workflowStatus: "cancelled" }
+    ]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
       totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
       pendingRequests: 4, absentToday: 1, exceptionCount: 0, recentActivity: []
     });
@@ -1712,11 +1907,12 @@ describe("Manager dashboard", () => {
       schedule: [],
       attendance: [],
       attendanceState: "idle",
-      requests: [
-        { id: "req-10", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" }
-      ]
+      requests: []
     });
-    apiMocks.fetchAdminOverview.mockResolvedValue({
+    apiMocks.fetchManagerRequests.mockResolvedValue([
+      { id: "req-10", title: "Izin sakit", status: "Menunggu", detail: "Demam.", workflowStatus: "pending_manager" }
+    ]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
       totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
       pendingRequests: 1, absentToday: 0, exceptionCount: 0, recentActivity: []
     });

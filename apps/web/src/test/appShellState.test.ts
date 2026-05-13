@@ -50,8 +50,22 @@ describe("app shell state", () => {
       "team",
       "attendance",
       "requests",
+      "exceptions",
       "profile"
     ]);
+  });
+
+  it("applies manager-specific labels for team and attendance sections", () => {
+    const nav = getNavigationForRole("manager");
+    expect(nav.find((item) => item.key === "team")?.label).toBe("Tim Saya");
+    expect(nav.find((item) => item.key === "attendance")?.label).toBe("Presensi Tim");
+    expect(nav.find((item) => item.key === "exceptions")?.label).toBe("Pengecualian");
+  });
+
+  it("does not apply manager label overrides for admin role", () => {
+    const nav = getNavigationForRole("admin");
+    expect(nav.find((item) => item.key === "team")?.label).toBe("Tim");
+    expect(nav.find((item) => item.key === "attendance")?.label).toBe("Presensi");
   });
 
   it("keeps scanner users in kiosk-first navigation", () => {

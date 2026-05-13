@@ -4,20 +4,22 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 
 ## Current status
 
-- MVP documentation is current through Phase 7.5.
-- Phase 6 completed employee-facing simplification and polish: simplified check-in/check-out, scanner token clarification, recent history fix, employee Pengajuan/Jadwal/Slip Gaji tabs, and mobile typography/spacing cleanup.
-- Phase 7 added organization structure foundation, multi-step approval state machine (API), and manager dashboard UI.
-- Phase 7.4 implemented the request approval state machine in API services: employee request creation, optional manager step, HR final step, rejection finalization, timeline retrieval, and backward-compatible status labels.
-- Phase 7.5 shipped the manager dashboard UI: role-scoped navigation (home/team/attendance/requests/profile only), Beranda with team stats, Tim Saya roster, Presensi Tim attendance grid, Pengajuan with two-step approval banner, and Profil with identity + permissions panels. Step-aware `workflowStatus` labels now render in all request cards. Demo approval stub corrected to return role-aware transitions. 132 tests passing.
+- Documentation is current through Phase 8.3.
+- Phase 6 completed employee-facing simplification and polish.
+- Phase 7 added organization structure, multi-step approval state machine (API), and initial manager dashboard UI.
+- Phase 7.4 implemented request approval state machine: employee creation, optional manager step, HR final step, rejection finalization, backward-compatible status labels.
+- Phase 7.5 shipped initial manager dashboard: role-scoped nav, Beranda with team stats, Tim Saya, Presensi Tim, Pengajuan with two-step banner, Profil. 132 tests passing.
+- Phase 8.1 wired manager-scoped data: `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
+- Phase 8.3 completed Manager Dashboard UX polish: nav updated to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, manager-specific request queue, rebuilt home with team status panels, refined team and attendance views, manager permission summary in Profil. **141 tests passing.**
 
 ## Fixed decisions
 
 - Manager remains a limited operational approver, not full HR admin.
-- Manager nav is strictly: home, team, attendance, requests, profile. Reports, scanner, and locations are not accessible.
+- Manager nav is: Beranda, Tim Saya, Presensi Tim, Pengajuan, Pengecualian, Profil. Laporan, Lokasi global, Scanner, and settings are not accessible.
 - Request approval is step-based: Manager approval advances to HR, does not finalize. HR approval finalizes.
 - Employees without `manager_id` go directly to HR approval.
-- Old `approval_requests.status` labels remain readable: `Menunggu`, `Disetujui`, `Ditolak`. `workflowStatus` adds step-aware labels on top.
-- Scanner tokens belong to Scanner/Kiosk mode only; employee check-in/check-out should not expose token entry.
+- Old `approval_requests.status` labels remain readable. `workflowStatus` adds step-aware labels on top.
+- Scanner tokens belong to Scanner/Kiosk mode only.
 - Slip Gaji is lightweight/read-only until a real payslip source exists.
 - Payroll-ready CSV/reporting is MVP scope; full payroll processing is not.
 - Face recognition, advanced anti-spoofing, and real device fingerprinting are roadmap only.
@@ -25,14 +27,14 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 ## Known limitations
 
 - Selfie upload/storage is still not finalized; `selfie_url` may remain nullable.
-- Manager data scope: team roster and attendance grid are not department-segmented — manager sees org-wide data bounded only by approval step ownership, not by department.
-- Approval UI timeline/step-history panel is not built; only the current `workflowStatus` label is shown per request card.
+- Manager data scope: team roster is scoped via `manager_id`, but real production QA with seeded manager/team data not yet done.
+- Approval UI timeline/step-history panel is not built; only `workflowStatus` label shown per request card.
 - Demo `approveRequest` stub returns a generic request title after action — does not preserve the original request title.
-- Existing legacy single-step requests remain readable but are not backfilled into full step timelines.
 - Shift assignment workflow is not complete in post-login UI/API.
 - Employee Jadwal depends on limited schedule data; Slip Gaji has no real payslip model yet.
 - Some operational routes still use local/demo-store style persistence rather than fully normalized Supabase reads/writes.
 - Very narrow mobile screens still need manual QA with production-length names, notes, and dense report data.
+- Superadmin boundary is conceptual; no dedicated Superadmin-only settings UI built.
 
 ## Roadmap only
 
@@ -44,15 +46,18 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 - Face recognition
 - Advanced anti-spoofing
 - Real device fingerprinting
+- Payroll, notifications, chat/comments, analytics
 
 ## Most important docs
 
 - `Documents/TAPTU/HANDOFF_CURRENT.md`
 - `Documents/TAPTU/HANDOFF_TAPTU.md`
+- `Documents/TAPTU/CHANGELOG_PHASE_8.md`
 - `Documents/TAPTU/CHANGELOG_PHASE_7.md`
 - `Documents/TAPTU/CHANGELOG_PHASE_6.md`
-- `Documents/TAPTU/CHANGELOG_PHASE_5.md`
 
 ## Recommended next step
 
-Operational hardening: surface approval step timelines clearly (step history panel), narrow manager data scope to assigned department/team, finish selfie storage, complete shift assignment UX/API, and replace remaining demo-store style routes with Supabase-backed reads/writes.
+1. Manual QA Phase 8 manager scenarios with seeded manager/team data (check home, Tim Saya, Presensi Tim, Pengajuan, Pengecualian, Profil).
+2. If Phase 8 passes QA → Phase 9: approval step timeline panel + reporting hardening.
+3. Do not build payroll, notifications, chat/comments, analytics, or reimbursement yet.

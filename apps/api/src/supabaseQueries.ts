@@ -28,6 +28,10 @@ function toNullableUuid(value: string | undefined | null) {
 type ProfileStructureRelation = { name?: string | null; full_name?: string | null } | null;
 
 type ProfileStructureRow = {
+  id?: string;
+  full_name?: string;
+  email?: string;
+  role?: string;
   department_id?: string | null;
   manager_id?: string | null;
   position?: string | null;
@@ -47,6 +51,44 @@ function readProfileStructure(row: ProfileStructureRow | null | undefined) {
     managerName: manager?.full_name ?? null,
     position: row?.position ?? null,
     employeeCode: row?.employee_code ?? null
+  };
+}
+
+const EMPLOYEE_LIST_SELECT = "id, full_name, email, role, department_id, manager_id, position, employee_code, departments(name), manager:profiles!profiles_manager_id_fkey(full_name)";
+const TEAM_PROFILE_SELECT = "id, full_name";
+
+async function getManagerTeamProfiles<T extends ProfileStructureRow>(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  managerId: string,
+  selectColumns: string
+): Promise<T[]> {
+  if (!organizationId || !managerId) return [];
+
+  const { data, error } = await sb
+    .from("profiles")
+    .select(selectColumns)
+    .eq("organization_id", organizationId)
+    .eq("manager_id", managerId)
+    .in("role", ["employee"]);
+
+  if (error) {
+    throw new Error(`Failed to fetch manager team: ${error.message}`);
+  }
+
+  return (data ?? []) as unknown as T[];
+}
+
+function emptyOverview() {
+  return {
+    totalEmployees: 0,
+    checkedInToday: 0,
+    onTimeToday: 0,
+    lateToday: 0,
+    pendingRequests: 0,
+    absentToday: 0,
+    exceptionCount: 0,
+    recentActivity: []
   };
 }
 
@@ -719,6 +761,35 @@ export async function supabaseGetRequests(
   return getEmployeeRequests(sb, userId);
 }
 
+export async function supabaseGetManagerRequests(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  managerId: string
+) {
+  const teamProfiles = await getManagerTeamProfiles<{ id: string; full_name: string }>(
+    sb,
+    organizationId,
+    managerId,
+    TEAM_PROFILE_SELECT
+  );
+  const employeeIds = teamProfiles.map((profile) => profile.id);
+  if (employeeIds.length === 0) return [];
+
+  const userMap = new Map(teamProfiles.map((profile) => [profile.id, profile.full_name]));
+  const { data, error } = await sb
+    .from("approval_requests")
+    .select("*")
+    .in("employee_id", employeeIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Failed to fetch manager requests: ${error.message}`);
+
+  const rows = data ?? [];
+  const stepsByRequestId = await getApprovalStepsByRequestIds(sb, rows.map((row) => row.id));
+
+  return rows.map((row) => toLeaveRequestItem(row, userMap.get(row.employee_id) ?? undefined, stepsByRequestId.get(row.id) ?? []));
+}
+
 export async function createEmployeeRequest(
   sb: SupabaseAdmin,
   userId: string,
@@ -801,7 +872,9 @@ export async function supabaseGetRequestById(
   sb: SupabaseAdmin,
   requestId: string,
   userId: string,
-  isAdmin: boolean
+  isAdmin: boolean,
+  actorRole?: UserRole,
+  organizationId?: string
 ) {
   const { data, error } = await sb
     .from("approval_requests")
@@ -813,6 +886,16 @@ export async function supabaseGetRequestById(
 
   // Employees can only see their own
   if (!isAdmin && data.employee_id !== userId) return null;
+  if (actorRole === "manager") {
+    if (!organizationId) return null;
+    const teamProfiles = await getManagerTeamProfiles<{ id: string }>(
+      sb,
+      organizationId,
+      userId,
+      "id"
+    );
+    if (!teamProfiles.some((profile) => profile.id === data.employee_id)) return null;
+  }
 
   const profileData = data.profiles as Record<string, string> | null;
   const steps = await getApprovalStepsForRequest(sb, requestId);
@@ -1093,23 +1176,90 @@ export async function supabaseGetAdminOverview(
   };
 }
 
-export async function supabaseGetEmployeeList(
+export async function supabaseGetManagerOverview(
   sb: SupabaseAdmin,
-  organizationId: string
-): Promise<EmployeeListItem[]> {
+  organizationId: string,
+  managerId: string
+) {
   const today = new Date().toISOString().slice(0, 10);
+  const teamProfiles = await getManagerTeamProfiles<{ id: string; full_name: string }>(
+    sb,
+    organizationId,
+    managerId,
+    TEAM_PROFILE_SELECT
+  );
+  const employeeIds = teamProfiles.map((profile) => profile.id);
+  if (employeeIds.length === 0) return emptyOverview();
 
-  const { data: profiles, error: profilesError } = await sb
-    .from("profiles")
-    .select("id, full_name, email, role, department_id, manager_id, position, employee_code, departments(name), manager:profiles!profiles_manager_id_fkey(full_name)")
-    .eq("organization_id", organizationId)
-    .in("role", ["employee", "manager"]);
+  const employeeNameById = new Map(teamProfiles.map((profile) => [profile.id, profile.full_name]));
 
-  if (profilesError) {
-    throw new Error(`Failed to fetch employees: ${profilesError.message}`);
+  const { data: todayAtt, error: attendanceError } = await sb
+    .from("attendance_records")
+    .select("state, status, check_in_time, employee_id, validation_status, validation_reasons")
+    .eq("attendance_date", today)
+    .in("employee_id", employeeIds);
+
+  if (attendanceError) {
+    throw new Error(`Failed to fetch manager attendance overview: ${attendanceError.message}`);
   }
 
-  const employeeIds = (profiles ?? []).map((profile) => profile.id);
+  const checkedIn = (todayAtt ?? []).filter(
+    (row) => row.state === "checked_in" || row.state === "checked_out"
+  );
+  const onTime = checkedIn.filter((row) => {
+    if (!row.check_in_time) return false;
+    const hour = new Date(row.check_in_time).getHours();
+    const minute = new Date(row.check_in_time).getMinutes();
+    return hour < 8 || (hour === 8 && minute <= 15);
+  });
+
+  const { count: pendingRequests, error: requestError } = await sb
+    .from("approval_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "Menunggu")
+    .in("employee_id", employeeIds);
+
+  if (requestError) {
+    throw new Error(`Failed to fetch manager pending requests: ${requestError.message}`);
+  }
+
+  const { count: exceptionCount, error: exceptionError } = await sb
+    .from("attendance_exceptions")
+    .select("id", { count: "exact", head: true })
+    .in("employee_id", employeeIds)
+    .in("status", ["Need Review", "Request Correction"]);
+
+  if (exceptionError) {
+    throw new Error(`Failed to fetch manager exceptions count: ${exceptionError.message}`);
+  }
+
+  return {
+    totalEmployees: employeeIds.length,
+    checkedInToday: checkedIn.length,
+    onTimeToday: onTime.length,
+    lateToday: checkedIn.length - onTime.length,
+    pendingRequests: pendingRequests ?? 0,
+    absentToday: Math.max(0, employeeIds.length - checkedIn.length),
+    exceptionCount: exceptionCount ?? 0,
+    recentActivity: (todayAtt ?? []).slice(0, 5).map((row, index) => ({
+      id: `${row.employee_id}-${index}`,
+      employeeName: employeeNameById.get(row.employee_id) ?? "Employee",
+      event: row.validation_status === "verified" ? (row.state === "checked_out" ? "Check-out" : "Check-in") : "Butuh review",
+      time: row.check_in_time
+        ? new Date(row.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+        : "--.--",
+      status: row.status ?? (row.state === "checked_out" ? "Selesai" : "Tepat waktu"),
+      detail: row.validation_status === "verified" ? "Sinkron dari attendance_records" : ((row.validation_reasons as string[] | null)?.join(", ") ?? "Butuh review")
+    }))
+  };
+}
+
+async function getEmployeeListForProfiles(
+  sb: SupabaseAdmin,
+  profiles: ProfileStructureRow[]
+): Promise<EmployeeListItem[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  const employeeIds = profiles.map((profile) => profile.id).filter((id): id is string => Boolean(id));
   if (employeeIds.length === 0) return [];
 
   const { data: attendance, error: attendanceError } = await sb
@@ -1124,7 +1274,7 @@ export async function supabaseGetEmployeeList(
 
   const attendanceByEmployeeId = new Map((attendance ?? []).map((record) => [record.employee_id, record]));
 
-  return (profiles ?? []).map((profile) => {
+  return profiles.map((profile) => {
     const record = attendanceByEmployeeId.get(profile.id);
     let todayStatus: EmployeeListItem["todayStatus"] = "absent";
 
@@ -1135,9 +1285,9 @@ export async function supabaseGetEmployeeList(
     const workLocation = firstRelation(record?.work_locations);
 
     return {
-      id: profile.id,
-      fullName: profile.full_name,
-      email: profile.email,
+      id: profile.id!,
+      fullName: profile.full_name ?? "Employee",
+      email: profile.email ?? "",
       role: profile.role as UserRole,
       ...readProfileStructure(profile),
       todayStatus,
@@ -1147,6 +1297,38 @@ export async function supabaseGetEmployeeList(
       locationName: workLocation?.name ?? undefined
     };
   });
+}
+
+export async function supabaseGetEmployeeList(
+  sb: SupabaseAdmin,
+  organizationId: string
+): Promise<EmployeeListItem[]> {
+  const { data: profiles, error: profilesError } = await sb
+    .from("profiles")
+    .select(EMPLOYEE_LIST_SELECT)
+    .eq("organization_id", organizationId)
+    .in("role", ["employee", "manager"]);
+
+  if (profilesError) {
+    throw new Error(`Failed to fetch employees: ${profilesError.message}`);
+  }
+
+  return getEmployeeListForProfiles(sb, (profiles ?? []) as ProfileStructureRow[]);
+}
+
+export async function supabaseGetManagerEmployeeList(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  managerId: string
+): Promise<EmployeeListItem[]> {
+  const profiles = await getManagerTeamProfiles<ProfileStructureRow>(
+    sb,
+    organizationId,
+    managerId,
+    EMPLOYEE_LIST_SELECT
+  );
+
+  return getEmployeeListForProfiles(sb, profiles);
 }
 
 // ─── Employee summary ───────────────────────────────────────
@@ -1345,6 +1527,47 @@ export async function supabaseGetExceptions(
 
   if (error) {
     throw new Error(`Failed to fetch exceptions: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    attendanceRecordId: row.attendance_record_id,
+    employeeId: row.employee_id,
+    employeeName: userMap.get(row.employee_id) ?? "Employee",
+    exceptionType: row.exception_type,
+    reason: row.reason,
+    status: row.status,
+    adminNote: row.admin_note ?? undefined,
+    reviewedBy: row.reviewed_by ?? undefined,
+    reviewedAt: row.reviewed_at ?? undefined,
+    createdAt: row.created_at
+  }));
+}
+
+export async function supabaseGetManagerExceptions(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  managerId: string
+): Promise<AttendanceExceptionItem[]> {
+  const teamProfiles = await getManagerTeamProfiles<{ id: string; full_name: string }>(
+    sb,
+    organizationId,
+    managerId,
+    TEAM_PROFILE_SELECT
+  );
+
+  const userMap = new Map(teamProfiles.map((profile) => [profile.id, profile.full_name]));
+  const userIds = teamProfiles.map((profile) => profile.id);
+  if (userIds.length === 0) return [];
+
+  const { data, error } = await sb
+    .from("attendance_exceptions")
+    .select("*")
+    .in("employee_id", userIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch manager exceptions: ${error.message}`);
   }
 
   return (data ?? []).map((row) => ({

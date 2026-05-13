@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { approveRequest, fetchEmployeeSummary, getDashboard, login } from "../lib/api";
+import {
+  approveRequest,
+  fetchEmployeeSummary,
+  fetchManagerEmployeeList,
+  fetchManagerExceptionQueue,
+  fetchManagerOverview,
+  fetchManagerRequests,
+  getDashboard,
+  login
+} from "../lib/api";
 
 describe("api client", () => {
   afterEach(() => {
@@ -113,6 +122,7 @@ describe("demo mode dashboard", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const result = await getDashboard("demo:manager");
     expect(result.greeting).toContain("Raka");
+    expect(result.requests).toEqual([]);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -149,5 +159,34 @@ describe("demo mode approveRequest — step-aware transitions", () => {
     expect(result.request.workflowStatus).toBe("rejected");
     expect(result.request.status).toBe("Ditolak");
     expect(result.request.adminNote).toBe("Tidak sesuai prosedur.");
+  });
+});
+
+describe("manager scoped API client", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("uses manager scoped endpoints without demo dummy employees", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ totalEmployees: 0, checkedInToday: 0, onTimeToday: 0, lateToday: 0, pendingRequests: 0, absentToday: 0, exceptionCount: 0, recentActivity: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(fetchManagerOverview("token:manager")).resolves.toMatchObject({ totalEmployees: 0 });
+    await expect(fetchManagerEmployeeList("token:manager")).resolves.toEqual([]);
+    await expect(fetchManagerExceptionQueue("token:manager")).resolves.toEqual([]);
+    await expect(fetchManagerRequests("token:manager")).resolves.toEqual([]);
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "/api/admin/overview",
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer token:manager" }) })
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/admin/employees", expect.any(Object));
+    expect(fetchSpy).toHaveBeenNthCalledWith(3, "/api/admin/exceptions", expect.any(Object));
+    expect(fetchSpy).toHaveBeenNthCalledWith(4, "/api/admin/requests", expect.any(Object));
   });
 });

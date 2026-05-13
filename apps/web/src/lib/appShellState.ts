@@ -8,6 +8,7 @@ import {
   MapPinned,
   ScanFace,
   Settings,
+  ShieldCheck,
   TimerReset,
   UserRound,
   Users,
@@ -22,6 +23,7 @@ export type AppSectionKey =
   | "attendance"
   | "history"
   | "requests"
+  | "exceptions"
   | "schedule"
   | "payslip"
   | "locations"
@@ -38,6 +40,7 @@ export type AppShellEvent =
   | { type: "OPEN_ATTENDANCE" }
   | { type: "OPEN_HISTORY" }
   | { type: "OPEN_REQUESTS" }
+  | { type: "OPEN_EXCEPTIONS" }
   | { type: "OPEN_SCHEDULE" }
   | { type: "OPEN_PAYSLIP" }
   | { type: "OPEN_LOCATIONS" }
@@ -60,6 +63,7 @@ const sections: Record<AppSectionKey, AppTabDefinition> = {
   attendance: { key: "attendance", label: "Presensi", icon: Clock3, path: "/app/attendance", description: "Check-in dan validasi" },
   history: { key: "history", label: "Riwayat", icon: History, path: "/app/history", description: "Histori absensi pribadi" },
   requests: { key: "requests", label: "Pengajuan", icon: TimerReset, path: "/app/requests", description: "Pengajuan dan approval" },
+  exceptions: { key: "exceptions", label: "Pengecualian", icon: ShieldCheck, path: "/app/exceptions", description: "Validasi kehadiran tim" },
   schedule: { key: "schedule", label: "Jadwal", icon: CalendarDays, path: "/app/schedule", description: "Shift kerja pribadi" },
   payslip: { key: "payslip", label: "Slip Gaji", icon: WalletCards, path: "/app/payslip", description: "Ringkasan payroll pribadi" },
   locations: { key: "locations", label: "Lokasi", icon: MapPinned, path: "/app/locations", description: "Geofence kerja" },
@@ -72,7 +76,7 @@ const sections: Record<AppSectionKey, AppTabDefinition> = {
 const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
   superadmin: ["home", "team", "attendance", "requests", "locations", "reports", "settings", "profile"],
   admin: ["home", "team", "attendance", "requests", "locations", "reports", "profile"],
-  manager: ["home", "team", "attendance", "requests", "profile"],
+  manager: ["home", "team", "attendance", "requests", "exceptions", "profile"],
   employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
 };
@@ -80,7 +84,7 @@ const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
 const compactNavigation: Record<UserRole, AppSectionKey[]> = {
   superadmin: ["home", "attendance", "requests", "profile"],
   admin: ["home", "attendance", "requests", "profile"],
-  manager: ["home", "attendance", "requests", "profile"],
+  manager: ["home", "team", "requests", "exceptions", "profile"],
   employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
 };
@@ -99,6 +103,7 @@ const eventMap: Record<AppShellEvent["type"], AppSectionKey> = {
   OPEN_ATTENDANCE: "attendance",
   OPEN_HISTORY: "history",
   OPEN_REQUESTS: "requests",
+  OPEN_EXCEPTIONS: "exceptions",
   OPEN_SCHEDULE: "schedule",
   OPEN_PAYSLIP: "payslip",
   OPEN_LOCATIONS: "locations",
@@ -108,12 +113,30 @@ const eventMap: Record<AppShellEvent["type"], AppSectionKey> = {
   OPEN_SETTINGS: "settings"
 };
 
+const managerLabelOverrides: Partial<Record<AppSectionKey, string>> = {
+  team: "Tim Saya",
+  attendance: "Presensi Tim",
+  exceptions: "Pengecualian"
+};
+
 export function getTabsForRole(role: UserRole): AppTabDefinition[] {
-  return compactNavigation[role].map((key) => sections[key]);
+  return compactNavigation[role].map((key) => {
+    const section = sections[key];
+    if (role === "manager" && managerLabelOverrides[key]) {
+      return { ...section, label: managerLabelOverrides[key]! };
+    }
+    return section;
+  });
 }
 
 export function getNavigationForRole(role: NavigationRole): AppTabDefinition[] {
-  return roleNavigation[role].map((key) => sections[key]);
+  return roleNavigation[role].map((key) => {
+    const section = sections[key];
+    if (role === "manager" && managerLabelOverrides[key]) {
+      return { ...section, label: managerLabelOverrides[key]! };
+    }
+    return section;
+  });
 }
 
 export function getDefaultAppSection(role: NavigationRole): AppSectionKey {

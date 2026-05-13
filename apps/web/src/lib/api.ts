@@ -57,7 +57,13 @@ export async function register(payload: RegisterRequest): Promise<LoginResponse>
 }
 
 export async function getDashboard(token: string): Promise<DashboardPayload> {
-  if (isDemoToken(token)) return Promise.resolve(getDemoDashboard(token));
+  if (isDemoToken(token)) {
+    const dashboard = getDemoDashboard(token);
+    if (token === "demo:manager") {
+      return Promise.resolve({ ...dashboard, attendance: [], requests: [] });
+    }
+    return Promise.resolve(dashboard);
+  }
   return requestJson<DashboardPayload>("/dashboard", {}, token);
 }
 
@@ -222,6 +228,22 @@ export async function fetchAdminOverview(token: string) {
   return requestJson<AdminOverview>("/admin/overview", {}, token);
 }
 
+export async function fetchManagerOverview(token: string) {
+  if (isDemoToken(token)) {
+    return Promise.resolve({
+      totalEmployees: 0,
+      checkedInToday: 0,
+      onTimeToday: 0,
+      lateToday: 0,
+      pendingRequests: 0,
+      absentToday: 0,
+      exceptionCount: 0,
+      recentActivity: []
+    });
+  }
+  return requestJson<AdminOverview>("/admin/overview", {}, token);
+}
+
 export async function fetchEmployeeSummary(token: string) {
   if (isDemoToken(token)) return Promise.resolve(getDemoEmployeeSummary());
   return requestJson<EmployeeSummary>("/employee/summary", {}, token);
@@ -229,6 +251,11 @@ export async function fetchEmployeeSummary(token: string) {
 
 export async function fetchExceptionQueue(token: string) {
   if (isDemoToken(token)) return Promise.resolve(getDemoExceptionQueue());
+  return requestJson<AttendanceExceptionItem[]>("/admin/exceptions", {}, token);
+}
+
+export async function fetchManagerExceptionQueue(token: string) {
+  if (isDemoToken(token)) return Promise.resolve([]);
   return requestJson<AttendanceExceptionItem[]>("/admin/exceptions", {}, token);
 }
 
@@ -254,6 +281,16 @@ export async function fetchAuditLogs(token: string) {
 export async function fetchEmployeeList(token: string): Promise<EmployeeListItem[]> {
   if (isDemoToken(token)) return Promise.resolve(getDemoEmployeeList());
   return requestJson<EmployeeListItem[]>("/admin/employees", {}, token);
+}
+
+export async function fetchManagerEmployeeList(token: string): Promise<EmployeeListItem[]> {
+  if (isDemoToken(token)) return Promise.resolve([]);
+  return requestJson<EmployeeListItem[]>("/admin/employees", {}, token);
+}
+
+export async function fetchManagerRequests(token: string): Promise<LeaveRequestItem[]> {
+  if (isDemoToken(token)) return Promise.resolve([]);
+  return requestJson<LeaveRequestItem[]>("/admin/requests", {}, token);
 }
 
 export async function fetchWorkLocations(token: string): Promise<WorkLocationItem[]> {

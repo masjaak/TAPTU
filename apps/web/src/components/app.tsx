@@ -43,7 +43,13 @@ export function AppShell({
   const activeItem = navigation.find((item) => item.key === activeKey) ?? navigation[0];
   const mobilePrimaryKeys = ["home", "attendance", "history", "requests", "profile"];
   const hasEmployeeSelfService = navigation.some((item) => item.key === "schedule" || item.key === "payslip");
-  const mobileNavigation = hasEmployeeSelfService ? navigation.filter((item) => mobilePrimaryKeys.includes(item.key)) : [];
+  const isManagerNav = navigation.some((item) => item.key === "exceptions") && !navigation.some((item) => item.key === "locations");
+  const managerMobileKeys = ["home", "team", "requests", "exceptions", "profile"];
+  const mobileNavigation = isManagerNav
+    ? navigation.filter((item) => managerMobileKeys.includes(item.key))
+    : hasEmployeeSelfService
+      ? navigation.filter((item) => mobilePrimaryKeys.includes(item.key))
+      : [];
 
   function handleNavigate(item: AppNavItem) {
     onNavigate(item);
