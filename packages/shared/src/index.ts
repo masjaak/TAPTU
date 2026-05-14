@@ -307,6 +307,16 @@ export interface EmployeeListItem {
   locationName?: string;
 }
 
+export interface DepartmentItem {
+  id: string;
+  name: string;
+  managerId?: string | null;
+  managerName?: string | null;
+  description?: string | null;
+  isActive: boolean;
+  memberCount?: number;
+}
+
 export interface WorkLocationItem {
   id: string;
   name: string;

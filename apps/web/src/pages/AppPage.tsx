@@ -32,6 +32,7 @@ import type {
   DashboardPayload,
   DashboardScheduleItem,
   DashboardStat,
+  DepartmentItem,
   EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
@@ -62,6 +63,7 @@ import {
   cancelRequest,
   checkIn,
   checkOut,
+  createDepartment,
   createRequest,
   createShift,
   createWorkLocation,
@@ -69,6 +71,7 @@ import {
   fetchAuditLogs,
   fetchAdminOverview,
   fetchAttendanceHistoryByFilter,
+  fetchDepartments,
   fetchEmployeeList,
   fetchEmployeeSummary,
   fetchExceptionQueue,
@@ -83,8 +86,10 @@ import {
   fetchShifts,
   fetchWorkLocations,
   getDashboard,
+  reassignEmployeeDepartment,
   refreshScannerToken,
   reviewException,
+  updateDepartment,
   updateShift,
   updateWorkLocation
 } from "../lib/api";
@@ -413,6 +418,16 @@ export function AppPage() {
   const [workLocationsError, setWorkLocationsError] = useState<string | null>(null);
   const [shiftsLoaded, setShiftsLoaded] = useState(false);
   const [shiftsError, setShiftsError] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<DepartmentItem[]>([]);
+  const [departmentsLoaded, setDepartmentsLoaded] = useState(false);
+  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
+  const [divisiFormOpen, setDivisiFormOpen] = useState(false);
+  const [editingDivisi, setEditingDivisi] = useState<DepartmentItem | null>(null);
+  const [divisiForm, setDivisiForm] = useState({ name: "", managerId: "" });
+  const [divisiFormError, setDivisiFormError] = useState<string | null>(null);
+  const [ubahPenempatanEmployee, setUbahPenempatanEmployee] = useState<EmployeeListItem | null>(null);
+  const [ubahPenempatanDeptId, setUbahPenempatanDeptId] = useState("");
+  const [ubahPenempatanError, setUbahPenempatanError] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [requestFormError, setRequestFormError] = useState<string | null>(null);
   const [approvalErrors, setApprovalErrors] = useState<Record<string, string>>({});
@@ -599,6 +614,19 @@ export function AppPage() {
         .catch((error) => {
           setEmployeeListLoaded(true);
           setEmployeeListError(error instanceof Error ? error.message : "Daftar karyawan gagal dimuat.");
+        });
+    }
+
+    if (tab === "team" && isAdmin && !departmentsLoaded) {
+      setDepartmentsError(null);
+      fetchDepartments(session.token)
+        .then((items) => {
+          setDepartments(items);
+          setDepartmentsLoaded(true);
+        })
+        .catch((error) => {
+          setDepartmentsLoaded(true);
+          setDepartmentsError(error instanceof Error ? error.message : "Daftar divisi gagal dimuat.");
         });
     }
 
@@ -1178,6 +1206,61 @@ export function AppPage() {
       setActionMessage("Exception diperbarui.");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Exception gagal diperbarui.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleSubmitDivisiForm(e: React.FormEvent) {
+    e.preventDefault();
+    if (!divisiForm.name.trim()) {
+      setDivisiFormError("Nama divisi wajib diisi.");
+      return;
+    }
+    const key = editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi";
+    setBusyAction(key);
+    setDivisiFormError(null);
+    try {
+      if (editingDivisi) {
+        await updateDepartment(currentSession.token, editingDivisi.id, {
+          name: divisiForm.name.trim(),
+          managerId: divisiForm.managerId || null
+        });
+      } else {
+        await createDepartment(currentSession.token, {
+          name: divisiForm.name.trim(),
+          managerId: divisiForm.managerId || null
+        });
+      }
+      const refreshed = await fetchDepartments(currentSession.token);
+      setDepartments(refreshed);
+      setDivisiFormOpen(false);
+      setEditingDivisi(null);
+      setDivisiForm({ name: "", managerId: "" });
+      setActionMessage(editingDivisi ? "Divisi berhasil diperbarui." : "Divisi baru berhasil ditambahkan.");
+    } catch (error) {
+      setDivisiFormError(error instanceof Error ? error.message : "Gagal menyimpan divisi.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleUbahPenempatan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ubahPenempatanEmployee) return;
+    setBusyAction(`ubah-penempatan-${ubahPenempatanEmployee.id}`);
+    setUbahPenempatanError(null);
+    try {
+      await reassignEmployeeDepartment(currentSession.token, ubahPenempatanEmployee.id, {
+        departmentId: ubahPenempatanDeptId || null
+      });
+      const refreshed = await fetchEmployeeList(currentSession.token);
+      setEmployeeList(refreshed);
+      setUbahPenempatanEmployee(null);
+      setUbahPenempatanDeptId("");
+      setActionMessage("Penempatan karyawan berhasil diperbarui.");
+    } catch (error) {
+      setUbahPenempatanError(error instanceof Error ? error.message : "Gagal mengubah penempatan karyawan.");
     } finally {
       setBusyAction(null);
     }
@@ -3168,7 +3251,8 @@ export function AppPage() {
       { key: "shift", header: "Shift" },
       { key: "checkin", header: "Check-in" },
       { key: "status", header: "Status" },
-      { key: "validation", header: "Validasi" }
+      { key: "validation", header: "Validasi" },
+      { key: "actions", header: "Aksi" }
     ];
 
     return (
@@ -3274,7 +3358,20 @@ export function AppPage() {
                   <StatusBadge tone={emp.validationStatus === "verified" ? "success" : emp.validationStatus === "needs_review" ? "warning" : "danger"}>
                     {emp.validationStatus === "verified" ? "Terverifikasi" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
                   </StatusBadge>
-                ) : <span className="text-xs text-[#7a8495]">-</span>
+                ) : <span className="text-xs text-[#7a8495]">-</span>,
+                actions: (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUbahPenempatanEmployee(emp);
+                      setUbahPenempatanDeptId(emp.departmentId ?? "");
+                      setUbahPenempatanError(null);
+                    }}
+                    className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff]"
+                  >
+                    Ubah divisi
+                  </button>
+                )
               }))}
             />
           )}
@@ -3282,12 +3379,31 @@ export function AppPage() {
 
         {!isManager ? (
           <div data-testid="divisi-penempatan-section">
-            <Panel eyebrow="Struktur tim" title="Divisi & Penempatan">
-              <div className="mb-4 rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
-                {/* TODO(backend): sambungkan ke department API — buat divisi, edit nama, atur manager, dan ubah penempatan karyawan */}
-                Data divisi berasal dari informasi departemen karyawan saat ini. Buat divisi baru, edit nama, atur manager, dan ubah penempatan karyawan membutuhkan API backend — tandai untuk Codex.
+            <Panel
+              eyebrow="Struktur tim"
+              title="Divisi & Penempatan"
+              className="flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-[#667085]">Kelola divisi, tetapkan manager, dan atur penempatan karyawan.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingDivisi(null);
+                    setDivisiForm({ name: "", managerId: "" });
+                    setDivisiFormError(null);
+                    setDivisiFormOpen(true);
+                  }}
+                  className="shrink-0 rounded-2xl bg-[#1769ff] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1255d4]"
+                >
+                  + Tambah divisi
+                </button>
               </div>
-              {divisiList.length === 0 ? (
+              {!departmentsLoaded ? (
+                <LoadingState label="Memuat daftar divisi" />
+              ) : departmentsError ? (
+                <ErrorState title="Daftar divisi belum tersedia" description={`${departmentsError} Coba buka ulang halaman Tim.`} />
+              ) : departments.length === 0 ? (
                 <EmptyState
                   title="Belum ada divisi"
                   description="Tambahkan divisi agar HR dapat mengelompokkan karyawan dan menetapkan manager."
@@ -3305,15 +3421,15 @@ export function AppPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#edf0f5]">
-                        {divisiList.map((div) => (
+                        {departments.map((div) => (
                           <tr key={div.id} data-testid={`divisi-row-${div.id}`}>
                             <td className="max-w-[200px] break-words px-4 py-3.5 text-sm font-semibold text-[#111827]">{div.name}</td>
                             <td className="px-4 py-3.5 text-sm text-[#596172]">
                               {div.managerName ?? <span className="text-[#9aa3b2]">Belum ditetapkan</span>}
                             </td>
-                            <td className="px-4 py-3.5 text-sm text-[#111827]">{div.memberCount} anggota</td>
+                            <td className="px-4 py-3.5 text-sm text-[#111827]">{div.memberCount ?? 0} anggota</td>
                             <td className="px-4 py-3.5 text-sm">
-                              <StatusBadge tone="success">Aktif</StatusBadge>
+                              <StatusBadge tone={div.isActive ? "success" : "neutral"}>{div.isActive ? "Aktif" : "Nonaktif"}</StatusBadge>
                             </td>
                             <td className="px-4 py-3.5">
                               <div className="flex flex-wrap gap-2">
@@ -3326,18 +3442,26 @@ export function AppPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  disabled
                                   aria-label="Edit divisi"
-                                  title="Membutuhkan backend API"
-                                  className="cursor-not-allowed rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#9aa3b2]"
+                                  onClick={() => {
+                                    setEditingDivisi(div);
+                                    setDivisiForm({ name: div.name, managerId: div.managerId ?? "" });
+                                    setDivisiFormError(null);
+                                    setDivisiFormOpen(true);
+                                  }}
+                                  className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff]"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   type="button"
-                                  disabled
-                                  title="Membutuhkan backend API"
-                                  className="cursor-not-allowed rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#9aa3b2]"
+                                  onClick={() => {
+                                    setEditingDivisi(div);
+                                    setDivisiForm({ name: div.name, managerId: div.managerId ?? "" });
+                                    setDivisiFormError(null);
+                                    setDivisiFormOpen(true);
+                                  }}
+                                  className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff]"
                                 >
                                   Atur manager
                                 </button>
@@ -3965,6 +4089,109 @@ export function AppPage() {
             {requestDetail.adminNote ? <p className="text-sm font-semibold text-[#667085]">Catatan reviewer: {requestDetail.adminNote}</p> : null}
           </div>
         ) : null}
+      </Dialog>
+
+      <Dialog
+        title={editingDivisi ? "Edit divisi" : "Tambah divisi baru"}
+        open={divisiFormOpen}
+        onClose={() => {
+          setDivisiFormOpen(false);
+          setEditingDivisi(null);
+          setDivisiForm({ name: "", managerId: "" });
+          setDivisiFormError(null);
+        }}
+      >
+        <form onSubmit={handleSubmitDivisiForm} className="space-y-4">
+          <FormInput
+            label="Nama divisi"
+            value={divisiForm.name}
+            onChange={(e) => setDivisiForm((c) => ({ ...c, name: e.target.value }))}
+            placeholder="Contoh: Operations, F&B Service, Front Office"
+            error={divisiFormError ?? undefined}
+          />
+          <div className="grid gap-1">
+            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]" htmlFor="divisi-manager-select">
+              Manager divisi
+            </label>
+            <select
+              id="divisi-manager-select"
+              aria-label="Manager divisi"
+              value={divisiForm.managerId}
+              onChange={(e) => setDivisiForm((c) => ({ ...c, managerId: e.target.value }))}
+              className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10"
+            >
+              <option value="">Belum ditetapkan</option>
+              {employeeList
+                .filter((emp) => emp.role === "manager" || emp.role === "admin" || emp.role === "superadmin")
+                .map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                ))}
+            </select>
+          </div>
+          {divisiFormError ? <p className="text-xs text-[#c0392b]">{divisiFormError}</p> : null}
+          <div className="flex gap-2 pt-1">
+            <PrimaryButton type="submit" disabled={busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi")}>
+              Simpan divisi
+            </PrimaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                setDivisiFormOpen(false);
+                setEditingDivisi(null);
+                setDivisiForm({ name: "", managerId: "" });
+                setDivisiFormError(null);
+              }}
+            >
+              Batal
+            </SecondaryButton>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        title={ubahPenempatanEmployee ? `Ubah penempatan — ${ubahPenempatanEmployee.fullName}` : "Ubah penempatan"}
+        open={Boolean(ubahPenempatanEmployee)}
+        onClose={() => {
+          setUbahPenempatanEmployee(null);
+          setUbahPenempatanDeptId("");
+          setUbahPenempatanError(null);
+        }}
+      >
+        <form onSubmit={handleUbahPenempatan} className="space-y-4">
+          <div className="grid gap-1">
+            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]" htmlFor="ubah-penempatan-select">
+              Divisi baru
+            </label>
+            <select
+              id="ubah-penempatan-select"
+              aria-label="Divisi baru"
+              value={ubahPenempatanDeptId}
+              onChange={(e) => setUbahPenempatanDeptId(e.target.value)}
+              className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10"
+            >
+              <option value="">Tanpa divisi</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+          {ubahPenempatanError ? <p className="text-xs text-[#c0392b]">{ubahPenempatanError}</p> : null}
+          <div className="flex gap-2 pt-1">
+            <PrimaryButton type="submit" disabled={Boolean(busyAction?.startsWith("ubah-penempatan-"))}>
+              Simpan penempatan
+            </PrimaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                setUbahPenempatanEmployee(null);
+                setUbahPenempatanDeptId("");
+                setUbahPenempatanError(null);
+              }}
+            >
+              Batal
+            </SecondaryButton>
+          </div>
+        </form>
       </Dialog>
     </AppShell>
   );

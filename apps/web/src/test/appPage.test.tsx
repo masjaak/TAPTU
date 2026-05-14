@@ -31,7 +31,11 @@ const apiMocks = vi.hoisted(() => ({
   createWorkLocation: vi.fn(),
   updateWorkLocation: vi.fn(),
   createShift: vi.fn(),
-  updateShift: vi.fn()
+  updateShift: vi.fn(),
+  fetchDepartments: vi.fn(),
+  createDepartment: vi.fn(),
+  updateDepartment: vi.fn(),
+  reassignEmployeeDepartment: vi.fn()
 }));
 
 vi.mock("../lib/api", () => apiMocks);
@@ -109,6 +113,10 @@ describe("AppPage", () => {
       record: { day: "Hari ini", status: "Tepat waktu", time: "17:05", method: "Manual" }
     });
     apiMocks.exportReportCsv.mockImplementation(() => undefined);
+    apiMocks.fetchDepartments.mockResolvedValue([]);
+    apiMocks.createDepartment.mockResolvedValue({ id: "dep-new", name: "New", managerId: null, managerName: null, isActive: true, memberCount: 0 });
+    apiMocks.updateDepartment.mockResolvedValue({ id: "dep-ops", name: "Updated", managerId: null, managerName: null, isActive: true, memberCount: 0 });
+    apiMocks.reassignEmployeeDepartment.mockResolvedValue({ id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service" });
   });
 
   afterEach(() => {
@@ -1727,6 +1735,13 @@ describe("HR team filters", () => {
   beforeEach(() => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset());
     setupAdminSession();
+    apiMocks.fetchDepartments.mockResolvedValue([]);
+    apiMocks.fetchExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchWorkLocations.mockResolvedValue([]);
+    apiMocks.fetchShifts.mockResolvedValue([]);
+    apiMocks.fetchReportRows.mockResolvedValue([]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -2215,6 +2230,7 @@ describe("HR filter bar UI polish", () => {
     apiMocks.fetchShifts.mockResolvedValue([]);
     apiMocks.fetchReportRows.mockResolvedValue([]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchDepartments.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -2271,11 +2287,14 @@ describe("HR filter bar UI polish", () => {
 });
 
 describe("HR Divisi & Penempatan", () => {
+  const DEPT_OPS = { id: "dep-ops", name: "Operations", managerId: "mgr-1", managerName: "Raka Saputra", isActive: true, memberCount: 2 };
+  const DEPT_FNB = { id: "dep-fnb", name: "F&B Service", managerId: null, managerName: null, isActive: true, memberCount: 1 };
+
   function setupAdminWithDepartments() {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
-        token: "demo:admin",
+        token: "real-admin-token",
         user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", role: "admin", organizationName: "TAPTU HQ" }
       })
     );
@@ -2287,6 +2306,7 @@ describe("HR Divisi & Penempatan", () => {
     apiMocks.fetchShifts.mockResolvedValue([]);
     apiMocks.fetchReportRows.mockResolvedValue([]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchDepartments.mockResolvedValue([DEPT_OPS, DEPT_FNB]);
     apiMocks.fetchEmployeeList.mockResolvedValue([
       {
         id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee",
@@ -2305,6 +2325,12 @@ describe("HR Divisi & Penempatan", () => {
         departmentId: "dep-fnb", departmentName: "F&B Service",
         managerId: null, managerName: null,
         todayStatus: "absent", validationStatus: null
+      },
+      {
+        id: "mgr-1", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager",
+        departmentId: "dep-ops", departmentName: "Operations",
+        managerId: null, managerName: null,
+        todayStatus: "present", validationStatus: "verified"
       }
     ]);
   }
@@ -2327,25 +2353,24 @@ describe("HR Divisi & Penempatan", () => {
     expect(screen.getByText(/divisi & penempatan/i)).toBeTruthy();
   });
 
-  it("shows empty state when no employees have department data", async () => {
+  it("shows empty state when no departments exist", async () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
-        token: "demo:admin",
+        token: "real-admin-token",
         user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", role: "admin", organizationName: "TAPTU HQ" }
       })
     );
     apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
-    apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 1, checkedInToday: 0, onTimeToday: 0, lateToday: 0, pendingRequests: 0, absentToday: 1, exceptionCount: 0, recentActivity: [] });
+    apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 0, checkedInToday: 0, onTimeToday: 0, lateToday: 0, pendingRequests: 0, absentToday: 0, exceptionCount: 0, recentActivity: [] });
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
     apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
     apiMocks.fetchWorkLocations.mockResolvedValue([]);
     apiMocks.fetchShifts.mockResolvedValue([]);
     apiMocks.fetchReportRows.mockResolvedValue([]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
-    apiMocks.fetchEmployeeList.mockResolvedValue([
-      { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: null, departmentName: null, todayStatus: "present" }
-    ]);
+    apiMocks.fetchDepartments.mockResolvedValue([]);
+    apiMocks.fetchEmployeeList.mockResolvedValue([]);
     renderRoute("/app/team");
 
     await screen.findByTestId("divisi-penempatan-section");
@@ -2353,7 +2378,7 @@ describe("HR Divisi & Penempatan", () => {
     expect(screen.getByText(/tambahkan divisi/i)).toBeTruthy();
   });
 
-  it("shows division names, member counts, and manager names per row", async () => {
+  it("shows division names, member counts, and manager names from API data", async () => {
     setupAdminWithDepartments();
     renderRoute("/app/team");
 
@@ -2386,7 +2411,7 @@ describe("HR Divisi & Penempatan", () => {
     localStorage.setItem(
       "taptu-session",
       JSON.stringify({
-        token: "demo:manager",
+        token: "real-manager-token",
         user: { id: "usr-mgr-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", organizationName: "TAPTU HQ" }
       })
     );
@@ -2400,6 +2425,7 @@ describe("HR Divisi & Penempatan", () => {
     apiMocks.fetchShifts.mockResolvedValue([]);
     apiMocks.fetchReportRows.mockResolvedValue([]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchDepartments.mockResolvedValue([]);
     renderRoute("/app/team");
 
     await waitFor(() => {
@@ -2407,13 +2433,120 @@ describe("HR Divisi & Penempatan", () => {
     });
   });
 
-  it("Edit and Atur manager buttons are disabled indicating backend requirement", async () => {
+  it("Tambah divisi form opens, submits, and refreshes the division list", async () => {
     setupAdminWithDepartments();
-    renderRoute("/app/team");
+    apiMocks.createDepartment.mockResolvedValue({ id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 });
+    apiMocks.fetchDepartments
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB])
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB, { id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 }]);
 
+    renderRoute("/app/team");
     await screen.findByTestId("divisi-penempatan-section");
-    const editButtons = screen.getAllByRole("button", { name: /edit divisi/i });
-    expect(editButtons.length).toBeGreaterThan(0);
-    editButtons.forEach((btn) => expect((btn as HTMLButtonElement).disabled).toBe(true));
+
+    fireEvent.click(screen.getByRole("button", { name: /tambah divisi/i }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/nama divisi/i), { target: { value: "IT" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    await waitFor(() => {
+      expect(apiMocks.createDepartment).toHaveBeenCalledWith(
+        "real-admin-token",
+        expect.objectContaining({ name: "IT" })
+      );
+      expect(screen.getByTestId("divisi-row-dep-it")).toBeTruthy();
+    });
+  });
+
+  it("Edit divisi opens pre-filled form and saves name update", async () => {
+    setupAdminWithDepartments();
+    apiMocks.updateDepartment.mockResolvedValue({ ...DEPT_OPS, name: "Operasional" });
+    apiMocks.fetchDepartments
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB])
+      .mockResolvedValueOnce([{ ...DEPT_OPS, name: "Operasional" }, DEPT_FNB]);
+
+    renderRoute("/app/team");
+    const opsRow = await screen.findByTestId("divisi-row-dep-ops");
+    fireEvent.click(within(opsRow).getByRole("button", { name: /edit divisi/i }));
+
+    const nameInput = screen.getByLabelText(/nama divisi/i);
+    expect((nameInput as HTMLInputElement).value).toBe("Operations");
+    fireEvent.change(nameInput, { target: { value: "Operasional" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    await waitFor(() => {
+      expect(apiMocks.updateDepartment).toHaveBeenCalledWith(
+        "real-admin-token",
+        "dep-ops",
+        expect.objectContaining({ name: "Operasional" })
+      );
+      const divisiSection = screen.getByTestId("divisi-penempatan-section");
+      expect(within(divisiSection).getByText("Operasional")).toBeTruthy();
+    });
+  });
+
+  it("Atur manager button opens edit form and saves manager assignment", async () => {
+    setupAdminWithDepartments();
+    apiMocks.updateDepartment.mockResolvedValue({ ...DEPT_FNB, managerId: "mgr-1", managerName: "Raka Saputra" });
+    apiMocks.fetchDepartments
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB])
+      .mockResolvedValueOnce([DEPT_OPS, { ...DEPT_FNB, managerId: "mgr-1", managerName: "Raka Saputra" }]);
+
+    renderRoute("/app/team");
+    const fnbRow = await screen.findByTestId("divisi-row-dep-fnb");
+    fireEvent.click(within(fnbRow).getByRole("button", { name: /atur manager/i }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    const managerSelect = screen.getByLabelText(/manager divisi/i);
+    fireEvent.change(managerSelect, { target: { value: "mgr-1" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    await waitFor(() => {
+      expect(apiMocks.updateDepartment).toHaveBeenCalledWith(
+        "real-admin-token",
+        "dep-fnb",
+        expect.objectContaining({ managerId: "mgr-1" })
+      );
+    });
+  });
+
+  it("Ubah divisi button opens dialog and reassigns employee to new division", async () => {
+    setupAdminWithDepartments();
+    apiMocks.reassignEmployeeDepartment.mockResolvedValue({
+      id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee",
+      departmentId: "dep-fnb", departmentName: "F&B Service",
+      managerId: null, managerName: null, todayStatus: "present"
+    });
+    apiMocks.fetchEmployeeList
+      .mockResolvedValueOnce([
+        { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "mgr-1", managerName: "Raka Saputra", todayStatus: "present" },
+        { id: "e3", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", managerId: null, managerName: null, todayStatus: "absent" },
+        { id: "mgr-1", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", managerId: null, managerName: null, todayStatus: "present" }
+      ])
+      .mockResolvedValueOnce([
+        { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", managerId: null, managerName: null, todayStatus: "present" },
+        { id: "e3", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", managerId: null, managerName: null, todayStatus: "absent" },
+        { id: "mgr-1", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", managerId: null, managerName: null, todayStatus: "present" }
+      ]);
+
+    renderRoute("/app/team");
+    await screen.findByText("Fikri Maulana");
+
+    const fikriNameEl = screen.getByText("Fikri Maulana");
+    const fikriRow = fikriNameEl.closest("tr");
+    fireEvent.click(within(fikriRow!).getByRole("button", { name: /ubah divisi/i }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    const deptSelect = screen.getByLabelText(/divisi baru/i);
+    fireEvent.change(deptSelect, { target: { value: "dep-fnb" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan penempatan/i }));
+
+    await waitFor(() => {
+      expect(apiMocks.reassignEmployeeDepartment).toHaveBeenCalledWith(
+        "real-admin-token",
+        "e1",
+        expect.objectContaining({ departmentId: "dep-fnb" })
+      );
+    });
   });
 });

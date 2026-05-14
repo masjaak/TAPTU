@@ -5,6 +5,7 @@ import {
   appendScannerAttempt,
   buildAttendanceReportRows,
   calculateDistanceMeters,
+  canManageOrganizationStructure,
   computeAdminOverview,
   computeEmployeeList,
   computeEmployeeSummary,
@@ -47,6 +48,18 @@ function createIdleRecord() {
     updatedAt: "2026-04-30T07:00:00.000Z"
   };
 }
+
+describe("organization structure management permissions", () => {
+  it.each([
+    ["superadmin", true],
+    ["admin", true],
+    ["manager", false],
+    ["employee", false],
+    ["scanner", false]
+  ] as const)("allows only HR admin roles to manage departments: %s", (role, expected) => {
+    expect(canManageOrganizationStructure(role)).toBe(expected);
+  });
+});
 
 describe("attendance state machine", () => {
   it("moves from idle to checked_in", () => {

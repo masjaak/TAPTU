@@ -1,6 +1,6 @@
 import type { SupabaseAdmin } from "./supabase";
 import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord, EmployeeListFilters } from "./domain";
-import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, EmployeeListItem, EmployeeSummary, LeaveRequestItem, UserRole } from "@taptu/shared";
+import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, DepartmentItem, EmployeeListItem, EmployeeSummary, LeaveRequestItem, UserRole } from "@taptu/shared";
 import { applyEmployeeListFilters, createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain";
 
 /**
@@ -40,6 +40,15 @@ type ProfileStructureRow = {
   manager?: ProfileStructureRelation | ProfileStructureRelation[];
 };
 
+type DepartmentStructureRow = {
+  id?: string;
+  name?: string | null;
+  manager_id?: string | null;
+  description?: string | null;
+  is_active?: boolean | null;
+  manager?: ProfileStructureRelation | ProfileStructureRelation[];
+};
+
 function readProfileStructure(row: ProfileStructureRow | null | undefined) {
   const department = firstRelation(row?.departments);
   const manager = firstRelation(row?.manager);
@@ -55,6 +64,7 @@ function readProfileStructure(row: ProfileStructureRow | null | undefined) {
 }
 
 const EMPLOYEE_LIST_SELECT = "id, full_name, email, role, department_id, manager_id, position, employee_code, departments(name), manager:profiles!profiles_manager_id_fkey(full_name)";
+const DEPARTMENT_SELECT = "id, name, manager_id, description, is_active, manager:profiles!departments_manager_id_fkey(full_name)";
 const TEAM_PROFILE_SELECT = "id, full_name";
 
 async function getManagerTeamProfiles<T extends ProfileStructureRow>(
@@ -1307,6 +1317,207 @@ async function getEmployeeListForProfiles(
       locationName: workLocation?.name ?? undefined
     };
   });
+}
+
+function toDepartmentItem(row: DepartmentStructureRow, memberCounts = new Map<string, number>()): DepartmentItem {
+  const manager = firstRelation(row.manager);
+
+  return {
+    id: row.id!,
+    name: row.name ?? "",
+    managerId: row.manager_id ?? null,
+    managerName: manager?.full_name ?? null,
+    description: row.description ?? null,
+    isActive: row.is_active ?? true,
+    memberCount: memberCounts.get(row.id!) ?? 0
+  };
+}
+
+function toNullableId(value: string | undefined | null) {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toEmployeeListItemFromProfile(profile: ProfileStructureRow): EmployeeListItem {
+  return {
+    id: profile.id!,
+    fullName: profile.full_name ?? "Employee",
+    email: profile.email ?? "",
+    role: profile.role as UserRole,
+    ...readProfileStructure(profile),
+    todayStatus: "absent"
+  };
+}
+
+async function assertProfileInOrganization(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  profileId: string,
+  message: string
+) {
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id")
+    .eq("id", profileId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(message);
+  }
+}
+
+async function assertDepartmentInOrganization(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  departmentId: string,
+  message: string
+) {
+  const { data, error } = await sb
+    .from("departments")
+    .select("id")
+    .eq("id", departmentId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(message);
+  }
+}
+
+export async function supabaseGetDepartments(
+  sb: SupabaseAdmin,
+  organizationId: string
+): Promise<DepartmentItem[]> {
+  const { data: departments, error: departmentsError } = await sb
+    .from("departments")
+    .select(DEPARTMENT_SELECT)
+    .eq("organization_id", organizationId)
+    .order("name");
+
+  if (departmentsError) {
+    throw new Error(`Failed to fetch departments: ${departmentsError.message}`);
+  }
+
+  const { data: members, error: membersError } = await sb
+    .from("profiles")
+    .select("department_id")
+    .eq("organization_id", organizationId);
+
+  if (membersError) {
+    throw new Error(`Failed to fetch department members: ${membersError.message}`);
+  }
+
+  const memberCounts = new Map<string, number>();
+  for (const member of members ?? []) {
+    if (!member.department_id) continue;
+    memberCounts.set(member.department_id, (memberCounts.get(member.department_id) ?? 0) + 1);
+  }
+
+  return ((departments ?? []) as DepartmentStructureRow[]).map((department) => toDepartmentItem(department, memberCounts));
+}
+
+export async function supabaseCreateDepartment(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  payload: { name: string; managerId?: string | null; description?: string | null; isActive?: boolean }
+): Promise<DepartmentItem> {
+  const managerId = toNullableId(payload.managerId);
+  if (managerId) {
+    await assertProfileInOrganization(sb, organizationId, managerId, "Department manager must be in the same organization.");
+  }
+
+  const { data, error } = await sb
+    .from("departments")
+    .insert({
+      organization_id: organizationId,
+      name: payload.name,
+      manager_id: managerId,
+      description: payload.description ?? null,
+      is_active: payload.isActive ?? true
+    })
+    .select(DEPARTMENT_SELECT)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create department: ${error?.message ?? "No department returned"}`);
+  }
+
+  return toDepartmentItem(data as DepartmentStructureRow);
+}
+
+export async function supabaseUpdateDepartment(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  departmentId: string,
+  payload: { name?: string; managerId?: string | null; description?: string | null; isActive?: boolean }
+): Promise<DepartmentItem> {
+  const update: Record<string, unknown> = {};
+
+  if (payload.name !== undefined) update.name = payload.name;
+  if (payload.description !== undefined) update.description = payload.description;
+  if (payload.isActive !== undefined) update.is_active = payload.isActive;
+  if (payload.managerId !== undefined) {
+    const managerId = toNullableId(payload.managerId);
+    if (managerId) {
+      await assertProfileInOrganization(sb, organizationId, managerId, "Department manager must be in the same organization.");
+    }
+    update.manager_id = managerId;
+  }
+
+  const { data, error } = await sb
+    .from("departments")
+    .update(update)
+    .eq("id", departmentId)
+    .eq("organization_id", organizationId)
+    .select(DEPARTMENT_SELECT)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to update department: ${error?.message ?? "No department returned"}`);
+  }
+
+  return toDepartmentItem(data as DepartmentStructureRow);
+}
+
+export async function supabaseReassignEmployeeDepartment(
+  sb: SupabaseAdmin,
+  organizationId: string,
+  employeeId: string,
+  payload: { departmentId?: string | null; managerId?: string | null }
+): Promise<EmployeeListItem> {
+  const update: Record<string, unknown> = {};
+
+  if (payload.departmentId !== undefined) {
+    const departmentId = toNullableId(payload.departmentId);
+    if (departmentId) {
+      await assertDepartmentInOrganization(sb, organizationId, departmentId, "Employee department must be in the same organization.");
+    }
+    update.department_id = departmentId;
+  }
+
+  if (payload.managerId !== undefined) {
+    const managerId = toNullableId(payload.managerId);
+    if (managerId) {
+      await assertProfileInOrganization(sb, organizationId, managerId, "Employee manager must be in the same organization.");
+    }
+    update.manager_id = managerId;
+  }
+
+  const { data, error } = await sb
+    .from("profiles")
+    .update(update)
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .select(EMPLOYEE_LIST_SELECT)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to update employee department: ${error?.message ?? "No employee returned"}`);
+  }
+
+  return toEmployeeListItemFromProfile(data as ProfileStructureRow);
 }
 
 export async function supabaseGetEmployeeList(

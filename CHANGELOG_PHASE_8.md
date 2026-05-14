@@ -120,3 +120,30 @@
 
 - `appPage.test.tsx`: new `describe("HR Divisi & Penempatan")` block with 6 tests covering: section renders, empty state, row data (name/manager/count), Lihat anggota filter, manager role exclusion, disabled Edit buttons.
 - Final result: **162 tests passing**, 0 failures.
+
+## Phase 8.5 – HR Divisi & Penempatan Connected Actions
+
+### Backend API used
+
+- `GET /api/departments` → `fetchDepartments` — loads departments when `tab === "team"` and `isAdmin`.
+- `POST /api/departments` → `createDepartment` — creates new division.
+- `PATCH /api/departments/:id` → `updateDepartment` — edits name or assigns manager.
+- `PATCH /api/employees/:id` → `reassignEmployeeDepartment` — reassigns employee to a different division.
+
+### UI changes (AppPage.tsx)
+
+- **Data source switch:** Divisi panel now uses `departments` state (fetched from API) instead of `divisiList` derived from employee list. Separate loading/error states.
+- **Tambah divisi button:** Opens Dialog form with "Nama divisi" input and "Manager divisi" dropdown (populated from employees with manager/admin role). On submit: calls `createDepartment`, refreshes `departments`, shows success toast.
+- **Edit divisi button:** Opens same form pre-filled with division name and current manager. On submit: calls `updateDepartment`, refreshes `departments`.
+- **Atur manager button:** Opens same edit form — same behavior as "Edit" (user can change manager in the form).
+- **Ubah divisi button (employee table):** New "Aksi" column added to admin employee table. "Ubah divisi" opens Dialog with dropdown of available departments. On submit: calls `reassignEmployeeDepartment`, refreshes `employeeList` via `fetchEmployeeList`.
+- **Status column:** Uses `DepartmentItem.isActive` — shows "Aktif" or "Nonaktif" badge.
+- **Member count:** Uses `DepartmentItem.memberCount` from API (not derived).
+- **No fake success:** All actions wired to real API calls with `busyAction` loading state and error display.
+
+### Tests
+
+- Rewrote `describe("HR Divisi & Penempatan")` block: updated 6 existing tests to use API-provided department data (`fetchDepartments` mock) instead of derived `divisiList`.
+- Added 4 new action tests: Tambah divisi (create + refresh), Edit divisi (pre-fill + update), Atur manager (manager assignment), Ubah divisi (employee reassignment + employee list refresh).
+- Fixed `fetchDepartments` missing from `HR team filters` and `HR filter bar UI polish` describe-level `beforeEach` blocks.
+- Final result: **166 tests passing**, 0 failures.

@@ -30,6 +30,10 @@ export type RequestApprovalStepStatus = ApprovalStepStatus;
 export type RequestApprovalFinalStatus = ApprovalFinalStatus;
 export type RequestApprovalWorkflowStatus = ApprovalWorkflowStatus;
 
+export function canManageOrganizationStructure(role: UserRole): boolean {
+  return role === "admin" || role === "superadmin";
+}
+
 export interface AttendanceRecord {
   id?: string;
   userId: string;

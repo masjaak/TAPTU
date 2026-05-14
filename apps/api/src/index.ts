@@ -16,6 +16,7 @@ import type {
   AuthUser,
   DashboardPayload,
   DashboardStat,
+  DepartmentItem,
   EmployeeSummary,
   LeaveRequestItem,
   LoginRequest,
@@ -42,6 +43,7 @@ import {
   filterAttendanceHistory,
   generateCsvFromRows,
   generateScannerToken,
+  canManageOrganizationStructure,
   reduceAttendance,
   reduceExceptionReview,
   reduceRequests,
@@ -78,6 +80,10 @@ import {
   supabaseDeleteRequest,
   supabaseGetAdminOverview,
   supabaseGetManagerOverview,
+  supabaseGetDepartments,
+  supabaseCreateDepartment,
+  supabaseUpdateDepartment,
+  supabaseReassignEmployeeDepartment,
   supabaseGetEmployeeList,
   supabaseGetManagerEmployeeList,
   supabaseGetEmployeeSummary,
@@ -165,6 +171,7 @@ const storePath = join(apiDir, "..", "data", "demo-store.json");
 const apiConfig = getApiConfig();
 const storage = createStorageAdapter(apiConfig, storePath);
 let store = await storage.load();
+let localDepartments: DepartmentItem[] = [];
 
 const useSupabase = apiConfig.storageMode === "supabase";
 let sb: SupabaseAdmin | null = null;
@@ -341,6 +348,22 @@ const approvalSchema = z.object({
 const exceptionDecisionSchema = z.object({
   status: z.enum(["Need Review", "Approved", "Rejected", "Request Correction"]),
   adminNote: z.string().trim().min(2)
+});
+
+const departmentSchema = z.object({
+  name: z.string().trim().min(2),
+  managerId: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  isActive: z.boolean().optional()
+});
+
+const departmentPatchSchema = departmentSchema.partial();
+
+const employeeDepartmentPatchSchema = z.object({
+  departmentId: z.string().nullable().optional(),
+  managerId: z.string().nullable().optional()
+}).refine((payload) => payload.departmentId !== undefined || payload.managerId !== undefined, {
+  message: "departmentId or managerId is required."
 });
 
 const historyFilterSchema = z.enum(["all", "present", "issue"]).catch("all");
@@ -539,6 +562,32 @@ async function getOrganizationIdForUser(userId: string) {
 
   const { data: profile } = await sb.from("profiles").select("organization_id").eq("id", userId).maybeSingle();
   return profile?.organization_id ?? null;
+}
+
+function listLocalDepartments(): DepartmentItem[] {
+  return localDepartments.map((department) => ({
+    ...department,
+    managerName: department.managerId ? users.find((user) => user.id === department.managerId)?.fullName ?? null : null,
+    memberCount: users.filter((user) => user.departmentId === department.id).length
+  }));
+}
+
+function updateLocalEmployeeStructure(employeeId: string, patch: { departmentId?: string | null; managerId?: string | null }) {
+  const employee = users.find((entry) => entry.id === employeeId);
+  if (!employee) return null;
+
+  if (patch.departmentId !== undefined) {
+    const department = patch.departmentId ? localDepartments.find((entry) => entry.id === patch.departmentId) : null;
+    employee.departmentId = patch.departmentId ?? null;
+    employee.departmentName = department?.name ?? null;
+  }
+  if (patch.managerId !== undefined) {
+    const manager = patch.managerId ? users.find((entry) => entry.id === patch.managerId) : null;
+    employee.managerId = patch.managerId ?? null;
+    employee.managerName = manager?.fullName ?? null;
+  }
+
+  return computeEmployeeList(store, [employee])[0];
 }
 
 app.get("/api/health", (_req, res) => {
@@ -1479,6 +1528,102 @@ app.get("/api/admin/audit-logs", async (req, res) => {
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, 20)
   );
+});
+
+app.get("/api/departments", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (!canManageOrganizationStructure(user.role)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  if (useSupabase && sb) {
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (!organizationId) return res.json([]);
+    return res.json(await supabaseGetDepartments(sb, organizationId));
+  }
+
+  return res.json(listLocalDepartments());
+});
+
+app.post("/api/departments", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (!canManageOrganizationStructure(user.role)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const parsed = departmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data divisi tidak valid." });
+
+  if (useSupabase && sb) {
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (!organizationId) return res.status(400).json({ message: "Organisasi tidak ditemukan." });
+    return res.status(201).json(await supabaseCreateDepartment(sb, organizationId, parsed.data));
+  }
+
+  const department: DepartmentItem = {
+    id: `dep-${Date.now()}`,
+    name: parsed.data.name,
+    managerId: parsed.data.managerId ?? null,
+    managerName: parsed.data.managerId ? users.find((entry) => entry.id === parsed.data.managerId)?.fullName ?? null : null,
+    description: parsed.data.description ?? null,
+    isActive: parsed.data.isActive ?? true,
+    memberCount: 0
+  };
+  localDepartments = [...localDepartments, department];
+  return res.status(201).json(department);
+});
+
+app.patch("/api/departments/:id", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (!canManageOrganizationStructure(user.role)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const parsed = departmentPatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data update divisi tidak valid." });
+
+  if (useSupabase && sb) {
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (!organizationId) return res.status(400).json({ message: "Organisasi tidak ditemukan." });
+    return res.json(await supabaseUpdateDepartment(sb, organizationId, req.params.id, parsed.data));
+  }
+
+  const existing = localDepartments.find((department) => department.id === req.params.id);
+  if (!existing) return res.status(404).json({ message: "Divisi tidak ditemukan." });
+
+  const updated: DepartmentItem = {
+    ...existing,
+    name: parsed.data.name ?? existing.name,
+    managerId: parsed.data.managerId !== undefined ? parsed.data.managerId : existing.managerId,
+    description: parsed.data.description !== undefined ? parsed.data.description : existing.description,
+    isActive: parsed.data.isActive ?? existing.isActive
+  };
+  localDepartments = localDepartments.map((department) => department.id === req.params.id ? updated : department);
+  return res.json(listLocalDepartments().find((department) => department.id === req.params.id) ?? updated);
+});
+
+app.patch("/api/employees/:id", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (!canManageOrganizationStructure(user.role)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const parsed = employeeDepartmentPatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Data penempatan karyawan tidak valid." });
+
+  if (useSupabase && sb) {
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (!organizationId) return res.status(400).json({ message: "Organisasi tidak ditemukan." });
+    return res.json(await supabaseReassignEmployeeDepartment(sb, organizationId, req.params.id, parsed.data));
+  }
+
+  const updated = updateLocalEmployeeStructure(req.params.id, parsed.data);
+  if (!updated) return res.status(404).json({ message: "Karyawan tidak ditemukan." });
+  return res.json(updated);
 });
 
 // Employee list

@@ -7,6 +7,7 @@ import type {
   AttendanceTimelineItem,
   AuditLogItem,
   DashboardPayload,
+  DepartmentItem,
   EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
@@ -286,6 +287,52 @@ export async function fetchEmployeeList(token: string, filters?: { search?: stri
   if (filters?.status) params.set("status", filters.status);
   const query = params.toString();
   return requestJson<EmployeeListItem[]>(`/admin/employees${query ? `?${query}` : ""}`, {}, token);
+}
+
+export async function fetchDepartments(token: string): Promise<DepartmentItem[]> {
+  if (isDemoToken(token)) return Promise.resolve([]);
+  return requestJson<DepartmentItem[]>("/departments", {}, token);
+}
+
+export async function createDepartment(
+  token: string,
+  payload: { name: string; managerId?: string | null; description?: string | null; isActive?: boolean }
+): Promise<DepartmentItem> {
+  if (isDemoToken(token)) {
+    return Promise.resolve({
+      id: `dep-${Date.now()}`,
+      name: payload.name,
+      managerId: payload.managerId ?? null,
+      managerName: null,
+      description: payload.description ?? null,
+      isActive: payload.isActive ?? true,
+      memberCount: 0
+    });
+  }
+  return requestJson<DepartmentItem>("/departments", { method: "POST", body: JSON.stringify(payload) }, token);
+}
+
+export async function updateDepartment(
+  token: string,
+  id: string,
+  patch: { name?: string; managerId?: string | null; description?: string | null; isActive?: boolean }
+): Promise<DepartmentItem> {
+  if (isDemoToken(token)) {
+    return Promise.resolve({ id, name: patch.name ?? "Demo Department", managerId: patch.managerId ?? null, description: patch.description ?? null, isActive: patch.isActive ?? true, memberCount: 0 });
+  }
+  return requestJson<DepartmentItem>(`/departments/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
+}
+
+export async function reassignEmployeeDepartment(
+  token: string,
+  id: string,
+  patch: { departmentId?: string | null; managerId?: string | null }
+): Promise<EmployeeListItem> {
+  if (isDemoToken(token)) {
+    const found = getDemoEmployeeList().find((employee) => employee.id === id) ?? getDemoEmployeeList()[0];
+    return Promise.resolve({ ...found, departmentId: patch.departmentId ?? found.departmentId, managerId: patch.managerId ?? found.managerId });
+  }
+  return requestJson<EmployeeListItem>(`/employees/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
 }
 
 export async function fetchManagerEmployeeList(token: string): Promise<EmployeeListItem[]> {

@@ -6,7 +6,9 @@ import {
   approveRequestStep,
   createEmployeeRequest,
   rejectRequestStep,
+  supabaseCreateDepartment,
   supabaseBuildAttendanceReportRows,
+  supabaseGetDepartments,
   supabaseCreateCheckInRecord,
   supabaseCreateRequest,
   supabaseGetAttendanceHistory,
@@ -14,6 +16,8 @@ import {
   supabaseGetManagerEmployeeList,
   supabaseGetManagerExceptions,
   supabaseGetManagerOverview,
+  supabaseReassignEmployeeDepartment,
+  supabaseUpdateDepartment,
   supabaseUpdateCheckOutRecord
 } from "./supabaseQueries";
 
@@ -557,6 +561,271 @@ describe("Supabase manager-scoped data access", () => {
       pendingRequests: 1,
       exceptionCount: 1
     });
+  });
+});
+
+describe("Supabase department management", () => {
+  it("lists organization departments with manager name and member count", async () => {
+    const departmentFilters: Array<[string, unknown]> = [];
+    const profileFilters: Array<[string, unknown]> = [];
+    const sb = {
+      from(table: string) {
+        if (table === "departments") {
+          return {
+            select(columns: string) {
+              expect(columns).toContain("manager:profiles!departments_manager_id_fkey(full_name)");
+              return this;
+            },
+            eq(column: string, value: unknown) {
+              departmentFilters.push([column, value]);
+              return this;
+            },
+            order(column: string) {
+              expect(column).toBe("name");
+              return Promise.resolve({
+                data: [
+                  {
+                    id: "dep-sales",
+                    name: "Sales",
+                    manager_id: "usr-manager-01",
+                    description: "Field sales",
+                    is_active: true,
+                    manager: { full_name: "Raka Saputra" }
+                  }
+                ],
+                error: null
+              });
+            }
+          };
+        }
+
+        expect(table).toBe("profiles");
+        return {
+          select(columns: string) {
+            expect(columns).toBe("department_id");
+            return this;
+          },
+          eq(column: string, value: unknown) {
+            profileFilters.push([column, value]);
+            return Promise.resolve({
+              data: [
+                { department_id: "dep-sales" },
+                { department_id: "dep-sales" },
+                { department_id: null }
+              ],
+              error: null
+            });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseGetDepartments(sb, "org-01");
+
+    expect(departmentFilters).toContainEqual(["organization_id", "org-01"]);
+    expect(profileFilters).toContainEqual(["organization_id", "org-01"]);
+    expect(result).toEqual([
+      {
+        id: "dep-sales",
+        name: "Sales",
+        managerId: "usr-manager-01",
+        managerName: "Raka Saputra",
+        description: "Field sales",
+        isActive: true,
+        memberCount: 2
+      }
+    ]);
+  });
+
+  it("creates a department scoped to the current organization", async () => {
+    let insertPayload: Record<string, unknown> | null = null;
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() {
+              return this;
+            },
+            eq() {
+              return this;
+            },
+            maybeSingle() {
+              return Promise.resolve({ data: { id: "usr-manager-01" }, error: null });
+            }
+          };
+        }
+
+        expect(table).toBe("departments");
+        return {
+          insert(payload: Record<string, unknown>) {
+            insertPayload = payload;
+            return {
+              select() {
+                return {
+                  single() {
+                    return Promise.resolve({
+                      data: {
+                        id: "dep-sales",
+                        name: payload.name,
+                        manager_id: payload.manager_id,
+                        description: payload.description,
+                        is_active: payload.is_active,
+                        manager: { full_name: "Raka Saputra" }
+                      },
+                      error: null
+                    });
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseCreateDepartment(sb, "org-01", {
+      name: "Sales",
+      managerId: "usr-manager-01",
+      description: "Field sales",
+      isActive: true
+    });
+
+    expect(insertPayload).toMatchObject({
+      organization_id: "org-01",
+      name: "Sales",
+      manager_id: "usr-manager-01",
+      description: "Field sales",
+      is_active: true
+    });
+    expect(result.managerName).toBe("Raka Saputra");
+  });
+
+  it("updates department manager only inside the organization", async () => {
+    const filters: Array<[string, unknown]> = [];
+    let updatePayload: Record<string, unknown> | null = null;
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() {
+              return this;
+            },
+            eq() {
+              return this;
+            },
+            maybeSingle() {
+              return Promise.resolve({ data: { id: "usr-manager-02" }, error: null });
+            }
+          };
+        }
+
+        expect(table).toBe("departments");
+        return {
+          update(payload: Record<string, unknown>) {
+            updatePayload = payload;
+            return this;
+          },
+          eq(column: string, value: unknown) {
+            filters.push([column, value]);
+            return this;
+          },
+          select() {
+            return this;
+          },
+          single() {
+            return Promise.resolve({
+              data: {
+                id: "dep-sales",
+                name: "Sales Ops",
+                manager_id: "usr-manager-02",
+                description: null,
+                is_active: true,
+                manager: { full_name: "Maya Lead" }
+              },
+              error: null
+            });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseUpdateDepartment(sb, "org-01", "dep-sales", {
+      name: "Sales Ops",
+      managerId: "usr-manager-02"
+    });
+
+    expect(updatePayload).toMatchObject({ name: "Sales Ops", manager_id: "usr-manager-02" });
+    expect(filters).toContainEqual(["id", "dep-sales"]);
+    expect(filters).toContainEqual(["organization_id", "org-01"]);
+    expect(result.managerName).toBe("Maya Lead");
+  });
+
+  it("assigns an employee to a department within the same organization", async () => {
+    const filters: Array<[string, unknown]> = [];
+    let updatePayload: Record<string, unknown> | null = null;
+    const sb = {
+      from(table: string) {
+        if (table === "departments") {
+          return {
+            select() {
+              return this;
+            },
+            eq() {
+              return this;
+            },
+            maybeSingle() {
+              return Promise.resolve({ data: { id: "dep-sales" }, error: null });
+            }
+          };
+        }
+
+        expect(table).toBe("profiles");
+        return {
+          select() {
+            return this;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: { id: "usr-manager-01" }, error: null });
+          },
+          update(payload: Record<string, unknown>) {
+            updatePayload = payload;
+            return this;
+          },
+          eq(column: string, value: unknown) {
+            filters.push([column, value]);
+            return this;
+          },
+          single() {
+            return Promise.resolve({
+              data: {
+                id: "usr-employee-01",
+                full_name: "Fikri Maulana",
+                email: "fikri@taptu.app",
+                role: "employee",
+                department_id: "dep-sales",
+                manager_id: "usr-manager-01",
+                position: null,
+                employee_code: null,
+                departments: { name: "Sales" },
+                manager: { full_name: "Raka Saputra" }
+              },
+              error: null
+            });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const result = await supabaseReassignEmployeeDepartment(sb, "org-01", "usr-employee-01", {
+      departmentId: "dep-sales",
+      managerId: "usr-manager-01"
+    });
+
+    expect(updatePayload).toMatchObject({ department_id: "dep-sales", manager_id: "usr-manager-01" });
+    expect(filters).toContainEqual(["id", "usr-employee-01"]);
+    expect(filters).toContainEqual(["organization_id", "org-01"]);
+    expect(result.departmentId).toBe("dep-sales");
+    expect(result.managerId).toBe("usr-manager-01");
   });
 });
 

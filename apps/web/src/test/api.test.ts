@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   approveRequest,
+  createDepartment,
   fetchEmployeeSummary,
+  fetchDepartments,
   fetchEmployeeList,
   fetchReportRows,
   fetchManagerEmployeeList,
@@ -10,7 +12,9 @@ import {
   fetchManagerOverview,
   fetchManagerRequests,
   getDashboard,
-  login
+  login,
+  reassignEmployeeDepartment,
+  updateDepartment
 } from "../lib/api";
 
 describe("api client", () => {
@@ -234,5 +238,30 @@ describe("HR filter API client", () => {
       "/api/admin/reports?dateFrom=2026-05-01&dateTo=2026-05-14&departmentId=dep-ops&status=needs_review",
       expect.any(Object)
     );
+  });
+});
+
+describe("HR department API client", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("uses department management endpoints without changing dashboard routes", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: "dep-sales", name: "Sales", isActive: true }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: "dep-sales", name: "Sales Ops", isActive: true }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: "usr-employee-01", departmentId: "dep-sales" }) });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await fetchDepartments("token:admin");
+    await createDepartment("token:admin", { name: "Sales", managerId: null, description: null, isActive: true });
+    await updateDepartment("token:admin", "dep-sales", { managerId: "usr-manager-01" });
+    await reassignEmployeeDepartment("token:admin", "usr-employee-01", { departmentId: "dep-sales", managerId: "usr-manager-01" });
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(1, "/api/departments", expect.any(Object));
+    expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/departments", expect.objectContaining({ method: "POST" }));
+    expect(fetchSpy).toHaveBeenNthCalledWith(3, "/api/departments/dep-sales", expect.objectContaining({ method: "PATCH" }));
+    expect(fetchSpy).toHaveBeenNthCalledWith(4, "/api/employees/usr-employee-01", expect.objectContaining({ method: "PATCH" }));
   });
 });
