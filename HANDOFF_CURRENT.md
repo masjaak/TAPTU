@@ -4,7 +4,7 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 
 ## Current status
 
-- Documentation is current through Phase 8.3.
+- Documentation is current through Phase 8.6.
 - Phase 6 completed employee-facing simplification and polish.
 - Phase 7 added organization structure, multi-step approval state machine (API), and initial manager dashboard UI.
 - Phase 7.4 implemented request approval state machine: employee creation, optional manager step, HR final step, rejection finalization, backward-compatible status labels.
@@ -12,7 +12,8 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 - Phase 8.1 wired manager-scoped data: `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
 - Phase 8.3 completed Manager Dashboard UX polish: nav updated to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, manager-specific request queue, rebuilt home with team status panels, refined team and attendance views, manager permission summary in Profil. 141 tests passing.
 - Phase 8.4 added HR Divisi & Penempatan UI shell: division table in HR Tim workspace, data derived from employee list, actions disabled with TODO notice. 162 tests passing.
-- Phase 8.5 connected all Divisi & Penempatan actions to backend API: Tambah divisi (createDepartment), Edit/Atur manager (updateDepartment), Ubah divisi in employee table (reassignEmployeeDepartment). Data source switched to `fetchDepartments` with loading/error states. **166 tests passing.**
+- Phase 8.5 connected all Divisi & Penempatan actions to backend API: Tambah divisi (createDepartment), Edit/Atur manager (updateDepartment), Ubah divisi in employee table (reassignEmployeeDepartment). Data source switched to `fetchDepartments` with loading/error states. 166 tests passing.
+- Phase 8.6 replaced native `<select>` filter controls in HR Tim with custom `FilterSelect` component (Taptu style, portal dropdown, scroll-safe, no native browser popup). New `FilterSelect` exported from `components/app.tsx`. Divisi and Status filters in HR Tim filter strip now use combobox role. **169 tests passing.**
 
 ## Fixed decisions
 

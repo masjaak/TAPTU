@@ -1762,8 +1762,14 @@ describe("HR team filters", () => {
     expect(screen.getAllByText("Anisa Rahma").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("Cari karyawan"), { target: { value: "EMP-002" } });
-    fireEvent.change(screen.getByLabelText("Divisi / Departemen"), { target: { value: "dep-sales" } });
-    fireEvent.change(screen.getByLabelText("Status hari ini"), { target: { value: "late" } });
+
+    const divisionCombobox = screen.getByRole("combobox", { name: "Divisi / Departemen" });
+    fireEvent.click(divisionCombobox);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Sales" }));
+
+    const statusCombobox = screen.getByRole("combobox", { name: "Status hari ini" });
+    fireEvent.click(statusCombobox);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Terlambat" }));
 
     await waitFor(() => expect(screen.queryByText("Fikri Maulana")).toBeNull());
     expect(screen.getAllByText("Anisa Rahma").length).toBeGreaterThan(0);
@@ -1776,10 +1782,11 @@ describe("HR team filters", () => {
 
     renderRoute("/app/team");
 
-    const divisionSelect = await screen.findByLabelText("Divisi / Departemen");
-    const options = within(divisionSelect).getAllByRole("option");
+    const divisionCombobox = await screen.findByRole("combobox", { name: "Divisi / Departemen" });
+    fireEvent.click(divisionCombobox);
+    const options = screen.getAllByRole("option");
 
-    expect(options.map((option) => option.textContent)).toEqual(["Semua divisi"]);
+    expect(options.map((o) => o.textContent?.trim())).toEqual(["Semua divisi"]);
     expect(screen.getByText("Fikri Maulana")).toBeTruthy();
   });
 
@@ -1792,7 +1799,7 @@ describe("HR team filters", () => {
     renderRoute("/app/team");
 
     expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
-    expect(screen.queryByLabelText("Divisi / Departemen")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Divisi / Departemen" })).toBeNull();
     expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledWith("demo:manager");
   });
 });
@@ -2268,8 +2275,8 @@ describe("HR filter bar UI polish", () => {
 
     expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
     expect(screen.getByLabelText("Cari karyawan")).toBeTruthy();
-    expect(screen.getByLabelText("Divisi / Departemen")).toBeTruthy();
-    expect(screen.getByLabelText("Status hari ini")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Divisi / Departemen" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Status hari ini" })).toBeTruthy();
   });
 
   it("HR Laporan filter bar renders all four filter fields and apply button", async () => {
@@ -2283,6 +2290,43 @@ describe("HR filter bar UI polish", () => {
     expect(screen.getByLabelText("Divisi / Departemen")).toBeTruthy();
     expect(screen.getByLabelText("Status absensi")).toBeTruthy();
     expect(screen.getByRole("button", { name: /terapkan filter/i })).toBeTruthy();
+  });
+
+  it("HR Tim division filter is a custom combobox, not a native select", async () => {
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    const combobox = screen.getByRole("combobox", { name: "Divisi / Departemen" });
+    expect(combobox.tagName).not.toBe("SELECT");
+    expect(combobox.getAttribute("aria-haspopup")).toBe("listbox");
+  });
+
+  it("HR Tim status filter is a custom combobox, not a native select", async () => {
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    const combobox = screen.getByRole("combobox", { name: "Status hari ini" });
+    expect(combobox.tagName).not.toBe("SELECT");
+    expect(combobox.getAttribute("aria-haspopup")).toBe("listbox");
+  });
+
+  it("HR Tim division filter options come from employee department data", async () => {
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present" },
+      { id: "e2", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-sales", departmentName: "Sales", todayStatus: "late" }
+    ]);
+
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    const combobox = screen.getByRole("combobox", { name: "Divisi / Departemen" });
+    fireEvent.click(combobox);
+
+    const options = screen.getAllByRole("option");
+    const labels = options.map((o) => o.textContent?.trim());
+    expect(labels).toContain("Semua divisi");
+    expect(labels).toContain("Operations");
+    expect(labels).toContain("Sales");
   });
 });
 

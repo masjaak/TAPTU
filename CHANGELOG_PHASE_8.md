@@ -121,6 +121,36 @@
 - `appPage.test.tsx`: new `describe("HR Divisi & Penempatan")` block with 6 tests covering: section renders, empty state, row data (name/manager/count), Lihat anggota filter, manager role exclusion, disabled Edit buttons.
 - Final result: **162 tests passing**, 0 failures.
 
+## Phase 8.6 – HR Tim Custom Filter Dropdowns
+
+### New component: `FilterSelect` (`components/app.tsx`)
+
+- Added `FilterSelectOption` interface: `{ value: string; label: string }`.
+- Added `FilterSelect` component: custom combobox-style dropdown using React portal, same scroll-safe behavior as `CategorySelect`.
+- Trigger button: `role="combobox"`, `aria-label`, `aria-expanded`, `aria-haspopup="listbox"`. No native macOS popup.
+- Options rendered via portal into `document.body` with `role="listbox"` and `role="option"`. Max height 260px with internal scroll.
+- Dropdown does not close when user scrolls inside the options list.
+- Selected option shown with blue accent and checkmark. Unselected options highlight on hover.
+- `onChange` receives the option `value` (not label), compatible with ID-based filter state.
+
+### AppPage.tsx changes
+
+- Imported `FilterSelect` from `../components/app`.
+- Replaced `<select aria-label="Divisi / Departemen">` in HR Tim filter strip with `<FilterSelect>`.
+- Replaced `<select aria-label="Status hari ini">` in HR Tim filter strip with `<FilterSelect>`.
+- Report filter strip and Dialog form selects (Manager divisi, Divisi baru) remain as native `<select>` — those are form controls, not filter strips.
+
+### Tests
+
+- Updated `"keeps HR team organization-wide by default and filters by search, division, and status"`: replaced `fireEvent.change` on native select with `fireEvent.click(combobox)` + `fireEvent.mouseDown(option)`.
+- Updated `"shows only the default division option when no departments exist"`: open combobox then assert `role="option"` items.
+- Updated `"does not show HR global filters on the manager team page"`: `queryByRole("combobox", ...)` instead of `queryByLabelText`.
+- Updated `"HR Tim filter bar renders search and both filter controls accessible"`: `getByRole("combobox", ...)` instead of `getByLabelText`.
+- Added `"HR Tim division filter is a custom combobox, not a native select"`: checks `tagName !== SELECT` and `aria-haspopup="listbox"`.
+- Added `"HR Tim status filter is a custom combobox, not a native select"`: same checks.
+- Added `"HR Tim division filter options come from employee department data"`: opens dropdown, verifies options include department names derived from employee list.
+- Final result: **169 tests passing**, 0 failures.
+
 ## Phase 8.5 – HR Divisi & Penempatan Connected Actions
 
 ### Backend API used

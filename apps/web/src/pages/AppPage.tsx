@@ -48,6 +48,7 @@ import {
   Dialog,
   EmptyState,
   ErrorState,
+  FilterSelect,
   FormInput,
   LoadingState,
   PageHeader,
@@ -3280,27 +3281,25 @@ export function AppPage() {
               </div>
               {!isManager ? (
                 <>
-                  <select
-                    aria-label="Divisi / Departemen"
-                    value={employeeDepartmentFilter}
-                    onChange={(e) => setEmployeeDepartmentFilter(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e2e7f0] bg-white py-2.5 pl-3 pr-8 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10 sm:w-48"
-                  >
-                    <option value="">Semua divisi</option>
-                    {departmentOptions.map((department) => (
-                      <option key={department.id} value={department.id}>{department.name}</option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Status hari ini"
-                    value={employeeStatusFilter}
-                    onChange={(e) => setEmployeeStatusFilter(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e2e7f0] bg-white py-2.5 pl-3 pr-8 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10 sm:w-40"
-                  >
-                    {employeeStatusFilters.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
+                  <div className="sm:w-48">
+                    <FilterSelect
+                      ariaLabel="Divisi / Departemen"
+                      value={employeeDepartmentFilter}
+                      onChange={setEmployeeDepartmentFilter}
+                      options={[
+                        { value: "", label: "Semua divisi" },
+                        ...departmentOptions.map((d) => ({ value: d.id, label: d.name }))
+                      ]}
+                    />
+                  </div>
+                  <div className="sm:w-40">
+                    <FilterSelect
+                      ariaLabel="Status hari ini"
+                      value={employeeStatusFilter}
+                      onChange={setEmployeeStatusFilter}
+                      options={employeeStatusFilters.map((o) => ({ value: o.value, label: o.label }))}
+                    />
+                  </div>
                 </>
               ) : null}
             </div>

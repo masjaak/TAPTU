@@ -523,6 +523,167 @@ export function CategorySelect({
   );
 }
 
+export interface FilterSelectOption {
+  value: string;
+  label: string;
+}
+
+export function FilterSelect({
+  ariaLabel,
+  value,
+  onChange,
+  options
+}: {
+  ariaLabel: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: FilterSelectOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? options[0]?.label ?? "";
+
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        close();
+        triggerRef.current?.focus();
+      }
+    }
+
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      close();
+    }
+
+    function handleScroll(e: Event) {
+      if (listRef.current?.contains(e.target as Node)) return;
+      close();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open, close]);
+
+  function handleToggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    if (triggerRef.current) {
+      setTriggerRect(triggerRef.current.getBoundingClientRect());
+    }
+    setOpen(true);
+  }
+
+  function handleSelect(optionValue: string) {
+    onChange(optionValue);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  const listboxId = `filter-select-${ariaLabel.toLowerCase().replace(/\s+/g, "-")}-listbox`;
+
+  const dropdownStyle: React.CSSProperties = triggerRect
+    ? {
+        position: "fixed",
+        top: `${triggerRect.bottom + 4}px`,
+        left: `${triggerRect.left}px`,
+        width: `${Math.max(triggerRect.width, 160)}px`,
+        maxHeight: "260px",
+        zIndex: 9999,
+        overflowY: "auto"
+      }
+    : { position: "fixed", top: "0", left: "0", width: "0", maxHeight: "260px", zIndex: 9999 };
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={open ? listboxId : undefined}
+        onClick={handleToggle}
+        className={clsx(
+          "flex w-full items-center justify-between rounded-2xl border bg-white py-2.5 pl-3 pr-3 text-left text-sm text-[#111827] outline-none transition",
+          open
+            ? "border-[#1769ff] ring-2 ring-[#1769ff]/10"
+            : "border-[#e2e7f0] hover:border-[#c8d0e0]"
+        )}
+      >
+        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={clsx(
+            "ml-2 h-4 w-4 shrink-0 text-[#667085] transition-transform duration-150",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={listRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={ariaLabel}
+            style={dropdownStyle}
+            className="rounded-2xl border border-[#e2e7f0] bg-white shadow-[0_8px_32px_rgba(20,24,31,0.14)]"
+          >
+            <div className="py-1">
+              {options.map((option) => {
+                const isSelected = option.value === value;
+                return (
+                  <div
+                    key={option.value}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex={0}
+                    onMouseDown={() => handleSelect(option.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleSelect(option.value);
+                      }
+                    }}
+                    className={clsx(
+                      "flex cursor-pointer items-center justify-between px-3.5 py-2 text-sm transition",
+                      isSelected
+                        ? "bg-[#edf4ff] font-semibold text-[#1769ff]"
+                        : "font-medium text-[#111827] hover:bg-[#f4f7ff]"
+                    )}
+                  >
+                    <span>{option.label}</span>
+                    {isSelected ? <Check className="h-3.5 w-3.5 shrink-0 text-[#1769ff]" /> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
 export function DataTable({
   caption,
   columns,

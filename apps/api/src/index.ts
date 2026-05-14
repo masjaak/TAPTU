@@ -590,6 +590,17 @@ function updateLocalEmployeeStructure(employeeId: string, patch: { departmentId?
   return computeEmployeeList(store, [employee])[0];
 }
 
+export function resetLocalOrganizationStructureForTests() {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) return;
+  localDepartments = [];
+  for (const user of users) {
+    user.departmentId = null;
+    user.departmentName = null;
+    user.managerId = null;
+    user.managerName = null;
+  }
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -1873,6 +1884,10 @@ app.get("/api/scanner/token", async (req, res) => {
   return res.json(buildScannerPayload());
 });
 
-app.listen(port, () => {
-  console.log(`Taptu API listening on http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  app.listen(port, () => {
+    console.log(`Taptu API listening on http://localhost:${port}`);
+  });
+}
+
+export { app };
