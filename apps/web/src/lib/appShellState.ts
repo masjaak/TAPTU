@@ -1,6 +1,7 @@
 import type { UserRole } from "@taptu/shared";
 import {
   BarChart3,
+  Building2,
   CalendarDays,
   Clock3,
   History,
@@ -20,6 +21,7 @@ export type NavigationRole = UserRole;
 export type AppSectionKey =
   | "home"
   | "team"
+  | "structure"
   | "attendance"
   | "history"
   | "requests"
@@ -37,6 +39,7 @@ export type AppTabKey = AppSectionKey;
 export type AppShellEvent =
   | { type: "OPEN_HOME" }
   | { type: "OPEN_TEAM" }
+  | { type: "OPEN_STRUCTURE" }
   | { type: "OPEN_ATTENDANCE" }
   | { type: "OPEN_HISTORY" }
   | { type: "OPEN_REQUESTS" }
@@ -60,6 +63,7 @@ export type AppTabDefinition = {
 const sections: Record<AppSectionKey, AppTabDefinition> = {
   home: { key: "home", label: "Beranda", icon: Home, path: "/app", description: "Ringkasan workspace" },
   team: { key: "team", label: "Tim", icon: Users, path: "/app/team", description: "Karyawan dan supervisor" },
+  structure: { key: "structure", label: "Struktur", icon: Building2, path: "/app/structure", description: "Divisi dan penempatan" },
   attendance: { key: "attendance", label: "Presensi", icon: Clock3, path: "/app/attendance", description: "Check-in dan validasi" },
   history: { key: "history", label: "Riwayat", icon: History, path: "/app/history", description: "Histori absensi pribadi" },
   requests: { key: "requests", label: "Pengajuan", icon: TimerReset, path: "/app/requests", description: "Pengajuan dan approval" },
@@ -74,8 +78,8 @@ const sections: Record<AppSectionKey, AppTabDefinition> = {
 };
 
 const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
-  superadmin: ["home", "team", "attendance", "requests", "locations", "reports", "settings", "profile"],
-  admin: ["home", "team", "attendance", "requests", "locations", "reports", "profile"],
+  superadmin: ["home", "team", "structure", "attendance", "requests", "locations", "reports", "settings", "profile"],
+  admin: ["home", "team", "structure", "attendance", "requests", "locations", "reports", "profile"],
   manager: ["home", "team", "attendance", "requests", "exceptions", "profile"],
   employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
@@ -100,6 +104,7 @@ const defaultSection: Record<NavigationRole, AppSectionKey> = {
 const eventMap: Record<AppShellEvent["type"], AppSectionKey> = {
   OPEN_HOME: "home",
   OPEN_TEAM: "team",
+  OPEN_STRUCTURE: "structure",
   OPEN_ATTENDANCE: "attendance",
   OPEN_HISTORY: "history",
   OPEN_REQUESTS: "requests",

@@ -426,6 +426,8 @@ export function AppPage() {
   const [editingDivisi, setEditingDivisi] = useState<DepartmentItem | null>(null);
   const [divisiForm, setDivisiForm] = useState({ name: "", managerId: "" });
   const [divisiFormError, setDivisiFormError] = useState<string | null>(null);
+  const [openDepartmentActionId, setOpenDepartmentActionId] = useState<string | null>(null);
+  const [departmentActionError, setDepartmentActionError] = useState<string | null>(null);
   const [ubahPenempatanEmployee, setUbahPenempatanEmployee] = useState<EmployeeListItem | null>(null);
   const [ubahPenempatanDeptId, setUbahPenempatanDeptId] = useState("");
   const [ubahPenempatanError, setUbahPenempatanError] = useState<string | null>(null);
@@ -604,7 +606,7 @@ export function AppPage() {
         });
     }
 
-    if ((tab === "team" || tab === "exceptions" || (tab === "reports" && isAdmin) || (tab === "attendance" && isManager)) && (isAdmin || isManager) && !employeeListLoaded) {
+    if ((tab === "team" || tab === "structure" || tab === "exceptions" || (tab === "reports" && isAdmin) || (tab === "attendance" && isManager)) && (isAdmin || isManager) && !employeeListLoaded) {
       const loadEmployees = isManager ? fetchManagerEmployeeList : fetchEmployeeList;
       setEmployeeListError(null);
       loadEmployees(session.token)
@@ -618,7 +620,7 @@ export function AppPage() {
         });
     }
 
-    if ((tab === "team" || tab === "reports") && isAdmin && !departmentsLoaded) {
+    if ((tab === "team" || tab === "structure" || tab === "reports") && isAdmin && !departmentsLoaded) {
       setDepartmentsError(null);
       Promise.resolve(fetchDepartments(session.token) ?? [])
         .then((items) => {
@@ -1262,6 +1264,50 @@ export function AppPage() {
       setActionMessage(editingDivisi ? "Divisi berhasil diperbarui." : "Divisi baru berhasil ditambahkan.");
     } catch (error) {
       setDivisiFormError(error instanceof Error ? error.message : "Gagal menyimpan divisi.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function openDepartmentForm(department: DepartmentItem) {
+    setEditingDivisi(department);
+    setDivisiForm({ name: department.name, managerId: department.managerId ?? "" });
+    setDivisiFormError(null);
+    setDepartmentActionError(null);
+    setOpenDepartmentActionId(null);
+    setDivisiFormOpen(true);
+  }
+
+  function handleViewDepartmentMembers(departmentId: string) {
+    setEmployeeDepartmentFilter(departmentId);
+    setDepartmentActionError(null);
+    setOpenDepartmentActionId(null);
+    setTab("team");
+    navigate("/app/team");
+  }
+
+  async function handleDeactivateDepartment(department: DepartmentItem) {
+    setOpenDepartmentActionId(null);
+
+    if ((department.memberCount ?? 0) > 0) {
+      setDepartmentActionError("Divisi ini masih memiliki anggota. Pindahkan anggota terlebih dahulu atau nonaktifkan divisi.");
+      return;
+    }
+
+    setDepartmentActionError(null);
+    setBusyAction(`deactivate-divisi-${department.id}`);
+
+    try {
+      const updated = await updateDepartment(currentSession.token, department.id, { isActive: false });
+      setDepartments((current) => current.map((item) => item.id === department.id ? updated : item));
+      fetchDepartments(currentSession.token)
+        .then((refreshed) => setDepartments(refreshed))
+        .catch((error) => {
+          setDepartmentsError(error instanceof Error ? error.message : "Daftar divisi gagal dimuat ulang.");
+        });
+      setActionMessage("Divisi berhasil dinonaktifkan.");
+    } catch (error) {
+      setDepartmentActionError(error instanceof Error ? error.message : "Gagal menonaktifkan divisi.");
     } finally {
       setBusyAction(null);
     }
@@ -3404,109 +3450,6 @@ export function AppPage() {
           )}
         </Panel>
 
-        {!isManager ? (
-          <div data-testid="divisi-penempatan-section">
-            <Panel
-              eyebrow="Struktur tim"
-              title="Divisi & Penempatan"
-              className="flex flex-col gap-4"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-[#667085]">Kelola divisi, tetapkan manager, dan atur penempatan karyawan.</p>
-                <button
-                  type="button"
-                  disabled={Boolean(departmentUnavailableReason)}
-                  title={departmentUnavailableReason}
-                  onClick={() => {
-                    setEditingDivisi(null);
-                    setDivisiForm({ name: "", managerId: "" });
-                    setDivisiFormError(null);
-                    setDivisiFormOpen(true);
-                  }}
-                  className="shrink-0 rounded-2xl bg-[#1769ff] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1255d4] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  + Tambah divisi
-                </button>
-              </div>
-              {!departmentsLoaded ? (
-                <LoadingState label="Memuat daftar divisi" />
-              ) : departmentsError ? (
-                <ErrorState title="Daftar divisi belum tersedia" description={`${departmentsError} Coba buka ulang halaman Tim.`} />
-              ) : departments.length === 0 ? (
-                <EmptyState
-                  title="Belum ada divisi"
-                  description="Tambahkan divisi agar HR dapat mengelompokkan karyawan dan menetapkan manager."
-                />
-              ) : (
-                <div className="overflow-hidden rounded-[20px] border border-[#edf0f5] sm:rounded-[24px]">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[600px] divide-y divide-[#edf0f5] bg-white sm:min-w-full">
-                      <caption className="sr-only">Daftar divisi organisasi</caption>
-                      <thead className="bg-[#f9fafc]">
-                        <tr>
-                          {(["Divisi", "Manager", "Jumlah anggota", "Status", "Aksi"] as const).map((header) => (
-                            <th key={header} scope="col" className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#667085]">{header}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#edf0f5]">
-                        {departments.map((div) => (
-                          <tr key={div.id} data-testid={`divisi-row-${div.id}`}>
-                            <td className="max-w-[200px] break-words px-4 py-3.5 text-sm font-semibold text-[#111827]">{div.name}</td>
-                            <td className="px-4 py-3.5 text-sm text-[#596172]">
-                              {div.managerName ?? <span className="text-[#9aa3b2]">Belum ditetapkan</span>}
-                            </td>
-                            <td className="px-4 py-3.5 text-sm text-[#111827]">{div.memberCount ?? 0} anggota</td>
-                            <td className="px-4 py-3.5 text-sm">
-                              <StatusBadge tone={div.isActive ? "success" : "neutral"}>{div.isActive ? "Aktif" : "Nonaktif"}</StatusBadge>
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setEmployeeDepartmentFilter(div.id)}
-                                  className="rounded-lg border border-[#1769ff] px-2.5 py-1 text-xs font-semibold text-[#1769ff] transition hover:bg-[#f0f5ff]"
-                                >
-                                  Lihat anggota
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label="Edit divisi"
-                                  onClick={() => {
-                                    setEditingDivisi(div);
-                                    setDivisiForm({ name: div.name, managerId: div.managerId ?? "" });
-                                    setDivisiFormError(null);
-                                    setDivisiFormOpen(true);
-                                  }}
-                                  className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff]"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingDivisi(div);
-                                    setDivisiForm({ name: div.name, managerId: div.managerId ?? "" });
-                                    setDivisiFormError(null);
-                                    setDivisiFormOpen(true);
-                                  }}
-                                  className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff]"
-                                >
-                                  Atur manager
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </Panel>
-          </div>
-        ) : null}
-
         {isManager ? null : (
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <Panel eyebrow="Antrian pengecualian" title="Attendance exceptions yang perlu keputusan">
@@ -3573,6 +3516,126 @@ export function AppPage() {
           </Panel>
         </section>
         )}
+      </div>
+    );
+  }
+
+  function renderStructureWorkspace() {
+    return (
+      <div className="grid gap-5">
+        <PageHeader
+          eyebrow="STRUKTUR TIM"
+          title="Divisi & Penempatan"
+          description="Kelola divisi, tetapkan manager, dan atur penempatan karyawan."
+        />
+
+        <div data-testid="divisi-penempatan-section">
+          <Panel title="Divisi & Penempatan" className="flex flex-col gap-4">
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                disabled={Boolean(departmentUnavailableReason)}
+                title={departmentUnavailableReason}
+                onClick={() => {
+                  setEditingDivisi(null);
+                  setDivisiForm({ name: "", managerId: "" });
+                  setDivisiFormError(null);
+                  setDepartmentActionError(null);
+                  setDivisiFormOpen(true);
+                }}
+                className="shrink-0 rounded-2xl bg-[#1769ff] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1255d4] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Tambah divisi
+              </button>
+            </div>
+            {departmentActionError ? <ErrorState title="Aksi divisi belum bisa dilanjutkan" description={departmentActionError} /> : null}
+            {!departmentsLoaded ? (
+              <LoadingState label="Memuat daftar divisi" />
+            ) : departmentsError ? (
+              <ErrorState title="Daftar divisi belum tersedia" description={`${departmentsError} Coba buka ulang halaman Struktur.`} />
+            ) : departments.length === 0 ? (
+              <EmptyState
+                title="Belum ada divisi"
+                description="Tambahkan divisi agar HR dapat mengelompokkan karyawan dan menetapkan manager."
+              />
+            ) : (
+              <div className="overflow-hidden rounded-[20px] border border-[#edf0f5] sm:rounded-[24px]">
+                <div className="overflow-x-auto">
+                  <table className="min-w-[600px] divide-y divide-[#edf0f5] bg-white sm:min-w-full">
+                    <caption className="sr-only">Daftar divisi organisasi</caption>
+                    <thead className="bg-[#f9fafc]">
+                      <tr>
+                        {(["Divisi", "Manager", "Jumlah anggota", "Status", "Aksi"] as const).map((header) => (
+                          <th key={header} scope="col" className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#667085]">{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#edf0f5]">
+                      {departments.map((div) => {
+                        const menuOpen = openDepartmentActionId === div.id;
+                        const isDeactivating = busyAction === `deactivate-divisi-${div.id}`;
+                        return (
+                          <tr key={div.id} data-testid={`divisi-row-${div.id}`}>
+                            <td className="max-w-[200px] break-words px-4 py-3.5 text-sm font-semibold text-[#111827]">{div.name}</td>
+                            <td className="px-4 py-3.5 text-sm text-[#596172]">
+                              {div.managerName ?? <span className="text-[#9aa3b2]">Belum ditetapkan</span>}
+                            </td>
+                            <td className="px-4 py-3.5 text-sm text-[#111827]">{div.memberCount ?? 0} anggota</td>
+                            <td className="px-4 py-3.5 text-sm">
+                              <StatusBadge tone={div.isActive ? "success" : "neutral"}>{div.isActive ? "Aktif" : "Nonaktif"}</StatusBadge>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="relative inline-block text-left">
+                                <button
+                                  type="button"
+                                  aria-haspopup="menu"
+                                  aria-expanded={menuOpen}
+                                  onClick={() => {
+                                    setDepartmentActionError(null);
+                                    setOpenDepartmentActionId(menuOpen ? null : div.id);
+                                  }}
+                                  className="rounded-lg border border-[#d8dde7] bg-white px-2.5 py-1 text-xs font-semibold text-[#111827] transition hover:border-[#1769ff] hover:text-[#1769ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+                                >
+                                  Aksi {div.name}
+                                </button>
+                                {menuOpen ? (
+                                  <div
+                                    role="menu"
+                                    aria-label={`Aksi ${div.name}`}
+                                    className="absolute right-0 z-20 mt-1 max-h-64 w-44 overflow-y-auto rounded-2xl border border-[#e2e7f0] bg-white p-1 shadow-[0_12px_32px_rgba(20,24,31,0.14)]"
+                                  >
+                                    <button type="button" role="menuitem" onMouseDown={() => handleViewDepartmentMembers(div.id)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff]">
+                                      Lihat anggota
+                                    </button>
+                                    <button type="button" role="menuitem" onMouseDown={() => openDepartmentForm(div)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff]">
+                                      Edit divisi
+                                    </button>
+                                    <button type="button" role="menuitem" onMouseDown={() => openDepartmentForm(div)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff]">
+                                      Atur manager
+                                    </button>
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      disabled={isDeactivating || !div.isActive}
+                                      onMouseDown={() => handleDeactivateDepartment(div)}
+                                      className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#a54c2f] hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      {isDeactivating ? "Menonaktifkan..." : "Nonaktifkan divisi"}
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </Panel>
+        </div>
       </div>
     );
   }
@@ -4040,6 +4103,10 @@ export function AppPage() {
 
     if (tab === "team") {
       return renderTeamWorkspace();
+    }
+
+    if (tab === "structure" && isAdmin) {
+      return renderStructureWorkspace();
     }
 
     if (tab === "exceptions" && isManager) {

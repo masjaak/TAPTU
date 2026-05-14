@@ -36,12 +36,14 @@ describe("app shell state", () => {
     expect(getNavigationForRole("admin").map((item) => item.key)).toEqual([
       "home",
       "team",
+      "structure",
       "attendance",
       "requests",
       "locations",
       "reports",
       "profile"
     ]);
+    expect(getNavigationForRole("admin").map((item) => item.label)).toContain("Struktur");
   });
 
   it("defines manager navigation without scanner or system settings", () => {
@@ -53,6 +55,10 @@ describe("app shell state", () => {
       "exceptions",
       "profile"
     ]);
+    expect(getNavigationForRole("manager").map((item) => item.key)).not.toContain("structure");
+    expect(getNavigationForRole("employee").map((item) => item.key)).not.toContain("structure");
+    expect(toAppSection("structure", "manager")).toBe("home");
+    expect(toAppSection("structure", "employee")).toBe("home");
   });
 
   it("applies manager-specific labels for team and attendance sections", () => {
