@@ -22,6 +22,7 @@ const apiMocks = vi.hoisted(() => ({
   fetchAuditLogs: vi.fn(),
   fetchExceptionQueue: vi.fn(),
   fetchManagerExceptionQueue: vi.fn(),
+  fetchScannerState: vi.fn(),
   refreshScannerToken: vi.fn(),
   checkIn: vi.fn(),
   checkOut: vi.fn(),
@@ -99,6 +100,13 @@ describe("AppPage", () => {
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
     apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+    apiMocks.fetchScannerState.mockResolvedValue({
+      token: "HDR-31A-7XZ",
+      expiresInSeconds: 30,
+      scansToday: 124,
+      locationName: "Gerbang Utama",
+      recentScans: []
+    });
     apiMocks.refreshScannerToken.mockResolvedValue({
       token: "HDR-31A-7XZ",
       expiresInSeconds: 30,
@@ -815,6 +823,67 @@ describe("AppPage", () => {
     );
   });
 
+  it("shows check-in save errors without refreshing history or showing fake success", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+    apiMocks.checkIn.mockRejectedValue(new Error("Database gagal menyimpan check-in."));
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /scan qr/i }));
+    fireEvent.click(screen.getByRole("button", { name: /konfirmasi check-in/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /submit check-in/i }));
+
+    expect(await screen.findByText("Database gagal menyimpan check-in.")).toBeTruthy();
+    expect(screen.queryByText(/check-in berhasil/i)).toBeNull();
+    expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(1);
+    expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(1);
+  });
+
   it("checks out an active attendance record and leaves the active state", async () => {
     localStorage.setItem(
       "taptu-session",
@@ -902,6 +971,70 @@ describe("AppPage", () => {
     expect(screen.queryByRole("button", { name: /check-out sekarang/i })).toBeNull();
     await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows check-out save errors without refreshing history or showing fake success", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [{ id: "today-active", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }],
+      attendanceState: "checked_in",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "checked_in",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-real-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        checkInTime: "2026-05-11T01:03:00.000Z",
+        status: "Tepat waktu",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-11T01:03:00.000Z",
+        updatedAt: "2026-05-11T01:03:00.000Z"
+      }
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([
+      { id: "today-active", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "Selfie" }
+    ]);
+    apiMocks.checkOut.mockRejectedValue(new Error("Database gagal menyimpan check-out."));
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /check-out sekarang/i }));
+
+    expect(await screen.findByText("Database gagal menyimpan check-out.")).toBeTruthy();
+    expect(screen.queryByText(/check-out berhasil/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /check-out sekarang/i })).toBeTruthy();
+    expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(1);
+    expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(1);
   });
 
   it("keeps employee check-in clickable and explains when validation is not ready", async () => {
@@ -1451,6 +1584,104 @@ describe("HR/Admin dashboard Indonesian labels", () => {
     expect(apiMocks.fetchManagerEmployeeList).not.toHaveBeenCalled();
   });
 
+  it("employee direct URL to HR reports falls back to employee workspace", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: {
+          id: "usr-employee-01",
+          fullName: "Fikri Maulana",
+          email: "employee@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "employee"
+        }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 22,
+      onTimeDays: 20,
+      lateDays: 2,
+      pendingRequests: 1,
+      currentAttendanceState: "idle",
+      assignedShift: {
+        id: "shift-pagi",
+        name: "Shift Pagi",
+        startTime: "08:00",
+        endTime: "17:00",
+        locationName: "Kantor Pusat"
+      },
+      todayRecord: {
+        id: "att-demo-01",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified",
+        validationReasons: [],
+        createdAt: "2026-05-02T08:03:00.000Z",
+        updatedAt: "2026-05-02T08:03:00.000Z"
+      }
+    });
+
+    renderRoute("/app/reports");
+
+    expect(await screen.findByText("Status hari ini")).toBeTruthy();
+    expect(screen.queryByText("Filter laporan kehadiran")).toBeNull();
+    expect(apiMocks.fetchReportRows).not.toHaveBeenCalled();
+    expect(apiMocks.fetchManagerEmployeeList).not.toHaveBeenCalled();
+  });
+
+  it("HR direct URL can access reports workspace", async () => {
+    setupAdminSession();
+
+    renderRoute("/app/reports");
+
+    expect(await screen.findByText("Filter laporan kehadiran")).toBeTruthy();
+    expect(screen.getByText("Rekap kehadiran validasi")).toBeTruthy();
+    expect(apiMocks.fetchReportRows).toHaveBeenCalledWith("demo:admin");
+  });
+
+  it("scanner direct URL to team falls back to scanner mode only", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:scanner",
+        user: {
+          id: "usr-scanner-01",
+          fullName: "Front Gate Scanner",
+          email: "scanner@taptu.app",
+          organizationName: "TAPTU HQ",
+          role: "scanner"
+        }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Front Gate Scanner",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: [],
+      scannerToken: "HDR-31A-7XZ"
+    });
+
+    renderRoute("/app/team");
+
+    expect(await screen.findByText("Gate kiosk aktif")).toBeTruthy();
+    expect(screen.queryByText("Kelola karyawan")).toBeNull();
+    expect(screen.queryByText("Status hari ini")).toBeNull();
+    expect(apiMocks.fetchScannerState).toHaveBeenCalledWith("demo:scanner");
+    expect(apiMocks.fetchEmployeeList).not.toHaveBeenCalled();
+  });
+
   it("team workspace exception action buttons use Indonesian labels", async () => {
     setupAdminSession();
     apiMocks.fetchExceptionQueue.mockResolvedValue([
@@ -1947,6 +2178,17 @@ describe("Manager dashboard", () => {
     expect(screen.queryByRole("button", { name: /^scanner$/i })).toBeNull();
   });
 
+  it("manager direct URL to HR reports falls back to manager workspace", async () => {
+    setupManagerSession();
+
+    renderRoute("/app/reports");
+
+    expect(await screen.findByText("Aktivitas tim hari ini")).toBeTruthy();
+    expect(screen.queryByText("Filter laporan kehadiran")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^laporan$/i })).toBeNull();
+    expect(apiMocks.fetchReportRows).not.toHaveBeenCalled();
+  });
+
   it("manager Tim page shows Tim Saya eyebrow not Daftar Karyawan", async () => {
     setupManagerSession();
     renderRoute("/app/team");
@@ -1976,6 +2218,27 @@ describe("Manager dashboard", () => {
 
     expect((await screen.findAllByText(/presensi tim/i)).length).toBeGreaterThan(0);
     expect((await screen.findAllByText(/^hadir$/i)).length).toBeGreaterThan(0);
+  });
+
+  it("manager Presensi Tim shows only manager-scoped team attendance", async () => {
+    setupManagerSession();
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-outside-01", fullName: "Outside Org Employee", email: "outside@taptu.app", role: "employee", departmentName: "Finance", todayStatus: "present", checkInTime: "08:01", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    apiMocks.fetchReportRows.mockResolvedValue([
+      { id: "org-att-01", employeeName: "Outside Org Employee", employeeId: "usr-outside-01", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:01:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+    ]);
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+
+    renderRoute("/app/attendance");
+
+    expect(await screen.findByText("Fikri Maulana")).toBeTruthy();
+    expect(screen.queryByText("Outside Org Employee")).toBeNull();
+    expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledWith("demo:manager");
+    expect(apiMocks.fetchEmployeeList).not.toHaveBeenCalled();
+    expect(apiMocks.fetchReportRows).not.toHaveBeenCalled();
   });
 
   it("manager Presensi Tim page shows empty attendance state when team is empty", async () => {
@@ -2086,6 +2349,50 @@ describe("Manager dashboard", () => {
     expect(screen.getByText("Menunggu HR")).toBeTruthy();
     expect(screen.getByText("Dibatalkan")).toBeTruthy();
     expect(screen.getByText("Menunggu HR Payroll")).toBeTruthy();
+  });
+
+  it("manager Pengajuan only shows approval actions for requests waiting on Manager", async () => {
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+      })
+    );
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Raka Saputra",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchManagerRequests.mockResolvedValue([
+      { id: "req-manager", title: "Izin menunggu Manager", status: "Menunggu", detail: "Belum direview manager.", workflowStatus: "pending_manager" },
+      { id: "req-hr", title: "Izin menunggu HR", status: "Menunggu", detail: "Sudah masuk antrean HR.", workflowStatus: "pending_hr" },
+      { id: "req-approved", title: "Izin sudah disetujui", status: "Disetujui", detail: "Selesai.", workflowStatus: "approved" }
+    ]);
+    apiMocks.fetchManagerOverview.mockResolvedValue({
+      totalEmployees: 15, checkedInToday: 12, onTimeToday: 10, lateToday: 2,
+      pendingRequests: 3, absentToday: 1, exceptionCount: 0, recentActivity: []
+    });
+    renderRoute("/app/requests");
+
+    const pendingManagerCard = (await screen.findByText("Izin menunggu Manager")).closest("article");
+    const pendingHrCard = screen.getByText("Izin menunggu HR").closest("article");
+    const approvedCard = screen.getByText("Izin sudah disetujui").closest("article");
+
+    expect(within(pendingManagerCard!).getByText("Menunggu Manager")).toBeTruthy();
+    expect(within(pendingManagerCard!).getByRole("button", { name: /setujui/i })).toBeTruthy();
+    expect(within(pendingManagerCard!).getByRole("button", { name: /tolak/i })).toBeTruthy();
+
+    expect(within(pendingHrCard!).getByText("Menunggu HR")).toBeTruthy();
+    expect(within(pendingHrCard!).queryByRole("button", { name: /setujui/i })).toBeNull();
+    expect(within(pendingHrCard!).queryByRole("button", { name: /tolak/i })).toBeNull();
+
+    expect(within(approvedCard!).getByText("Disetujui")).toBeTruthy();
+    expect(within(approvedCard!).queryByRole("button", { name: /setujui/i })).toBeNull();
+    expect(within(approvedCard!).queryByRole("button", { name: /tolak/i })).toBeNull();
   });
 
   it("manager Pengajuan shows safe empty state when manager scoped requests are empty", async () => {
@@ -2622,6 +2929,27 @@ describe("HR Divisi & Penempatan", () => {
     expect(screen.getByText("IT")).toBeTruthy();
   });
 
+  it("created division is available in the HR Tim division filter after save", async () => {
+    setupAdminWithDepartments();
+    apiMocks.createDepartment.mockResolvedValue({ id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 });
+    apiMocks.fetchDepartments
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB])
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB, { id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 }]);
+
+    renderRoute("/app/structure");
+    await screen.findByTestId("divisi-penempatan-section");
+
+    fireEvent.click(screen.getByRole("button", { name: /tambah divisi/i }));
+    fireEvent.change(screen.getByLabelText(/nama divisi/i), { target: { value: "IT" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    await screen.findByTestId("divisi-row-dep-it");
+    fireEvent.click(screen.getByRole("button", { name: "Tim" }));
+    fireEvent.click(await screen.findByRole("combobox", { name: "Divisi / Departemen" }));
+
+    expect(screen.getByRole("option", { name: "IT" })).toBeTruthy();
+  });
+
   it("create division failure shows error and keeps the modal open", async () => {
     setupAdminWithDepartments();
     apiMocks.createDepartment.mockRejectedValue(new Error("Backend divisi gagal menyimpan."));
@@ -2679,6 +3007,25 @@ describe("HR Divisi & Penempatan", () => {
     });
   });
 
+  it("Edit divisi failure keeps the modal open and does not update visible name", async () => {
+    setupAdminWithDepartments();
+    apiMocks.updateDepartment.mockRejectedValue(new Error("Backend divisi gagal update."));
+
+    renderRoute("/app/structure");
+    const opsRow = await screen.findByTestId("divisi-row-dep-ops");
+    fireEvent.click(within(opsRow).getByRole("button", { name: /aksi operations/i }));
+    fireEvent.mouseDown(screen.getByRole("menuitem", { name: /edit divisi/i }));
+
+    const nameInput = screen.getByLabelText(/nama divisi/i);
+    fireEvent.change(nameInput, { target: { value: "Operasional" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    expect((await screen.findAllByText("Backend divisi gagal update.")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(within(screen.getByTestId("divisi-row-dep-ops")).getByText("Operations")).toBeTruthy();
+    expect(screen.queryByText("Divisi berhasil diperbarui.")).toBeNull();
+  });
+
   it("Atur manager button opens edit form and saves manager assignment", async () => {
     setupAdminWithDepartments();
     apiMocks.updateDepartment.mockResolvedValue({ ...DEPT_FNB, managerId: "mgr-1", managerName: "Raka Saputra" });
@@ -2704,6 +3051,7 @@ describe("HR Divisi & Penempatan", () => {
         "dep-fnb",
         expect.objectContaining({ managerId: "mgr-1" })
       );
+      expect(within(screen.getByTestId("divisi-row-dep-fnb")).getByText("Raka Saputra")).toBeTruthy();
     });
   });
 

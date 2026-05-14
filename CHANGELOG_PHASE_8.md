@@ -1,5 +1,81 @@
 # Taptu Phase 8 Changelog
 
+## Phase 8 Final Stabilization – QA Closure
+
+### Manager Dashboard completed and scoped
+
+- Manager Dashboard is considered complete for Phase 8: Beranda, Tim Saya, Presensi Tim, Pengajuan, Pengecualian, and Profil are all role-specific.
+- Manager data paths use manager-scoped APIs: `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, and `fetchManagerRequests`.
+- Manager direct route access is guarded through `roleNavigation`/`toAppSection`; Laporan, Lokasi, Scanner, Struktur, and Settings fall back safely.
+- Manager Presensi Tim is covered by targeted QA to ensure it renders `fetchManagerEmployeeList` data only, not HR/global report rows.
+
+### HR Dashboard and HR Struktur hardening
+
+- HR Dashboard remains the org-wide operational workspace.
+- HR/Admin navigation is locked to: Beranda, Tim, Struktur, Presensi, Pengajuan, Lokasi, Laporan, Profil.
+- HR direct route access to reports remains valid and covered by targeted route QA.
+- HR Struktur/Divisi & Penempatan is added and connected through department APIs.
+
+### Department/division placement status
+
+- `GET /api/departments` / `fetchDepartments` supplies the HR Divisi panel.
+- `POST /api/departments` / `createDepartment` supports Tambah divisi.
+- `PATCH /api/departments/:id` / `updateDepartment` supports Edit divisi and Atur manager.
+- `PATCH /api/employees/:id` / `reassignEmployeeDepartment` supports Ubah divisi for employees.
+- Failure paths are covered for create/edit style flows so UI does not show fake success when backend writes fail.
+- Full HRIS employee profile management remains out of scope.
+
+### Approval two-step flow
+
+- Employee request creation creates manager + HR approval steps when employee has `manager_id`.
+- Employees without `manager_id` go directly to HR approval.
+- Manager approval advances the request to `pending_hr` / "Menunggu HR"; it does not final-approve.
+- HR approval finalizes as `approved` / "Disetujui".
+- Manager or HR rejection finalizes as `rejected` / "Ditolak"; reviewer note remains visible to employee in Riwayat Pengajuan.
+- Invalid transitions are covered: HR cannot approve a request still waiting for Manager, and Manager cannot final-approve an HR-stage request.
+
+### Attendance QA status
+
+- Employee check-in creates an `attendance_records` row.
+- Check-in success refreshes Employee Riwayat.
+- After check-in, Employee can check-out.
+- Check-out updates the same active attendance record by id, instead of creating a duplicate.
+- HR Presensi uses org-wide report rows.
+- Manager Presensi Tim uses only manager-scoped team attendance.
+- Employee attendance history is filtered by the current employee id.
+- Failed check-in/check-out saves show errors and do not show fake success or refresh history as if persistence succeeded.
+
+### Role access guard QA status
+
+- Employee direct URLs to HR/Manager/Superadmin sections fall back to employee home.
+- Manager direct URLs to HR Laporan, Lokasi, Scanner, Struktur, and Settings fall back to manager home.
+- HR can access Tim, Struktur, Presensi, Pengajuan, Lokasi, Laporan, and Profil.
+- Superadmin access remains valid according to current role system: includes Settings in navigation, but Scanner remains excluded.
+- Scanner can access Scanner and Profil only; direct URLs to other sections fall back to Scanner mode.
+
+### Tests run
+
+- `npm run test --workspace @taptu/api -- supabaseQueries.test.ts` — 21 tests passing.
+- `npm run test --workspace @taptu/web -- appPage.test.tsx` — 103 tests passing.
+- `npm run test --workspace @taptu/web -- appShellState.test.ts` — 12 tests passing.
+- Per instruction, no build was run for this documentation update.
+
+### Remaining limitations
+
+- Selfie upload/storage remains unfinished; `selfie_url` may remain nullable.
+- Approval timeline/step-history UI is not built; cards show the current workflow label and notes only.
+- Superadmin Settings is present in navigation, but no dedicated settings workspace is completed.
+- Shift assignment workflow remains incomplete in post-login UI/API.
+- Employee Jadwal and Slip Gaji remain lightweight placeholders backed by limited data.
+- Some operational paths still use local/demo-store style persistence instead of fully normalized Supabase flows.
+- Production-like manual QA is still recommended for seeded manager/team data and very narrow mobile screens with long names/notes.
+
+### Next safe phase
+
+- Next safe phase: **Phase 9 operational hardening**.
+- Recommended starting scope: manual QA with seeded manager/team data, approval timeline panel, reporting hardening, Supabase persistence gaps, shift assignment, selfie storage finalization, and dense mobile QA.
+- Continue avoiding payroll, notifications, chat/comments, analytics, reimbursement, and broad HRIS expansion until the stabilized MVP paths are hardened.
+
 ## Phase 8.1 – Manager-Scoped Data Foundation (Codex)
 
 - Added `fetchManagerOverview` — returns team-only stat summary (checkedInToday, lateToday, absentToday, pendingRequests, exceptionCount, recentActivity).

@@ -4,7 +4,7 @@
 
 Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
 
-The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 8.3. Phase 8 completed manager-scoped data wiring and Manager Dashboard UX polish (dedicated Pengecualian page, nav expanded to 6 items, all pages rebuilt with PageHeader and manager-specific copy). Known limitations remain around persistence hardening, manager department-scoping, approval timeline UI, shift assignment, selfie storage finalization, payslip data, and very narrow mobile QA with production-like data.
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 8 final stabilization. Phase 8 completed manager-scoped data wiring, Manager Dashboard UX polish, HR Dashboard hardening, HR Struktur/Divisi & Penempatan, two-step approval QA, attendance persistence QA, and role access guard QA. Known limitations remain around production-seeded manual QA, approval timeline UI, shift assignment, selfie storage finalization, payslip data, some Supabase persistence gaps, and very narrow mobile QA with production-like data.
 
 ## B. Fixed product decisions
 
@@ -14,7 +14,7 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Full payroll processing is out of MVP scope.
 - Payroll-ready CSV/reporting output is part of MVP.
 - Selfie capture/preview exists, but finalized storage/upload is still unfinished; `selfie_url` may remain nullable for now.
-- Department-level manager segmentation is not completed in MVP. Current manager access is broader than ideal and should be treated as a future improvement.
+- Manager team, attendance, exceptions, and request access is scoped through current `manager_id` endpoints and route guards. Production QA with seeded manager/team data is still recommended.
 - Scanner tokens are Scanner/Kiosk-only. Employee accounts should not manage or manually enter scanner tokens.
 - Slip Gaji is lightweight/read-only until a real payslip data source exists.
 
@@ -40,19 +40,21 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Phase 7.5: manager dashboard UI — scoped nav, Beranda/Tim Saya/Presensi Tim/Pengajuan/Profil pages, step-aware status labels, manager approval message, demo stub corrected.
 - Phase 8.1: manager-scoped data APIs — `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
 - Phase 8.3: Manager Dashboard UX polish — nav expanded to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, rebuilt Beranda with team status panels, manager-specific Tim Saya and Presensi Tim, dedicated team approval queue in Pengajuan, manager permission summary in Profil. 141 tests passing.
+- Phase 8.4-8.6: HR Struktur/Divisi & Penempatan added and connected to department/employee assignment APIs; HR Tim filter controls replaced with custom `FilterSelect` controls. 169 tests passing at Phase 8.6.
+- Phase 8 final stabilization: targeted QA for approval two-step flow, employee attendance check-in/check-out persistence, HR/Manager attendance visibility, and role access guards. Latest targeted runs: `supabaseQueries.test.ts` 21 passing, `appPage.test.tsx` 103 passing, `appShellState.test.ts` 12 passing.
 
 ## D. Routes/pages
 
 Main post-login pages currently surfaced through the app shell:
 
 - Admin dashboard: summary stats, recent activity, quick actions.
-- Manager dashboard: Beranda (team stats, date context, pending approvals panel, exceptions panel), Tim Saya (team roster, manager-specific columns), Presensi Tim (per-member attendance grid), Pengajuan (team approval queue primary, self-request secondary), Pengecualian (team exception queue with Indonesian type labels and actions), Profil (identity + active/inactive permission summary).
+- Manager dashboard: Beranda (team stats, date context, pending approvals panel, exceptions panel), Tim Saya (manager-scoped team roster), Presensi Tim (manager-scoped per-member attendance grid), Pengajuan (team approval queue primary, self-request secondary), Pengecualian (team exception queue with Indonesian type labels and actions), Profil (identity + active/inactive permission summary).
 - Employee attendance page: simplified check-in/check-out, current validation state, and attendance history.
 - Employee Pengajuan tab: request submit/list/detail/cancel flow using the existing approval request model.
 - Employee Jadwal tab: lightweight assigned-shift/upcoming schedule view from currently available summary/dashboard data.
 - Employee Slip Gaji tab: lightweight read-only placeholder that points to payroll-ready reporting while full payroll remains out of scope.
 - Scanner mode: token display, countdown, status, refresh, recent scan history.
-- Team list: employee roster and validation status.
+- HR Tim/Struktur: employee roster, validation status, and connected Divisi & Penempatan actions for create/edit division, assign manager, and reassign employee division.
 - Exception review queue: approve, reject, request correction.
 - Approval flow: request create/view/cancel and reviewer approve/reject actions.
 - Shift management: create/edit shifts, tolerance, optional break windows, linked location.
@@ -65,19 +67,21 @@ Main post-login pages currently surfaced through the app shell:
 ## E. Roles and access
 
 - Admin/HR:
-  full MVP operations surface including dashboard, team, attendance, requests, locations, reports, and profile.
+  full MVP operations surface including dashboard, team, structure, attendance, requests, locations, reports, and profile.
 - Manager:
-  limited operational approver. Nav: home, team, attendance, requests, profile only. Reports, scanner, and locations are not accessible.
+  limited operational approver. Nav: Beranda, Tim Saya, Presensi Tim, Pengajuan, Pengecualian, Profil. Laporan, Lokasi, Scanner, Struktur, and Settings are not accessible.
 - Employee:
   Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, and Profil.
 - Scanner/Kiosk:
   scanner workspace and profile only.
+- Superadmin:
+  current elevated navigation includes Settings, but Scanner remains excluded and the dedicated Settings workspace is not complete.
 
 Manager scoping behavior:
 
-- Nav enforced via `roleNavigation["manager"]` in `appShellState.ts`; `toAppSection` guard rejects unlisted sections.
+- Nav enforced via `roleNavigation` in `appShellState.ts`; `toAppSection` guard rejects unlisted sections and falls back to the role default.
 - Manager approval is step 1 only: Setujui advances request to `pending_hr`, not to `approved`. Action message: "Pengajuan diteruskan ke HR untuk keputusan final."
-- Current limitation: team roster and attendance data are not department-segmented — manager sees org-wide data bounded by approval step ownership only.
+- Manager data uses manager-scoped endpoints. Direct route QA verifies manager cannot render HR reports, locations, scanner, structure, or settings workspaces.
 
 Known role/access limitation:
 
@@ -153,7 +157,7 @@ Behavior:
 - Work location/geofence management:
   admin can create/edit lat/lng/radius work locations.
 - Reports:
-  admin/manager can filter attendance data, inspect validation flags, and open audit trail.
+  admin can filter attendance data, inspect validation flags, and open audit trail; manager sees scoped Presensi Tim rather than HR reports.
 - Payroll-ready CSV export:
   report rows can be exported for downstream payroll preparation, but full payroll processing is intentionally out of scope.
 - Employee Slip Gaji:
@@ -219,12 +223,12 @@ Concise manual checklist:
 - Real device fingerprinting is out of MVP scope.
 - Face recognition is out of MVP scope.
 - Full payroll processing is out of MVP scope.
-- Manager department-segmentation is not completed; team/attendance data is org-wide bounded by approval step ownership only.
+- Manager endpoints are scoped by `manager_id`; production-seeded QA is still recommended for real manager/team data.
 - Approval UI timeline/step-history panel is not built; only the current status label is shown per request card.
 - Shift assignment workflow is not completed in post-login UI/API.
 - Employee Jadwal is lightweight and depends on limited schedule data.
 - Employee Slip Gaji is lightweight/read-only and has no real payslip source yet.
-- Reimbursement/klaim, secure documents, organization structure, advanced notifications, full HRIS profile management, face recognition, advanced anti-spoofing, and real device fingerprinting are not built.
+- Reimbursement/klaim, secure documents, advanced notifications, full HRIS profile management, face recognition, advanced anti-spoofing, and real device fingerprinting are not built.
 - Very narrow mobile layouts should still be manually checked with production-length employee names, notes, and dense report rows.
 - Some phase 4/5 operational endpoints still rely on local/demo-store style paths rather than fully normalized Supabase relational persistence.
 - Profile workspace is lightweight and not a full account/settings system.
@@ -233,7 +237,7 @@ Concise manual checklist:
 
 - Reimbursement/klaim.
 - Secure file sharing/dokumen.
-- Organization structure.
+- Deeper organization structure and HRIS profile management beyond current Divisi & Penempatan.
 - Advanced notifications.
 - Full payroll processing.
 - Full HRIS employee profile management.
@@ -247,10 +251,11 @@ Recommended next step: the next phase should focus on operational hardening, not
 
 Priority order:
 
-1. Finish Supabase-backed persistence for phase 4/5/6 data flows.
-2. Implement shift assignment workflow end to end.
-3. Finalize selfie storage/upload and retention behavior.
-4. Add department/team-scoped manager access.
-5. Replace the lightweight Slip Gaji placeholder only after a real payslip source exists.
+1. Run manual QA with seeded manager/team data.
+2. Add approval step timeline panel and reporting hardening.
+3. Finish Supabase-backed persistence gaps for older operational data flows.
+4. Implement shift assignment workflow end to end.
+5. Finalize selfie storage/upload and retention behavior.
+6. Replace the lightweight Slip Gaji placeholder only after a real payslip source exists.
 
 This sequence closes the largest trust and handoff gaps while preserving the current MVP product shape.

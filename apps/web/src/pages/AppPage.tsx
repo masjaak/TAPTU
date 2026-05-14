@@ -2605,6 +2605,7 @@ export function AppPage() {
                   : ws === "approved" || item.status === "Disetujui" ? "success"
                   : ws === "approved_by_manager" ? "info"
                   : "warning";
+                const canApproveRequest = Boolean(item.id) && canShowApprovalActionsForRequest(currentSession.user.role, ws);
                 return (
                   <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_2px_12px_rgba(20,24,31,0.05)]">
                     <div className="flex flex-col gap-2">
@@ -2633,7 +2634,7 @@ export function AppPage() {
                         </div>
                       ) : null}
                     </div>
-                    {item.id ? (
+                    {canApproveRequest ? (
                       <div className="mt-4">
                         <FormInput
                           label="Catatan keputusan"
@@ -2654,7 +2655,7 @@ export function AppPage() {
                     ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
                       <SecondaryButton onClick={() => item.id && openRequestDetail(item.id)}>Detail</SecondaryButton>
-                      {item.id ? (
+                      {canApproveRequest ? (
                         <>
                           <PrimaryButton onClick={() => handleApproval(item.id!, "Disetujui")} disabled={busyAction === `Disetujui-${item.id}`}>
                             Setujui
