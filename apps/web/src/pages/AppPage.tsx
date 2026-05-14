@@ -618,11 +618,11 @@ export function AppPage() {
         });
     }
 
-    if (tab === "team" && isAdmin && !departmentsLoaded) {
+    if ((tab === "team" || tab === "reports") && isAdmin && !departmentsLoaded) {
       setDepartmentsError(null);
-      fetchDepartments(session.token)
+      Promise.resolve(fetchDepartments(session.token) ?? [])
         .then((items) => {
-          setDepartments(items);
+          setDepartments(items ?? []);
           setDepartmentsLoaded(true);
         })
         .catch((error) => {
@@ -676,7 +676,7 @@ export function AppPage() {
           setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
         });
     }
-  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
+  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, departmentsLoaded, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -698,13 +698,23 @@ export function AppPage() {
   }, [scannerMeta, tab]);
 
   const departmentOptions = useMemo(() => {
-    const unique = new Map<string, string>();
-    employeeList.forEach((employee) => {
-      if (employee.departmentId && employee.departmentName) {
-        unique.set(employee.departmentId, employee.departmentName);
-      }
-    });
-    return Array.from(unique, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    return departments
+      .filter((department) => department.isActive !== false)
+      .map((department) => ({ id: department.id, name: department.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [departments]);
+
+  const departmentUnavailableReason = departmentsError
+    ? `Backend divisi belum tersedia: ${departmentsError}`
+    : !departmentsLoaded
+      ? "Daftar divisi masih dimuat."
+      : undefined;
+
+  const managerOptions = useMemo(() => {
+    return employeeList
+      .filter((employee) => employee.role === "manager")
+      .map((employee) => ({ value: employee.id, label: employee.fullName }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [employeeList]);
 
   const divisiList = useMemo(() => {
@@ -1222,19 +1232,30 @@ export function AppPage() {
     setBusyAction(key);
     setDivisiFormError(null);
     try {
+      let savedDepartment: DepartmentItem;
       if (editingDivisi) {
-        await updateDepartment(currentSession.token, editingDivisi.id, {
+        savedDepartment = await updateDepartment(currentSession.token, editingDivisi.id, {
           name: divisiForm.name.trim(),
           managerId: divisiForm.managerId || null
         });
+        setDepartments((current) => current.map((department) => department.id === editingDivisi.id ? savedDepartment : department));
+        setEmployeeList((current) => current.map((employee) =>
+          employee.departmentId === editingDivisi.id
+            ? { ...employee, departmentName: savedDepartment.name }
+            : employee
+        ));
       } else {
-        await createDepartment(currentSession.token, {
+        savedDepartment = await createDepartment(currentSession.token, {
           name: divisiForm.name.trim(),
           managerId: divisiForm.managerId || null
         });
+        setDepartments((current) => [...current.filter((department) => department.id !== savedDepartment.id), savedDepartment]);
       }
-      const refreshed = await fetchDepartments(currentSession.token);
-      setDepartments(refreshed);
+      fetchDepartments(currentSession.token)
+        .then((refreshed) => setDepartments(refreshed))
+        .catch((error) => {
+          setDepartmentsError(error instanceof Error ? error.message : "Daftar divisi gagal dimuat ulang.");
+        });
       setDivisiFormOpen(false);
       setEditingDivisi(null);
       setDivisiForm({ name: "", managerId: "" });
@@ -1252,11 +1273,15 @@ export function AppPage() {
     setBusyAction(`ubah-penempatan-${ubahPenempatanEmployee.id}`);
     setUbahPenempatanError(null);
     try {
-      await reassignEmployeeDepartment(currentSession.token, ubahPenempatanEmployee.id, {
+      const updatedEmployee = await reassignEmployeeDepartment(currentSession.token, ubahPenempatanEmployee.id, {
         departmentId: ubahPenempatanDeptId || null
       });
-      const refreshed = await fetchEmployeeList(currentSession.token);
-      setEmployeeList(refreshed);
+      setEmployeeList((current) => current.map((employee) => employee.id === updatedEmployee.id ? updatedEmployee : employee));
+      fetchEmployeeList(currentSession.token)
+        .then((refreshed) => setEmployeeList(refreshed))
+        .catch((error) => {
+          setEmployeeListError(error instanceof Error ? error.message : "Daftar karyawan gagal dimuat ulang.");
+        });
       setUbahPenempatanEmployee(null);
       setUbahPenempatanDeptId("");
       setActionMessage("Penempatan karyawan berhasil diperbarui.");
@@ -2824,7 +2849,8 @@ export function AppPage() {
                 const statusTone = ws === "rejected" || item.status === "Ditolak" ? "danger"
                   : ws === "approved" || item.status === "Disetujui" ? "success"
                   : "warning";
-                const canApproveRequest = Boolean(item.id) && canShowApprovalActionsForRequest(currentSession.user.role, ws);
+                const requestId = item.id;
+                const canApproveRequest = Boolean(requestId) && canShowApprovalActionsForRequest(currentSession.user.role, ws);
                 return (
                   <article key={item.id ?? item.title} className="rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_2px_12px_rgba(20,24,31,0.05)]">
                     <div className="flex flex-col gap-2">
@@ -2849,17 +2875,17 @@ export function AppPage() {
                       <div className="mt-4">
                         <FormInput
                           label="Catatan approval"
-                          value={approvalNotes[item.id] ?? ""}
+                          value={approvalNotes[requestId!] ?? ""}
                           onChange={(event) => {
-                            setApprovalNotes((current) => ({ ...current, [item.id!]: event.target.value }));
+                            setApprovalNotes((current) => ({ ...current, [requestId!]: event.target.value }));
                             setApprovalErrors((current) => {
                               const next = { ...current };
-                              delete next[item.id!];
+                              delete next[requestId!];
                               return next;
                             });
                           }}
                           placeholder="Tambahkan alasan atau catatan reviewer"
-                          error={approvalErrors[item.id]}
+                          error={approvalErrors[requestId!]}
                           hint="Catatan wajib saat menolak agar alasan keputusan jelas."
                         />
                       </div>
@@ -3361,12 +3387,14 @@ export function AppPage() {
                 actions: (
                   <button
                     type="button"
+                    disabled={Boolean(departmentUnavailableReason)}
+                    title={departmentUnavailableReason}
                     onClick={() => {
                       setUbahPenempatanEmployee(emp);
                       setUbahPenempatanDeptId(emp.departmentId ?? "");
                       setUbahPenempatanError(null);
                     }}
-                    className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff]"
+                    className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Ubah divisi
                   </button>
@@ -3387,13 +3415,15 @@ export function AppPage() {
                 <p className="text-sm text-[#667085]">Kelola divisi, tetapkan manager, dan atur penempatan karyawan.</p>
                 <button
                   type="button"
+                  disabled={Boolean(departmentUnavailableReason)}
+                  title={departmentUnavailableReason}
                   onClick={() => {
                     setEditingDivisi(null);
                     setDivisiForm({ name: "", managerId: "" });
                     setDivisiFormError(null);
                     setDivisiFormOpen(true);
                   }}
-                  className="shrink-0 rounded-2xl bg-[#1769ff] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1255d4]"
+                  className="shrink-0 rounded-2xl bg-[#1769ff] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1255d4] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   + Tambah divisi
                 </button>
@@ -3753,12 +3783,18 @@ export function AppPage() {
                     <FormInput label="Jam selesai" type="time" value={shiftForm.endTime} onChange={(e) => setShiftForm((c) => ({ ...c, endTime: e.target.value }))} required />
                   </div>
                   <FormInput label="Toleransi terlambat (menit)" type="number" value={shiftForm.gracePeriodMinutes} onChange={(e) => setShiftForm((c) => ({ ...c, gracePeriodMinutes: e.target.value }))} />
-                  <SelectInput label="Lokasi kerja" value={shiftForm.workLocationId} onChange={(e) => setShiftForm((c) => ({ ...c, workLocationId: e.target.value }))}>
-                    <option value="">Pilih lokasi...</option>
-                    {workLocations.filter((l) => l.status === "active").map((l) => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </SelectInput>
+                  <div className="grid gap-1">
+                    <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Lokasi kerja</span>
+                    <FilterSelect
+                      ariaLabel="Lokasi kerja"
+                      value={shiftForm.workLocationId}
+                      onChange={(value) => setShiftForm((c) => ({ ...c, workLocationId: value }))}
+                      options={[
+                        { value: "", label: "Pilih lokasi..." },
+                        ...workLocations.filter((l) => l.status === "active").map((l) => ({ value: l.id, label: l.name }))
+                      ]}
+                    />
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FormInput label="Istirahat mulai (opsional)" type="time" value={shiftForm.breakStartTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakStartTime: e.target.value }))} />
                     <FormInput label="Istirahat selesai (opsional)" type="time" value={shiftForm.breakEndTime} onChange={(e) => setShiftForm((c) => ({ ...c, breakEndTime: e.target.value }))} />
@@ -3819,30 +3855,24 @@ export function AppPage() {
             </div>
             <div className="min-w-[150px] flex-1">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Divisi</span>
-              <select
-                aria-label="Divisi / Departemen"
+              <FilterSelect
+                ariaLabel="Divisi / Departemen"
                 value={reportFilters.departmentId}
-                onChange={(e) => setReportFilters((c) => ({ ...c, departmentId: e.target.value }))}
-                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
-              >
-                <option value="">Semua divisi</option>
-                {departmentOptions.map((department) => (
-                  <option key={department.id} value={department.id}>{department.name}</option>
-                ))}
-              </select>
+                onChange={(value) => setReportFilters((c) => ({ ...c, departmentId: value }))}
+                options={[
+                  { value: "", label: "Semua divisi" },
+                  ...departmentOptions.map((department) => ({ value: department.id, label: department.name }))
+                ]}
+              />
             </div>
             <div className="min-w-[150px] flex-1">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Status</span>
-              <select
-                aria-label="Status absensi"
+              <FilterSelect
+                ariaLabel="Status absensi"
                 value={reportFilters.status}
-                onChange={(e) => setReportFilters((c) => ({ ...c, status: e.target.value }))}
-                className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10"
-              >
-                {reportStatusFilters.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setReportFilters((c) => ({ ...c, status: value }))}
+                options={reportStatusFilters.map((option) => ({ value: option.value, label: option.label }))}
+              />
             </div>
             <div className="flex-shrink-0 self-end">
               <PrimaryButton onClick={handleApplyReportFilters} disabled={busyAction === "report-filter"}>
@@ -4093,6 +4123,8 @@ export function AppPage() {
       <Dialog
         title={editingDivisi ? "Edit divisi" : "Tambah divisi baru"}
         open={divisiFormOpen}
+        closeDisabled={busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi")}
+        closeDisabledReason="Tunggu sampai penyimpanan selesai."
         onClose={() => {
           setDivisiFormOpen(false);
           setEditingDivisi(null);
@@ -4109,31 +4141,37 @@ export function AppPage() {
             error={divisiFormError ?? undefined}
           />
           <div className="grid gap-1">
-            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]" htmlFor="divisi-manager-select">
-              Manager divisi
-            </label>
-            <select
-              id="divisi-manager-select"
-              aria-label="Manager divisi"
+            <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Manager divisi</span>
+            <FilterSelect
+              ariaLabel="Manager divisi"
               value={divisiForm.managerId}
-              onChange={(e) => setDivisiForm((c) => ({ ...c, managerId: e.target.value }))}
-              className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10"
-            >
-              <option value="">Belum ditetapkan</option>
-              {employeeList
-                .filter((emp) => emp.role === "manager" || emp.role === "admin" || emp.role === "superadmin")
-                .map((emp) => (
-                  <option key={emp.id} value={emp.id}>{emp.fullName}</option>
-                ))}
-            </select>
+              onChange={(value) => setDivisiForm((c) => ({ ...c, managerId: value }))}
+              options={[
+                { value: "", label: "Belum ditetapkan" },
+                ...managerOptions
+              ]}
+            />
+            {managerOptions.length === 0 ? (
+              <div className="rounded-2xl border border-[#edf0f5] bg-[#f9fafc] px-3 py-2 text-xs leading-5 text-[#596172]">
+                <p className="font-semibold text-[#111827]">Belum ada manager tersedia</p>
+                <p>Tambahkan akun manager terlebih dahulu.</p>
+              </div>
+            ) : null}
           </div>
           {divisiFormError ? <p className="text-xs text-[#c0392b]">{divisiFormError}</p> : null}
+          {busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi") ? (
+            <p className="rounded-2xl border border-[#d7e5ff] bg-[#f7faff] px-3 py-2 text-xs font-semibold text-[#174ea6]" role="status" aria-live="polite">
+              Divisi sedang disimpan. Dialog akan tertutup setelah data berhasil diperbarui.
+            </p>
+          ) : null}
           <div className="flex gap-2 pt-1">
-            <PrimaryButton type="submit" disabled={busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi")}>
-              Simpan divisi
+            <PrimaryButton type="submit" disabled={busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi") || Boolean(departmentsError)}>
+              {busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi") ? "Menyimpan divisi..." : "Simpan divisi"}
             </PrimaryButton>
             <SecondaryButton
               type="button"
+              disabled={busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi")}
+              title={busyAction === (editingDivisi ? `edit-divisi-${editingDivisi.id}` : "create-divisi") ? "Tunggu sampai penyimpanan selesai." : undefined}
               onClick={() => {
                 setDivisiFormOpen(false);
                 setEditingDivisi(null);
@@ -4150,6 +4188,8 @@ export function AppPage() {
       <Dialog
         title={ubahPenempatanEmployee ? `Ubah penempatan — ${ubahPenempatanEmployee.fullName}` : "Ubah penempatan"}
         open={Boolean(ubahPenempatanEmployee)}
+        closeDisabled={Boolean(busyAction?.startsWith("ubah-penempatan-"))}
+        closeDisabledReason="Tunggu sampai penyimpanan selesai."
         onClose={() => {
           setUbahPenempatanEmployee(null);
           setUbahPenempatanDeptId("");
@@ -4158,29 +4198,34 @@ export function AppPage() {
       >
         <form onSubmit={handleUbahPenempatan} className="space-y-4">
           <div className="grid gap-1">
-            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]" htmlFor="ubah-penempatan-select">
-              Divisi baru
-            </label>
-            <select
-              id="ubah-penempatan-select"
-              aria-label="Divisi baru"
+            <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Divisi baru</span>
+            <FilterSelect
+              ariaLabel="Divisi baru"
               value={ubahPenempatanDeptId}
-              onChange={(e) => setUbahPenempatanDeptId(e.target.value)}
-              className="w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-3 py-2.5 text-sm text-[#111827] outline-none transition focus:border-[#1769ff] focus:ring-2 focus:ring-[#1769ff]/10"
-            >
-              <option value="">Tanpa divisi</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
-              ))}
-            </select>
+              onChange={setUbahPenempatanDeptId}
+              options={[
+                { value: "", label: "Tanpa divisi" },
+                ...departmentOptions.map((dept) => ({ value: dept.id, label: dept.name }))
+              ]}
+            />
+            {departmentsError ? (
+              <p className="text-xs font-semibold text-[#c0392b]">Backend divisi belum tersedia: {departmentsError}</p>
+            ) : null}
           </div>
           {ubahPenempatanError ? <p className="text-xs text-[#c0392b]">{ubahPenempatanError}</p> : null}
+          {busyAction?.startsWith("ubah-penempatan-") ? (
+            <p className="rounded-2xl border border-[#d7e5ff] bg-[#f7faff] px-3 py-2 text-xs font-semibold text-[#174ea6]" role="status" aria-live="polite">
+              Penempatan sedang diperbarui. Dialog akan tertutup setelah data berhasil disimpan.
+            </p>
+          ) : null}
           <div className="flex gap-2 pt-1">
-            <PrimaryButton type="submit" disabled={Boolean(busyAction?.startsWith("ubah-penempatan-"))}>
-              Simpan penempatan
+            <PrimaryButton type="submit" disabled={Boolean(busyAction?.startsWith("ubah-penempatan-")) || Boolean(departmentsError)}>
+              {busyAction?.startsWith("ubah-penempatan-") ? "Menyimpan penempatan..." : "Simpan penempatan"}
             </PrimaryButton>
             <SecondaryButton
               type="button"
+              disabled={Boolean(busyAction?.startsWith("ubah-penempatan-"))}
+              title={busyAction?.startsWith("ubah-penempatan-") ? "Tunggu sampai penyimpanan selesai." : undefined}
               onClick={() => {
                 setUbahPenempatanEmployee(null);
                 setUbahPenempatanDeptId("");

@@ -9,6 +9,7 @@ import type {
   DashboardPayload,
   DashboardScheduleItem,
   DashboardStat,
+  DepartmentItem,
   EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
@@ -275,24 +276,35 @@ export function getDemoAuditLogs() {
   return AUDIT_LOGS;
 }
 
-const DEMO_EMPLOYEES: EmployeeListItem[] = [
-  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
-  { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
-  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", todayStatus: "present", checkInTime: "07:58", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", todayStatus: "present", checkInTime: "08:00", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
+  { id: "dep-ops", name: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", isActive: true, memberCount: 3 },
+  { id: "dep-fnb", name: "F&B Service", managerId: null, managerName: null, isActive: true, memberCount: 2 }
 ];
 
-const DEMO_WORK_LOCATIONS: WorkLocationItem[] = [
+const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
+  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
+  { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
+  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "07:58", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:00", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+];
+
+let demoDepartments: DepartmentItem[] = INITIAL_DEMO_DEPARTMENTS.map((department) => ({ ...department }));
+let demoEmployees: EmployeeListItem[] = INITIAL_DEMO_EMPLOYEES.map((employee) => ({ ...employee }));
+
+const INITIAL_DEMO_WORK_LOCATIONS: WorkLocationItem[] = [
   { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1, Jakarta Pusat", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" },
   { id: "loc-branch", name: "Kantor Cabang Selatan", address: "Jl. TB Simatupang No. 88, Jakarta Selatan", latitude: -6.295, longitude: 106.814, radiusMeters: 100, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
 ];
 
-const DEMO_SHIFTS: ShiftRecord[] = [
+const INITIAL_DEMO_SHIFTS: ShiftRecord[] = [
   { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", breakStartTime: "12:00", breakEndTime: "13:00", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" },
   { id: "shift-sore", name: "Shift Sore", startTime: "13:00", endTime: "22:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
 ];
+
+let demoWorkLocations: WorkLocationItem[] = INITIAL_DEMO_WORK_LOCATIONS.map((location) => ({ ...location }));
+let demoShifts: ShiftRecord[] = INITIAL_DEMO_SHIFTS.map((shift) => ({ ...shift }));
 
 const DEMO_REPORT_ROWS: AttendanceReportRow[] = [
   { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", checkOutTime: "2026-05-02T17:05:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], locationLat: -6.2087, locationLng: 106.8457, isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
@@ -303,15 +315,114 @@ const DEMO_REPORT_ROWS: AttendanceReportRow[] = [
 ];
 
 export function getDemoEmployeeList(): EmployeeListItem[] {
-  return DEMO_EMPLOYEES;
+  return demoEmployees.map((employee) => ({ ...employee }));
+}
+
+export function getDemoDepartments(): DepartmentItem[] {
+  return demoDepartments.map((department) => ({
+    ...department,
+    managerName: department.managerId ? demoEmployees.find((employee) => employee.id === department.managerId)?.fullName ?? null : null,
+    memberCount: demoEmployees.filter((employee) => employee.departmentId === department.id).length
+  }));
+}
+
+export function createDemoDepartment(payload: { name: string; managerId?: string | null; description?: string | null; isActive?: boolean }): DepartmentItem {
+  const manager = payload.managerId ? demoEmployees.find((employee) => employee.id === payload.managerId && employee.role === "manager") : null;
+  const department: DepartmentItem = {
+    id: `dep-${Date.now()}`,
+    name: payload.name,
+    managerId: manager?.id ?? null,
+    managerName: manager?.fullName ?? null,
+    description: payload.description ?? null,
+    isActive: payload.isActive ?? true,
+    memberCount: 0
+  };
+  demoDepartments = [...demoDepartments, department];
+  return { ...department };
+}
+
+export function updateDemoDepartment(id: string, patch: { name?: string; managerId?: string | null; description?: string | null; isActive?: boolean }): DepartmentItem {
+  const current = demoDepartments.find((department) => department.id === id);
+  if (!current) throw new Error("Divisi demo tidak ditemukan.");
+
+  const manager = patch.managerId ? demoEmployees.find((employee) => employee.id === patch.managerId && employee.role === "manager") : null;
+  const updated: DepartmentItem = {
+    ...current,
+    name: patch.name ?? current.name,
+    managerId: patch.managerId !== undefined ? manager?.id ?? null : current.managerId ?? null,
+    managerName: patch.managerId !== undefined ? manager?.fullName ?? null : current.managerName ?? null,
+    description: patch.description !== undefined ? patch.description : current.description,
+    isActive: patch.isActive ?? current.isActive
+  };
+  demoDepartments = demoDepartments.map((department) => department.id === id ? updated : department);
+  demoEmployees = demoEmployees.map((employee) => employee.departmentId === id ? { ...employee, departmentName: updated.name } : employee);
+  return { ...updated, memberCount: demoEmployees.filter((employee) => employee.departmentId === id).length };
+}
+
+export function reassignDemoEmployeeDepartment(id: string, patch: { departmentId?: string | null; managerId?: string | null }): EmployeeListItem {
+  const current = demoEmployees.find((employee) => employee.id === id);
+  if (!current) throw new Error("Karyawan demo tidak ditemukan.");
+
+  const department = patch.departmentId ? demoDepartments.find((entry) => entry.id === patch.departmentId) : null;
+  const manager = patch.managerId ? demoEmployees.find((entry) => entry.id === patch.managerId && entry.role === "manager") : null;
+  const updated: EmployeeListItem = {
+    ...current,
+    departmentId: patch.departmentId !== undefined ? department?.id ?? null : current.departmentId ?? null,
+    departmentName: patch.departmentId !== undefined ? department?.name ?? null : current.departmentName ?? null,
+    managerId: patch.managerId !== undefined ? manager?.id ?? null : current.managerId ?? null,
+    managerName: patch.managerId !== undefined ? manager?.fullName ?? null : current.managerName ?? null
+  };
+  demoEmployees = demoEmployees.map((employee) => employee.id === id ? updated : employee);
+  return { ...updated };
 }
 
 export function getDemoWorkLocations(): WorkLocationItem[] {
-  return DEMO_WORK_LOCATIONS;
+  return demoWorkLocations.map((location) => ({ ...location }));
+}
+
+export function createDemoWorkLocation(payload: Omit<WorkLocationItem, "id" | "status" | "createdAt">): WorkLocationItem {
+  const location: WorkLocationItem = {
+    ...payload,
+    id: `loc-${Date.now()}`,
+    status: "active",
+    createdAt: new Date().toISOString()
+  };
+  demoWorkLocations = [...demoWorkLocations, location];
+  return { ...location };
+}
+
+export function updateDemoWorkLocation(id: string, patch: Partial<WorkLocationItem>): WorkLocationItem {
+  const current = demoWorkLocations.find((location) => location.id === id);
+  if (!current) throw new Error("Lokasi demo tidak ditemukan.");
+  const updated = { ...current, ...patch };
+  demoWorkLocations = demoWorkLocations.map((location) => location.id === id ? updated : location);
+  demoShifts = demoShifts.map((shift) => shift.workLocationId === id ? { ...shift, workLocationName: updated.name } : shift);
+  return { ...updated };
 }
 
 export function getDemoShifts(): ShiftRecord[] {
-  return DEMO_SHIFTS;
+  return demoShifts.map((shift) => ({ ...shift }));
+}
+
+export function createDemoShift(payload: Omit<ShiftRecord, "id" | "status" | "createdAt" | "updatedAt">): ShiftRecord {
+  const now = new Date().toISOString();
+  const shift: ShiftRecord = {
+    ...payload,
+    id: `shift-${Date.now()}`,
+    status: "active",
+    createdAt: now,
+    updatedAt: now
+  };
+  demoShifts = [...demoShifts, shift];
+  return { ...shift };
+}
+
+export function updateDemoShift(id: string, patch: Partial<ShiftRecord>): ShiftRecord {
+  const current = demoShifts.find((shift) => shift.id === id);
+  if (!current) throw new Error("Shift demo tidak ditemukan.");
+  const updated = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  demoShifts = demoShifts.map((shift) => shift.id === id ? updated : shift);
+  return { ...updated };
 }
 
 export function getDemoReportRows(): AttendanceReportRow[] {

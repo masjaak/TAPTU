@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import type { DepartmentItem } from "@taptu/shared";
 
 import { AppPage } from "../pages/AppPage";
 
@@ -1600,16 +1601,18 @@ describe("Phase 4: Reports workspace", () => {
 
   it("applies HR report date, division, and status filters", async () => {
     setupAdminSession();
-    apiMocks.fetchEmployeeList.mockResolvedValue([
-      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present" },
-      { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-sales", departmentName: "Sales", todayStatus: "late" }
+    apiMocks.fetchDepartments.mockResolvedValue([
+      { id: "dep-ops", name: "Operations", managerId: null, managerName: null, isActive: true, memberCount: 1 },
+      { id: "dep-sales", name: "Sales", managerId: null, managerName: null, isActive: true, memberCount: 1 }
     ]);
     renderRoute("/app/reports");
 
     fireEvent.change(await screen.findByLabelText("Dari tanggal"), { target: { value: "2026-05-01" } });
     fireEvent.change(screen.getByLabelText("Sampai tanggal"), { target: { value: "2026-05-14" } });
-    fireEvent.change(screen.getByLabelText("Divisi / Departemen"), { target: { value: "dep-sales" } });
-    fireEvent.change(screen.getByLabelText("Status absensi"), { target: { value: "needs_review" } });
+    fireEvent.click(await screen.findByRole("combobox", { name: "Divisi / Departemen" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Sales" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Status absensi" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Perlu review" }));
     fireEvent.click(screen.getByRole("button", { name: /terapkan filter/i }));
 
     await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenLastCalledWith("demo:admin", {
@@ -1751,6 +1754,10 @@ describe("HR team filters", () => {
   });
 
   it("keeps HR team organization-wide by default and filters by search, division, and status", async () => {
+    apiMocks.fetchDepartments.mockResolvedValue([
+      { id: "dep-ops", name: "Operations", managerId: null, managerName: null, isActive: true, memberCount: 1 },
+      { id: "dep-sales", name: "Sales", managerId: null, managerName: null, isActive: true, memberCount: 1 }
+    ]);
     apiMocks.fetchEmployeeList.mockResolvedValue([
       { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", employeeCode: "EMP-001", departmentId: "dep-ops", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
       { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", employeeCode: "EMP-002", departmentId: "dep-sales", departmentName: "Sales", managerName: null, todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
@@ -2310,10 +2317,10 @@ describe("HR filter bar UI polish", () => {
     expect(combobox.getAttribute("aria-haspopup")).toBe("listbox");
   });
 
-  it("HR Tim division filter options come from employee department data", async () => {
-    apiMocks.fetchEmployeeList.mockResolvedValue([
-      { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present" },
-      { id: "e2", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-sales", departmentName: "Sales", todayStatus: "late" }
+  it("HR Tim division filter options come from real department data", async () => {
+    apiMocks.fetchDepartments.mockResolvedValue([
+      { id: "dep-ops", name: "Operations", managerId: null, managerName: null, isActive: true, memberCount: 0 },
+      { id: "dep-empty", name: "New Empty Division", managerId: null, managerName: null, isActive: true, memberCount: 0 }
     ]);
 
     renderRoute("/app/team");
@@ -2326,7 +2333,7 @@ describe("HR filter bar UI polish", () => {
     const labels = options.map((o) => o.textContent?.trim());
     expect(labels).toContain("Semua divisi");
     expect(labels).toContain("Operations");
-    expect(labels).toContain("Sales");
+    expect(labels).toContain("New Empty Division");
   });
 });
 
@@ -2502,6 +2509,89 @@ describe("HR Divisi & Penempatan", () => {
     });
   });
 
+  it("division save shows a pending state, explains disabled close controls, and closes only after success", async () => {
+    setupAdminWithDepartments();
+    let resolveCreate!: (value: DepartmentItem) => void;
+    apiMocks.createDepartment.mockReturnValue(new Promise((resolve) => {
+      resolveCreate = resolve;
+    }));
+    apiMocks.fetchDepartments
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB])
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB, { id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 }]);
+
+    renderRoute("/app/team");
+    await screen.findByTestId("divisi-penempatan-section");
+
+    fireEvent.click(screen.getByRole("button", { name: /tambah divisi/i }));
+    fireEvent.change(screen.getByLabelText(/nama divisi/i), { target: { value: "IT" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /menyimpan divisi/i }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText("Divisi sedang disimpan. Dialog akan tertutup setelah data berhasil diperbarui.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /tutup dialog tambah divisi baru/i }).getAttribute("title")).toBe("Tunggu sampai penyimpanan selesai.");
+    expect(screen.getByRole("button", { name: /batal/i }).getAttribute("title")).toBe("Tunggu sampai penyimpanan selesai.");
+
+    resolveCreate({ id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.getByText("Divisi baru berhasil ditambahkan.")).toBeTruthy();
+    });
+  });
+
+  it("create division success updates the division filter with the new backend department", async () => {
+    setupAdminWithDepartments();
+    apiMocks.createDepartment.mockResolvedValue({ id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 });
+    apiMocks.fetchDepartments
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB])
+      .mockResolvedValueOnce([DEPT_OPS, DEPT_FNB, { id: "dep-it", name: "IT", managerId: null, managerName: null, isActive: true, memberCount: 0 }]);
+
+    renderRoute("/app/team");
+    await screen.findByTestId("divisi-penempatan-section");
+
+    fireEvent.click(screen.getByRole("button", { name: /tambah divisi/i }));
+    fireEvent.change(screen.getByLabelText(/nama divisi/i), { target: { value: "IT" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    await screen.findByTestId("divisi-row-dep-it");
+    fireEvent.click(screen.getByRole("combobox", { name: "Divisi / Departemen" }));
+    expect(screen.getByRole("option", { name: "IT" })).toBeTruthy();
+  });
+
+  it("create division failure shows error and keeps the modal open", async () => {
+    setupAdminWithDepartments();
+    apiMocks.createDepartment.mockRejectedValue(new Error("Backend divisi gagal menyimpan."));
+
+    renderRoute("/app/team");
+    await screen.findByTestId("divisi-penempatan-section");
+
+    fireEvent.click(screen.getByRole("button", { name: /tambah divisi/i }));
+    fireEvent.change(screen.getByLabelText(/nama divisi/i), { target: { value: "IT" } });
+    fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
+
+    expect((await screen.findAllByText("Backend divisi gagal menyimpan.")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.queryByTestId("divisi-row-dep-it")).toBeNull();
+  });
+
+  it("disabled division actions explain why HR cannot update placement", async () => {
+    setupAdminWithDepartments();
+    apiMocks.fetchDepartments.mockRejectedValue(new Error("Service divisi offline."));
+
+    renderRoute("/app/team");
+    await screen.findByText("Fikri Maulana");
+
+    const addButton = screen.getByRole("button", { name: /tambah divisi/i });
+    expect(addButton.hasAttribute("disabled")).toBe(true);
+    expect(addButton.getAttribute("title")).toBe("Backend divisi belum tersedia: Service divisi offline.");
+
+    const employeeRow = screen.getByText("Fikri Maulana").closest("tr");
+    const placementButton = within(employeeRow!).getByRole("button", { name: /ubah divisi/i });
+    expect(placementButton.hasAttribute("disabled")).toBe(true);
+    expect(placementButton.getAttribute("title")).toBe("Backend divisi belum tersedia: Service divisi offline.");
+  });
+
   it("Edit divisi opens pre-filled form and saves name update", async () => {
     setupAdminWithDepartments();
     apiMocks.updateDepartment.mockResolvedValue({ ...DEPT_OPS, name: "Operasional" });
@@ -2541,8 +2631,10 @@ describe("HR Divisi & Penempatan", () => {
     fireEvent.click(within(fnbRow).getByRole("button", { name: /atur manager/i }));
 
     expect(screen.getByRole("dialog")).toBeTruthy();
-    const managerSelect = screen.getByLabelText(/manager divisi/i);
-    fireEvent.change(managerSelect, { target: { value: "mgr-1" } });
+    const managerSelect = screen.getByRole("combobox", { name: /manager divisi/i });
+    expect(managerSelect.tagName).not.toBe("SELECT");
+    fireEvent.click(managerSelect);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Raka Saputra" }));
     fireEvent.click(screen.getByRole("button", { name: /simpan divisi/i }));
 
     await waitFor(() => {
@@ -2552,6 +2644,26 @@ describe("HR Divisi & Penempatan", () => {
         expect.objectContaining({ managerId: "mgr-1" })
       );
     });
+  });
+
+  it("manager dropdown uses only role manager options and explains when none are available", async () => {
+    setupAdminWithDepartments();
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "admin-1", fullName: "Nadia Putri", email: "admin@taptu.app", role: "admin", todayStatus: "present" },
+      { id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", todayStatus: "present" }
+    ]);
+
+    renderRoute("/app/team");
+    await screen.findByTestId("divisi-penempatan-section");
+
+    fireEvent.click(screen.getByRole("button", { name: /tambah divisi/i }));
+    expect(screen.getByText("Belum ada manager tersedia")).toBeTruthy();
+    expect(screen.getByText("Tambahkan akun manager terlebih dahulu.")).toBeTruthy();
+
+    const managerSelect = screen.getByRole("combobox", { name: /manager divisi/i });
+    fireEvent.click(managerSelect);
+    expect(screen.queryByRole("option", { name: "Nadia Putri" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "Fikri Maulana" })).toBeNull();
   });
 
   it("Ubah divisi button opens dialog and reassigns employee to new division", async () => {
@@ -2581,8 +2693,10 @@ describe("HR Divisi & Penempatan", () => {
     fireEvent.click(within(fikriRow!).getByRole("button", { name: /ubah divisi/i }));
 
     expect(screen.getByRole("dialog")).toBeTruthy();
-    const deptSelect = screen.getByLabelText(/divisi baru/i);
-    fireEvent.change(deptSelect, { target: { value: "dep-fnb" } });
+    const deptSelect = screen.getByRole("combobox", { name: /divisi baru/i });
+    expect(deptSelect.tagName).not.toBe("SELECT");
+    fireEvent.click(deptSelect);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "F&B Service" }));
     fireEvent.click(screen.getByRole("button", { name: /simpan penempatan/i }));
 
     await waitFor(() => {
@@ -2591,6 +2705,60 @@ describe("HR Divisi & Penempatan", () => {
         "e1",
         expect.objectContaining({ departmentId: "dep-fnb" })
       );
+      const fikriRow = screen.getByText("Fikri Maulana").closest("tr");
+      expect(within(fikriRow!).getByText("F&B Service")).toBeTruthy();
     });
+  });
+
+  it("placement save shows a pending state and keeps errors visible in the dialog", async () => {
+    setupAdminWithDepartments();
+    let rejectReassign!: (error: Error) => void;
+    apiMocks.reassignEmployeeDepartment.mockReturnValue(new Promise((_, reject) => {
+      rejectReassign = reject;
+    }));
+
+    renderRoute("/app/team");
+    await screen.findByText("Fikri Maulana");
+
+    const fikriRow = screen.getByText("Fikri Maulana").closest("tr");
+    fireEvent.click(within(fikriRow!).getByRole("button", { name: /ubah divisi/i }));
+    fireEvent.click(screen.getByRole("button", { name: /simpan penempatan/i }));
+
+    expect(screen.getByRole("button", { name: /menyimpan penempatan/i }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText("Penempatan sedang diperbarui. Dialog akan tertutup setelah data berhasil disimpan.")).toBeTruthy();
+
+    rejectReassign(new Error("Penempatan gagal diperbarui."));
+
+    expect(await screen.findByText("Penempatan gagal diperbarui.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("HR shift location dropdown is a custom combobox, not a native select", async () => {
+    setupAdminWithDepartments();
+    apiMocks.fetchWorkLocations.mockResolvedValue([
+      { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
+    ]);
+    apiMocks.fetchShifts.mockResolvedValue([
+      { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
+    ]);
+    renderRoute("/app/locations");
+
+    await screen.findByText("Shift Pagi");
+    fireEvent.click(screen.getByRole("button", { name: /tambah shift/i }));
+
+    const locationSelect = screen.getByRole("combobox", { name: "Lokasi kerja" });
+    expect(locationSelect.tagName).not.toBe("SELECT");
+    fireEvent.click(locationSelect);
+    expect(screen.getByRole("option", { name: "Kantor Pusat" })).toBeTruthy();
+  });
+
+  it("native select is not used for HR report division or status filters", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/reports");
+
+    const divisionFilter = await screen.findByRole("combobox", { name: "Divisi / Departemen" });
+    const statusFilter = screen.getByRole("combobox", { name: "Status absensi" });
+    expect(divisionFilter.tagName).not.toBe("SELECT");
+    expect(statusFilter.tagName).not.toBe("SELECT");
   });
 });

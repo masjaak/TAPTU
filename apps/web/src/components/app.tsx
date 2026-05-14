@@ -761,7 +761,21 @@ export function ErrorState({ title, description }: { title: string; description:
   );
 }
 
-export function Dialog({ title, open, children, onClose }: { title: string; open: boolean; children: ReactNode; onClose: () => void }) {
+export function Dialog({
+  title,
+  open,
+  children,
+  onClose,
+  closeDisabled = false,
+  closeDisabledReason
+}: {
+  title: string;
+  open: boolean;
+  children: ReactNode;
+  onClose: () => void;
+  closeDisabled?: boolean;
+  closeDisabledReason?: string;
+}) {
   if (!open) {
     return null;
   }
@@ -773,7 +787,14 @@ export function Dialog({ title, open, children, onClose }: { title: string; open
       <div className="w-full max-w-lg rounded-[24px] border border-[#edf0f5] bg-white p-4 shadow-[0_34px_90px_rgba(20,24,31,0.24)] sm:rounded-[30px] sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <h2 id={titleId} className="break-words text-lg font-bold tracking-[-0.01em] text-[#111827] sm:text-xl">{title}</h2>
-          <SecondaryButton onClick={onClose} aria-label={`Tutup dialog ${title}`}>Tutup</SecondaryButton>
+          <SecondaryButton
+            onClick={onClose}
+            aria-label={`Tutup dialog ${title}`}
+            disabled={closeDisabled}
+            title={closeDisabled ? closeDisabledReason : undefined}
+          >
+            Tutup
+          </SecondaryButton>
         </div>
         <div className="mt-5">{children}</div>
       </div>

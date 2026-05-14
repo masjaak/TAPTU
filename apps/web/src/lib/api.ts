@@ -25,6 +25,7 @@ import {
   getDemoAdminOverview,
   getDemoAttendanceHistory,
   getDemoDashboard,
+  getDemoDepartments,
   getDemoEmployeeList,
   getDemoExceptionQueue,
   getDemoEmployeeSummary,
@@ -36,6 +37,13 @@ import {
   getDemoShifts,
   getDemoWorkLocations,
   isDemoToken,
+  createDemoDepartment,
+  createDemoShift,
+  createDemoWorkLocation,
+  reassignDemoEmployeeDepartment,
+  updateDemoDepartment,
+  updateDemoShift,
+  updateDemoWorkLocation,
   tryDemoLogin
 } from "./demo";
 
@@ -290,7 +298,7 @@ export async function fetchEmployeeList(token: string, filters?: { search?: stri
 }
 
 export async function fetchDepartments(token: string): Promise<DepartmentItem[]> {
-  if (isDemoToken(token)) return Promise.resolve([]);
+  if (isDemoToken(token)) return Promise.resolve(getDemoDepartments());
   return requestJson<DepartmentItem[]>("/departments", {}, token);
 }
 
@@ -299,15 +307,7 @@ export async function createDepartment(
   payload: { name: string; managerId?: string | null; description?: string | null; isActive?: boolean }
 ): Promise<DepartmentItem> {
   if (isDemoToken(token)) {
-    return Promise.resolve({
-      id: `dep-${Date.now()}`,
-      name: payload.name,
-      managerId: payload.managerId ?? null,
-      managerName: null,
-      description: payload.description ?? null,
-      isActive: payload.isActive ?? true,
-      memberCount: 0
-    });
+    return Promise.resolve(createDemoDepartment(payload));
   }
   return requestJson<DepartmentItem>("/departments", { method: "POST", body: JSON.stringify(payload) }, token);
 }
@@ -318,7 +318,7 @@ export async function updateDepartment(
   patch: { name?: string; managerId?: string | null; description?: string | null; isActive?: boolean }
 ): Promise<DepartmentItem> {
   if (isDemoToken(token)) {
-    return Promise.resolve({ id, name: patch.name ?? "Demo Department", managerId: patch.managerId ?? null, description: patch.description ?? null, isActive: patch.isActive ?? true, memberCount: 0 });
+    return Promise.resolve(updateDemoDepartment(id, patch));
   }
   return requestJson<DepartmentItem>(`/departments/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
 }
@@ -329,8 +329,7 @@ export async function reassignEmployeeDepartment(
   patch: { departmentId?: string | null; managerId?: string | null }
 ): Promise<EmployeeListItem> {
   if (isDemoToken(token)) {
-    const found = getDemoEmployeeList().find((employee) => employee.id === id) ?? getDemoEmployeeList()[0];
-    return Promise.resolve({ ...found, departmentId: patch.departmentId ?? found.departmentId, managerId: patch.managerId ?? found.managerId });
+    return Promise.resolve(reassignDemoEmployeeDepartment(id, patch));
   }
   return requestJson<EmployeeListItem>(`/employees/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
 }
@@ -352,16 +351,14 @@ export async function fetchWorkLocations(token: string): Promise<WorkLocationIte
 
 export async function createWorkLocation(token: string, payload: Omit<WorkLocationItem, "id" | "status" | "createdAt">): Promise<WorkLocationItem> {
   if (isDemoToken(token)) {
-    return Promise.resolve({ ...payload, id: `loc-${Date.now()}`, status: "active", createdAt: new Date().toISOString() });
+    return Promise.resolve(createDemoWorkLocation(payload));
   }
   return requestJson<WorkLocationItem>("/admin/work-locations", { method: "POST", body: JSON.stringify(payload) }, token);
 }
 
 export async function updateWorkLocation(token: string, id: string, patch: Partial<WorkLocationItem>): Promise<WorkLocationItem> {
   if (isDemoToken(token)) {
-    const all = getDemoWorkLocations();
-    const found = all.find((l) => l.id === id) ?? all[0];
-    return Promise.resolve({ ...found, ...patch });
+    return Promise.resolve(updateDemoWorkLocation(id, patch));
   }
   return requestJson<WorkLocationItem>(`/admin/work-locations/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
 }
@@ -373,26 +370,29 @@ export async function fetchShifts(token: string): Promise<ShiftRecord[]> {
 
 export async function createShift(token: string, payload: Omit<ShiftRecord, "id" | "status" | "createdAt" | "updatedAt">): Promise<ShiftRecord> {
   if (isDemoToken(token)) {
-    const now = new Date().toISOString();
-    return Promise.resolve({ ...payload, id: `shift-${Date.now()}`, status: "active", createdAt: now, updatedAt: now });
+    return Promise.resolve(createDemoShift(payload));
   }
   return requestJson<ShiftRecord>("/admin/shifts", { method: "POST", body: JSON.stringify(payload) }, token);
 }
 
 export async function updateShift(token: string, id: string, patch: Partial<ShiftRecord>): Promise<ShiftRecord> {
   if (isDemoToken(token)) {
-    const all = getDemoShifts();
-    const found = all.find((s) => s.id === id) ?? all[0];
-    return Promise.resolve({ ...found, ...patch });
+    return Promise.resolve(updateDemoShift(id, patch));
   }
   return requestJson<ShiftRecord>(`/admin/shifts/${id}`, { method: "PATCH", body: JSON.stringify(patch) }, token);
 }
 
 export async function fetchReportRows(token: string, filters?: { dateFrom?: string; dateTo?: string; employeeId?: string; departmentId?: string; status?: string }): Promise<AttendanceReportRow[]> {
   if (isDemoToken(token)) {
-    const rows = getDemoReportRows();
-    if (filters?.status) return Promise.resolve(rows.filter((r) => r.status === filters.status));
-    if (filters?.employeeId) return Promise.resolve(rows.filter((r) => r.employeeId === filters.employeeId));
+    const employees = new Map(getDemoEmployeeList().map((employee) => [employee.id, employee]));
+    const rows = getDemoReportRows().filter((row) => {
+      if (filters?.dateFrom && row.date < filters.dateFrom) return false;
+      if (filters?.dateTo && row.date > filters.dateTo) return false;
+      if (filters?.status && row.status !== filters.status && row.validationStatus !== filters.status) return false;
+      if (filters?.employeeId && row.employeeId !== filters.employeeId) return false;
+      if (filters?.departmentId && employees.get(row.employeeId)?.departmentId !== filters.departmentId) return false;
+      return true;
+    });
     return Promise.resolve(rows);
   }
   const params = new URLSearchParams();
