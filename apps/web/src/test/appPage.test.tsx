@@ -2720,6 +2720,45 @@ describe("HR Divisi & Penempatan", () => {
     expect(screen.getByRole("menuitem", { name: /nonaktifkan divisi/i })).toBeTruthy();
   });
 
+  it("opens the division action menu from a row with all actions", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/structure");
+
+    const fnbRow = await screen.findByTestId("divisi-row-dep-fnb");
+    fireEvent.click(within(fnbRow).getByRole("button", { name: /aksi f&b service/i }));
+
+    const menu = screen.getByRole("menu", { name: /aksi f&b service/i });
+    expect(within(menu).getByRole("menuitem", { name: /lihat anggota/i })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: /edit divisi/i })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: /atur manager/i })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: /nonaktifkan divisi/i })).toBeTruthy();
+  });
+
+  it("closes the division action menu when clicking outside", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/structure");
+
+    const opsRow = await screen.findByTestId("divisi-row-dep-ops");
+    fireEvent.click(within(opsRow).getByRole("button", { name: /aksi operations/i }));
+    expect(screen.getByRole("menu", { name: /aksi operations/i })).toBeTruthy();
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByRole("menu", { name: /aksi operations/i })).toBeNull();
+  });
+
+  it("renders the division action menu outside the clipped table container", async () => {
+    setupAdminWithDepartments();
+    renderRoute("/app/structure");
+
+    const opsRow = await screen.findByTestId("divisi-row-dep-ops");
+    fireEvent.click(within(opsRow).getByRole("button", { name: /aksi operations/i }));
+
+    const menu = screen.getByRole("menu", { name: /aksi operations/i });
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu.closest("[data-testid='divisi-table-clip']")).toBeNull();
+  });
+
   it("does not fake success when deactivating a division that still has members", async () => {
     setupAdminWithDepartments();
     renderRoute("/app/structure");

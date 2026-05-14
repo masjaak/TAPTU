@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -112,6 +113,17 @@ import { clearSession, readSession } from "../lib/session";
 
 const attendanceFilters = ["all", "present", "issue"] as const;
 const requestCategories = ["Izin", "Cuti", "Sakit", "Koreksi Absensi", "Lupa Check-in/out"] as const;
+const DEPARTMENT_ACTION_MENU_WIDTH = 192;
+const DEPARTMENT_ACTION_MENU_MAX_HEIGHT = 260;
+const DEPARTMENT_ACTION_MENU_MARGIN = 8;
+
+interface DepartmentActionMenuPosition {
+  top?: number;
+  bottom?: number;
+  left: number;
+  width: number;
+}
+
 const employeeStatusFilters = [
   { value: "", label: "Semua status" },
   { value: "present", label: "Hadir" },
@@ -427,6 +439,7 @@ export function AppPage() {
   const [divisiForm, setDivisiForm] = useState({ name: "", managerId: "" });
   const [divisiFormError, setDivisiFormError] = useState<string | null>(null);
   const [openDepartmentActionId, setOpenDepartmentActionId] = useState<string | null>(null);
+  const [departmentActionMenuPosition, setDepartmentActionMenuPosition] = useState<DepartmentActionMenuPosition | null>(null);
   const [departmentActionError, setDepartmentActionError] = useState<string | null>(null);
   const [ubahPenempatanEmployee, setUbahPenempatanEmployee] = useState<EmployeeListItem | null>(null);
   const [ubahPenempatanDeptId, setUbahPenempatanDeptId] = useState("");
@@ -439,6 +452,8 @@ export function AppPage() {
   const [shiftFormError, setShiftFormError] = useState<string | null>(null);
   const [reportFilterError, setReportFilterError] = useState<string | null>(null);
   const selfieInputRef = useRef<HTMLInputElement | null>(null);
+  const departmentActionMenuRef = useRef<HTMLDivElement | null>(null);
+  const departmentActionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const appNavigation = useMemo(() => getNavigationForRole(sessionRole), [sessionRole]);
   const attendanceTrust = useMemo(
@@ -718,6 +733,94 @@ export function AppPage() {
       .map((employee) => ({ value: employee.id, label: employee.fullName }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [employeeList]);
+
+  function getDepartmentActionMenuPosition(rect: DOMRect): DepartmentActionMenuPosition {
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1024;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 768;
+    const width = DEPARTMENT_ACTION_MENU_WIDTH;
+    const estimatedHeight = 176;
+    const left = Math.min(
+      Math.max(DEPARTMENT_ACTION_MENU_MARGIN, rect.right - width),
+      Math.max(DEPARTMENT_ACTION_MENU_MARGIN, viewportWidth - width - DEPARTMENT_ACTION_MENU_MARGIN)
+    );
+    const spaceBelow = viewportHeight - rect.bottom - DEPARTMENT_ACTION_MENU_MARGIN;
+    const spaceAbove = rect.top - DEPARTMENT_ACTION_MENU_MARGIN;
+
+    if (spaceBelow < 176 && spaceAbove > spaceBelow) {
+      return {
+        bottom: Math.max(DEPARTMENT_ACTION_MENU_MARGIN, viewportHeight - rect.top + 4),
+        left,
+        width
+      };
+    }
+
+    return {
+      top: Math.max(
+        DEPARTMENT_ACTION_MENU_MARGIN,
+        Math.min(rect.bottom + 4, viewportHeight - estimatedHeight - DEPARTMENT_ACTION_MENU_MARGIN)
+      ),
+      left,
+      width
+    };
+  }
+
+  function closeDepartmentActionMenu() {
+    setOpenDepartmentActionId(null);
+    setDepartmentActionMenuPosition(null);
+  }
+
+  function toggleDepartmentActionMenu(departmentId: string, event: ReactMouseEvent<HTMLButtonElement>) {
+    setDepartmentActionError(null);
+
+    if (openDepartmentActionId === departmentId) {
+      closeDepartmentActionMenu();
+      return;
+    }
+
+    departmentActionButtonRefs.current[departmentId] = event.currentTarget;
+    setDepartmentActionMenuPosition(getDepartmentActionMenuPosition(event.currentTarget.getBoundingClientRect()));
+    setOpenDepartmentActionId(departmentId);
+  }
+
+  useEffect(() => {
+    if (!openDepartmentActionId) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const activeTrigger = departmentActionButtonRefs.current[openDepartmentActionId];
+      closeDepartmentActionMenu();
+      activeTrigger?.focus();
+    }
+
+    function handleMouseDown(event: MouseEvent) {
+      const target = event.target as Node;
+      const activeTrigger = departmentActionButtonRefs.current[openDepartmentActionId];
+      if (activeTrigger?.contains(target) || departmentActionMenuRef.current?.contains(target)) return;
+      closeDepartmentActionMenu();
+    }
+
+    function handleViewportChange() {
+      const activeTrigger = departmentActionButtonRefs.current[openDepartmentActionId];
+      if (!activeTrigger) {
+        closeDepartmentActionMenu();
+        return;
+      }
+
+      setDepartmentActionMenuPosition(getDepartmentActionMenuPosition(activeTrigger.getBoundingClientRect()));
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [openDepartmentActionId]);
 
   const divisiList = useMemo(() => {
     const map = new Map<string, { name: string; employees: EmployeeListItem[] }>();
@@ -1274,20 +1377,20 @@ export function AppPage() {
     setDivisiForm({ name: department.name, managerId: department.managerId ?? "" });
     setDivisiFormError(null);
     setDepartmentActionError(null);
-    setOpenDepartmentActionId(null);
+    closeDepartmentActionMenu();
     setDivisiFormOpen(true);
   }
 
   function handleViewDepartmentMembers(departmentId: string) {
     setEmployeeDepartmentFilter(departmentId);
     setDepartmentActionError(null);
-    setOpenDepartmentActionId(null);
+    closeDepartmentActionMenu();
     setTab("team");
     navigate("/app/team");
   }
 
   async function handleDeactivateDepartment(department: DepartmentItem) {
-    setOpenDepartmentActionId(null);
+    closeDepartmentActionMenu();
 
     if ((department.memberCount ?? 0) > 0) {
       setDepartmentActionError("Divisi ini masih memiliki anggota. Pindahkan anggota terlebih dahulu atau nonaktifkan divisi.");
@@ -3559,7 +3662,7 @@ export function AppPage() {
                 description="Tambahkan divisi agar HR dapat mengelompokkan karyawan dan menetapkan manager."
               />
             ) : (
-              <div className="overflow-hidden rounded-[20px] border border-[#edf0f5] sm:rounded-[24px]">
+              <div data-testid="divisi-table-clip" className="overflow-hidden rounded-[20px] border border-[#edf0f5] sm:rounded-[24px]">
                 <div className="overflow-x-auto">
                   <table className="min-w-[600px] divide-y divide-[#edf0f5] bg-white sm:min-w-full">
                     <caption className="sr-only">Daftar divisi organisasi</caption>
@@ -3573,7 +3676,6 @@ export function AppPage() {
                     <tbody className="divide-y divide-[#edf0f5]">
                       {departments.map((div) => {
                         const menuOpen = openDepartmentActionId === div.id;
-                        const isDeactivating = busyAction === `deactivate-divisi-${div.id}`;
                         return (
                           <tr key={div.id} data-testid={`divisi-row-${div.id}`}>
                             <td className="max-w-[200px] break-words px-4 py-3.5 text-sm font-semibold text-[#111827]">{div.name}</td>
@@ -3587,43 +3689,17 @@ export function AppPage() {
                             <td className="px-4 py-3.5">
                               <div className="relative inline-block text-left">
                                 <button
+                                  ref={(node) => {
+                                    departmentActionButtonRefs.current[div.id] = node;
+                                  }}
                                   type="button"
                                   aria-haspopup="menu"
                                   aria-expanded={menuOpen}
-                                  onClick={() => {
-                                    setDepartmentActionError(null);
-                                    setOpenDepartmentActionId(menuOpen ? null : div.id);
-                                  }}
+                                  onClick={(event) => toggleDepartmentActionMenu(div.id, event)}
                                   className="rounded-lg border border-[#d8dde7] bg-white px-2.5 py-1 text-xs font-semibold text-[#111827] transition hover:border-[#1769ff] hover:text-[#1769ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
                                 >
                                   Aksi {div.name}
                                 </button>
-                                {menuOpen ? (
-                                  <div
-                                    role="menu"
-                                    aria-label={`Aksi ${div.name}`}
-                                    className="absolute right-0 z-20 mt-1 max-h-64 w-44 overflow-y-auto rounded-2xl border border-[#e2e7f0] bg-white p-1 shadow-[0_12px_32px_rgba(20,24,31,0.14)]"
-                                  >
-                                    <button type="button" role="menuitem" onMouseDown={() => handleViewDepartmentMembers(div.id)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff]">
-                                      Lihat anggota
-                                    </button>
-                                    <button type="button" role="menuitem" onMouseDown={() => openDepartmentForm(div)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff]">
-                                      Edit divisi
-                                    </button>
-                                    <button type="button" role="menuitem" onMouseDown={() => openDepartmentForm(div)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff]">
-                                      Atur manager
-                                    </button>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      disabled={isDeactivating || !div.isActive}
-                                      onMouseDown={() => handleDeactivateDepartment(div)}
-                                      className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#a54c2f] hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      {isDeactivating ? "Menonaktifkan..." : "Nonaktifkan divisi"}
-                                    </button>
-                                  </div>
-                                ) : null}
                               </div>
                             </td>
                           </tr>
@@ -3637,6 +3713,59 @@ export function AppPage() {
           </Panel>
         </div>
       </div>
+    );
+  }
+
+  function renderDepartmentActionMenu() {
+    if (!openDepartmentActionId || !departmentActionMenuPosition) return null;
+
+    const department = departments.find((item) => item.id === openDepartmentActionId);
+    if (!department) return null;
+
+    const isDeactivating = busyAction === `deactivate-divisi-${department.id}`;
+    const style: CSSProperties = {
+      position: "fixed",
+      left: `${departmentActionMenuPosition.left}px`,
+      width: `${departmentActionMenuPosition.width}px`,
+      maxHeight: `${DEPARTMENT_ACTION_MENU_MAX_HEIGHT}px`,
+      overflowY: "auto",
+      zIndex: 9999
+    };
+
+    if (typeof departmentActionMenuPosition.top === "number") {
+      style.top = `${departmentActionMenuPosition.top}px`;
+    } else if (typeof departmentActionMenuPosition.bottom === "number") {
+      style.bottom = `${departmentActionMenuPosition.bottom}px`;
+    }
+
+    return createPortal(
+      <div
+        ref={departmentActionMenuRef}
+        role="menu"
+        aria-label={`Aksi ${department.name}`}
+        style={style}
+        className="rounded-2xl border border-[#e2e7f0] bg-white p-1 shadow-[0_12px_32px_rgba(20,24,31,0.14)]"
+      >
+        <button type="button" role="menuitem" onMouseDown={() => handleViewDepartmentMembers(department.id)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]">
+          Lihat anggota
+        </button>
+        <button type="button" role="menuitem" onMouseDown={() => openDepartmentForm(department)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]">
+          Edit divisi
+        </button>
+        <button type="button" role="menuitem" onMouseDown={() => openDepartmentForm(department)} className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#111827] hover:bg-[#f4f7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]">
+          Atur manager
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          disabled={isDeactivating || !department.isActive}
+          onMouseDown={() => handleDeactivateDepartment(department)}
+          className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#a54c2f] hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+        >
+          {isDeactivating ? "Menonaktifkan..." : "Nonaktifkan divisi"}
+        </button>
+      </div>,
+      document.body
     );
   }
 
@@ -4170,6 +4299,8 @@ export function AppPage() {
       ) : null}
 
       {renderTabContent()}
+
+      {renderDepartmentActionMenu()}
 
       <Dialog title={requestDetail?.title ?? "Detail pengajuan"} open={Boolean(requestDetail)} onClose={() => setRequestDetail(null)}>
         {requestDetail ? (
