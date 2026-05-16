@@ -22,6 +22,7 @@ describe("app shell state", () => {
       "attendance",
       "history",
       "requests",
+      "notifications",
       "schedule",
       "payslip",
       "profile"
@@ -40,6 +41,7 @@ describe("app shell state", () => {
       "structure",
       "attendance",
       "requests",
+      "notifications",
       "locations",
       "reports",
       "profile"
@@ -53,6 +55,7 @@ describe("app shell state", () => {
       "team",
       "attendance",
       "requests",
+      "notifications",
       "exceptions",
       "profile"
     ]);
@@ -91,6 +94,7 @@ describe("app shell state", () => {
       "attendance",
       "history",
       "requests",
+      "notifications",
       "schedule",
       "payslip",
       "profile"
@@ -100,6 +104,7 @@ describe("app shell state", () => {
       "team",
       "attendance",
       "requests",
+      "notifications",
       "exceptions",
       "profile"
     ]);
@@ -109,6 +114,7 @@ describe("app shell state", () => {
       "structure",
       "attendance",
       "requests",
+      "notifications",
       "locations",
       "reports",
       "profile"
@@ -119,6 +125,7 @@ describe("app shell state", () => {
       "structure",
       "attendance",
       "requests",
+      "notifications",
       "locations",
       "reports",
       "settings",

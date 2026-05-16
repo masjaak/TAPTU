@@ -11,8 +11,10 @@ import {
   fetchManagerExceptionQueue,
   fetchManagerOverview,
   fetchManagerRequests,
+  fetchNotifications,
   getDashboard,
   login,
+  markNotificationRead,
   reassignEmployeeDepartment,
   updateDepartment
 } from "../lib/api";
@@ -263,5 +265,32 @@ describe("HR department API client", () => {
     expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/departments", expect.objectContaining({ method: "POST" }));
     expect(fetchSpy).toHaveBeenNthCalledWith(3, "/api/departments/dep-sales", expect.objectContaining({ method: "PATCH" }));
     expect(fetchSpy).toHaveBeenNthCalledWith(4, "/api/employees/usr-employee-01", expect.objectContaining({ method: "PATCH" }));
+  });
+});
+
+describe("notification API client", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("uses recipient-scoped list and mark-read endpoints", async () => {
+    const notification = {
+      id: "ntf-1",
+      organizationId: "org-01",
+      recipientId: "usr-employee-01",
+      type: "request_approved",
+      title: "Disetujui",
+      message: "Izin disetujui.",
+      createdAt: "2026-05-15T08:00:00.000Z",
+      readAt: null
+    };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([notification]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ...notification, readAt: "2026-05-15T09:00:00.000Z" }) });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await fetchNotifications("token:employee");
+    await markNotificationRead("token:employee", "ntf-1");
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(1, "/api/notifications", expect.any(Object));
+    expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/notifications/ntf-1/read", expect.objectContaining({ method: "PATCH" }));
   });
 });

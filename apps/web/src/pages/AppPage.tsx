@@ -37,6 +37,7 @@ import type {
   EmployeeListItem,
   EmployeeSummary,
   LeaveRequestItem,
+  NotificationItem,
   ShiftRecord,
   UserRole,
   WorkLocationItem
@@ -81,6 +82,7 @@ import {
   fetchManagerExceptionQueue,
   fetchManagerOverview,
   fetchManagerRequests,
+  fetchNotifications,
   fetchReportRows,
   fetchRequestDetail,
   fetchRequests,
@@ -90,6 +92,7 @@ import {
   getDashboard,
   reassignEmployeeDepartment,
   refreshScannerToken,
+  markNotificationRead,
   reviewException,
   updateDepartment,
   updateShift,
@@ -336,6 +339,7 @@ export function AppPage() {
   const [attendance, setAttendance] = useState<AttendanceTimelineItem[]>([]);
   const [attendanceState, setAttendanceState] = useState<"idle" | "checked_in" | "checked_out">("idle");
   const [requests, setRequests] = useState<LeaveRequestItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [scannerToken, setScannerToken] = useState<string | undefined>();
   const [scannerMeta, setScannerMeta] = useState<{ expiresInSeconds: number; scansToday: number; locationName: string } | null>(null);
   const [scannerScans, setScannerScans] = useState<Array<{ id: string; employeeName: string; status: "success" | "invalid" | "expired"; time: string; detail: string }>>([]);
@@ -427,6 +431,8 @@ export function AppPage() {
   const [employeeListError, setEmployeeListError] = useState<string | null>(null);
   const [managerRequestsLoaded, setManagerRequestsLoaded] = useState(false);
   const [managerRequestsError, setManagerRequestsError] = useState<string | null>(null);
+  const [notificationsLoaded, setNotificationsLoaded] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [workLocationsLoaded, setWorkLocationsLoaded] = useState(false);
   const [workLocationsError, setWorkLocationsError] = useState<string | null>(null);
   const [shiftsLoaded, setShiftsLoaded] = useState(false);
@@ -455,7 +461,14 @@ export function AppPage() {
   const departmentActionMenuRef = useRef<HTMLDivElement | null>(null);
   const departmentActionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const appNavigation = useMemo(() => getNavigationForRole(sessionRole), [sessionRole]);
+  const appNavigation = useMemo(() => {
+    const unreadCount = notifications.filter((n) => !n.readAt).length;
+    return getNavigationForRole(sessionRole).map((item) =>
+      item.key === "notifications" && unreadCount > 0
+        ? { ...item, badge: unreadCount }
+        : item
+    );
+  }, [sessionRole, notifications]);
   const attendanceTrust = useMemo(
     () => evaluateAttendanceTrust(attendanceTrustSignal, secureAttendancePolicy),
     [attendanceTrustSignal]
@@ -607,6 +620,19 @@ export function AppPage() {
         });
     }
 
+    if (tab === "notifications" && !notificationsLoaded) {
+      setNotificationsError(null);
+      fetchNotifications(session.token)
+        .then((items) => {
+          setNotifications(items);
+          setNotificationsLoaded(true);
+        })
+        .catch((error) => {
+          setNotificationsLoaded(true);
+          setNotificationsError(error instanceof Error ? error.message : "Notifikasi gagal dimuat.");
+        });
+    }
+
     if ((tab === "team" || tab === "exceptions") && (isAdmin || isManager) && !exceptionQueueLoaded) {
       const loadExceptions = isManager ? fetchManagerExceptionQueue : fetchExceptionQueue;
       setExceptionQueueError(null);
@@ -693,7 +719,7 @@ export function AppPage() {
           setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
         });
     }
-  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, departmentsLoaded, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
+  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, departmentsLoaded, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, notificationsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -784,23 +810,24 @@ export function AppPage() {
 
   useEffect(() => {
     if (!openDepartmentActionId) return;
+    const activeDepartmentActionId = openDepartmentActionId;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      const activeTrigger = departmentActionButtonRefs.current[openDepartmentActionId];
+      const activeTrigger = departmentActionButtonRefs.current[activeDepartmentActionId];
       closeDepartmentActionMenu();
       activeTrigger?.focus();
     }
 
     function handleMouseDown(event: MouseEvent) {
       const target = event.target as Node;
-      const activeTrigger = departmentActionButtonRefs.current[openDepartmentActionId];
+      const activeTrigger = departmentActionButtonRefs.current[activeDepartmentActionId];
       if (activeTrigger?.contains(target) || departmentActionMenuRef.current?.contains(target)) return;
       closeDepartmentActionMenu();
     }
 
     function handleViewportChange() {
-      const activeTrigger = departmentActionButtonRefs.current[openDepartmentActionId];
+      const activeTrigger = departmentActionButtonRefs.current[activeDepartmentActionId];
       if (!activeTrigger) {
         closeDepartmentActionMenu();
         return;
@@ -2638,7 +2665,7 @@ export function AppPage() {
                       <div className="mt-4">
                         <FormInput
                           label="Catatan keputusan"
-                          value={approvalNotes[item.id] ?? ""}
+                          value={item.id ? approvalNotes[item.id] ?? "" : ""}
                           onChange={(event) => {
                             setApprovalNotes((current) => ({ ...current, [item.id!]: event.target.value }));
                             setApprovalErrors((current) => {
@@ -2648,7 +2675,7 @@ export function AppPage() {
                             });
                           }}
                           placeholder="Tambahkan alasan atau catatan untuk karyawan"
-                          error={approvalErrors[item.id]}
+                          error={item.id ? approvalErrors[item.id] : undefined}
                           hint="Wajib diisi saat menolak agar karyawan mengetahui alasannya."
                         />
                       </div>
@@ -3384,6 +3411,78 @@ export function AppPage() {
               </div>
             </dl>
           </div>
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderNotificationsWorkspace() {
+    const unreadCount = notifications.filter((item) => !item.readAt).length;
+    return (
+      <section className="grid gap-5">
+        <Panel eyebrow="Inbox" title={`Notifikasi${unreadCount > 0 ? ` · ${unreadCount} belum dibaca` : ""}`}>
+          {!notificationsLoaded ? (
+            <LoadingState label="Memuat notifikasi" />
+          ) : notificationsError ? (
+            <ErrorState title="Notifikasi belum tersedia" description={notificationsError} />
+          ) : notifications.length === 0 ? (
+            <EmptyState title="Belum ada notifikasi" description="Update pengajuan dan validasi akan muncul di sini." />
+          ) : (
+            <div className="grid gap-2">
+              {notifications.map((item) => {
+                const isUnread = !item.readAt;
+                return (
+                  <article
+                    key={item.id}
+                    data-read-state={isUnread ? "unread" : "read"}
+                    className={`relative overflow-hidden rounded-[18px] border p-4 transition-colors ${
+                      isUnread
+                        ? "border-[#dbe7ff] bg-[#f4f8ff]"
+                        : "border-[#edf0f5] bg-white"
+                    }`}
+                  >
+                    {isUnread ? (
+                      <span className="absolute left-0 top-0 h-full w-[3px] rounded-l-full bg-[#1769ff]" aria-hidden="true" />
+                    ) : null}
+                    <div className="flex items-start justify-between gap-3 pl-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {isUnread ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#1769ff]" aria-hidden="true" /> : null}
+                          <p className={`break-words text-sm leading-5 ${isUnread ? "font-semibold text-[#111827]" : "font-medium text-[#374151]"}`}>
+                            {item.title}
+                          </p>
+                        </div>
+                        <p className="mt-1 break-words text-[13px] leading-5 text-[#596172]">{item.message}</p>
+                        <p className="mt-2 text-[11px] font-medium text-[#9aa3b2]">
+                          {new Date(item.createdAt).toLocaleString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          })}
+                        </p>
+                      </div>
+                      {isUnread ? (
+                        <button
+                          type="button"
+                          aria-label="Tandai dibaca"
+                          onClick={async () => {
+                            if (!session) return;
+                            const read = await markNotificationRead(session.token, item.id);
+                            setNotifications((current) => current.map((entry) => entry.id === read.id ? read : entry));
+                          }}
+                          className="shrink-0 rounded-xl border border-[#dbe7ff] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#1769ff] transition hover:bg-[#f0f6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff]"
+                        >
+                          Tandai dibaca
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </Panel>
       </section>
     );
@@ -4213,6 +4312,10 @@ export function AppPage() {
 
     if (tab === "requests") {
       return renderRequestsWorkspace();
+    }
+
+    if (tab === "notifications") {
+      return renderNotificationsWorkspace();
     }
 
     if (tab === "schedule" && isEmployee) {

@@ -1,6 +1,6 @@
 import type { SupabaseAdmin } from "./supabase";
-import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord, EmployeeListFilters } from "./domain";
-import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, DepartmentItem, EmployeeListItem, EmployeeSummary, LeaveRequestItem, UserRole } from "@taptu/shared";
+import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord, EmployeeListFilters, NotificationDraft } from "./domain";
+import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, DepartmentItem, EmployeeListItem, EmployeeSummary, LeaveRequestItem, NotificationItem, UserRole } from "@taptu/shared";
 import { applyEmployeeListFilters, createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain";
 
 /**
@@ -315,6 +315,89 @@ function toAttendanceRecordFromRow(row: Record<string, any>, userId: string): At
     createdAt: row.created_at ?? `${today}T00:00:00.000Z`,
     updatedAt: row.updated_at ?? `${today}T00:00:00.000Z`
   };
+}
+
+function toNotificationItem(row: Record<string, any>): NotificationItem {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    recipientId: row.recipient_id,
+    recipientRole: row.recipient_role ?? undefined,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    entityType: row.entity_type ?? undefined,
+    entityId: row.entity_id ?? undefined,
+    readAt: row.read_at ?? null,
+    createdAt: row.created_at
+  };
+}
+
+export async function supabaseCreateNotifications(
+  sb: SupabaseAdmin,
+  drafts: NotificationDraft[]
+) {
+  const rows: Array<Record<string, unknown>> = [];
+  for (const draft of drafts) {
+    if (draft.recipientId) {
+      rows.push({
+        organization_id: draft.organizationId,
+        recipient_id: draft.recipientId,
+        recipient_role: draft.recipientRole ?? null,
+        type: draft.type,
+        title: draft.title,
+        message: draft.message,
+        entity_type: draft.entityType ?? null,
+        entity_id: draft.entityId ?? null
+      });
+      continue;
+    }
+    if (draft.recipientRole === "admin") {
+      const { data, error } = await sb
+        .from("profiles")
+        .select("id, role")
+        .eq("organization_id", draft.organizationId)
+        .in("role", ["admin", "superadmin"]);
+      if (error) throw new Error(`Failed to fetch notification recipients: ${error.message}`);
+      for (const profile of data ?? []) {
+        rows.push({
+          organization_id: draft.organizationId,
+          recipient_id: profile.id,
+          recipient_role: profile.role,
+          type: draft.type,
+          title: draft.title,
+          message: draft.message,
+          entity_type: draft.entityType ?? null,
+          entity_id: draft.entityId ?? null
+        });
+      }
+    }
+  }
+  if (rows.length === 0) return;
+  const { error } = await sb.from("notifications").insert(rows);
+  if (error) throw new Error(`Failed to create notifications: ${error.message}`);
+}
+
+export async function supabaseGetNotifications(sb: SupabaseAdmin, recipientId: string) {
+  const { data, error } = await sb
+    .from("notifications")
+    .select("*")
+    .eq("recipient_id", recipientId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`Failed to fetch notifications: ${error.message}`);
+  return (data ?? []).map(toNotificationItem);
+}
+
+export async function supabaseMarkNotificationRead(sb: SupabaseAdmin, notificationId: string, recipientId: string) {
+  const { data, error } = await sb
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .eq("recipient_id", recipientId)
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(`Failed to mark notification read: ${error.message}`);
+  return data ? toNotificationItem(data) : null;
 }
 
 function toAttendanceRecordPayload(userId: string, record: AttendanceRecord, attendanceDate = new Date().toISOString().slice(0, 10)) {
@@ -639,6 +722,7 @@ function toLeaveRequestItem(row: ApprovalRequestRow, requester?: string, steps: 
 
   return {
     id: row.id,
+    employeeId: row.employee_id,
     requester,
     category: row.request_type,
     startDate: row.start_date,

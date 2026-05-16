@@ -36,8 +36,11 @@ import {
   computeEmployeeList,
   computeEmployeeSummary,
   createAttendanceException,
+  createAttendanceExceptionNotificationDraft,
+  filterNotificationsForRecipient,
   createAuditLog,
   createInitialStore,
+  createRequestNotificationDrafts,
   createShiftRecord,
   createWorkLocationItem,
   filterAttendanceHistory,
@@ -48,6 +51,7 @@ import {
   reduceExceptionReview,
   reduceRequests,
   refreshScannerToken,
+  markNotificationRead,
   toExceptionItem,
   toWorkLocationModel,
   updateShiftRecord,
@@ -97,7 +101,10 @@ import {
   supabaseReviewException,
   supabaseCreateAuditLog,
   supabaseCreateAttendanceException,
-  supabaseGetManagerRequests
+  supabaseGetManagerRequests,
+  supabaseCreateNotifications,
+  supabaseGetNotifications,
+  supabaseMarkNotificationRead
 } from "./supabaseQueries";
 
 const app = express();
@@ -138,7 +145,8 @@ const users: Array<AuthUser & { password: string }> = [
     email: "employee@taptu.app",
     password: "Taptu123!",
     organizationName: "TAPTU HQ",
-    role: "employee"
+    role: "employee",
+    managerId: "usr-manager-01"
   },
   {
     id: "usr-employee-02",
@@ -172,6 +180,7 @@ const apiConfig = getApiConfig();
 const storage = createStorageAdapter(apiConfig, storePath);
 let store = await storage.load();
 let localDepartments: DepartmentItem[] = [];
+const localOrganizationId = "org-demo";
 
 const useSupabase = apiConfig.storageMode === "supabase";
 let sb: SupabaseAdmin | null = null;
@@ -548,6 +557,57 @@ function userDirectory() {
   return Object.fromEntries(users.map((entry) => [entry.id, entry.fullName]));
 }
 
+function createLocalNotifications(drafts: ReturnType<typeof createRequestNotificationDrafts>) {
+  const expanded = drafts.flatMap((draft) => {
+    if (draft.recipientId) return [draft];
+    if (draft.recipientRole === "admin") {
+      return users
+        .filter((candidate) => candidate.role === "admin" || candidate.role === "superadmin")
+        .map((candidate) => ({ ...draft, recipientId: candidate.id, recipientRole: candidate.role }));
+    }
+    return [];
+  });
+
+  const now = new Date().toISOString();
+  store.notifications ??= [];
+  store.notifications.unshift(...expanded.map((draft) => ({
+    ...draft,
+    id: `ntf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    recipientId: draft.recipientId!,
+    createdAt: now,
+    readAt: null
+  })));
+}
+
+function buildRequestNotificationDrafts(
+  event: Parameters<typeof createRequestNotificationDrafts>[0]["event"],
+  input: {
+    organizationId: string;
+    requestId: string;
+    employeeId: string;
+    employeeName: string;
+    category: Parameters<typeof createRequestNotificationDrafts>[0]["category"];
+    managerId?: string | null;
+    reviewerNote?: string;
+  }
+) {
+  return createRequestNotificationDrafts({ event, ...input });
+}
+
+async function notifyAttendanceExceptionCreated(input: {
+  organizationId: string;
+  exceptionId: string;
+  employeeName: string;
+  managerId?: string | null;
+}) {
+  const draft = createAttendanceExceptionNotificationDraft(input);
+  if (useSupabase && sb) {
+    await supabaseCreateNotifications(sb, [draft]);
+    return;
+  }
+  createLocalNotifications([draft]);
+}
+
 function listExceptionItems(): AttendanceExceptionItem[] {
   return store.exceptions
     .slice()
@@ -879,22 +939,36 @@ app.post("/api/attendance/checkin", async (req, res) => {
     const persisted = await supabaseUpsertAttendance(sb, user.id, next);
 
     if (validation.exceptionType) {
-      await supabaseCreateAttendanceException(
+      const exception = createAttendanceException(persisted, user.id, validation.exceptionType, reasons[0] ?? "Butuh review.");
+      const createdException = await supabaseCreateAttendanceException(
         sb,
-        createAttendanceException(persisted, user.id, validation.exceptionType, reasons[0] ?? "Butuh review.")
+        exception
       );
+      await notifyAttendanceExceptionCreated({
+        organizationId: organizationId!,
+        exceptionId: createdException.id,
+        employeeName: user.fullName,
+        managerId: user.managerId
+      });
     }
 
     if (persisted.status === "Terlambat") {
-      await supabaseCreateAttendanceException(
-        sb,
-        createAttendanceException(
-          persisted,
-          user.id,
-          "Late check-in",
-          "Check-in melebihi toleransi 10 menit dari awal shift."
-        )
+      const lateException = createAttendanceException(
+        persisted,
+        user.id,
+        "Late check-in",
+        "Check-in melebihi toleransi 10 menit dari awal shift."
       );
+      const createdLateException = await supabaseCreateAttendanceException(
+        sb,
+        lateException
+      );
+      await notifyAttendanceExceptionCreated({
+        organizationId: organizationId!,
+        exceptionId: createdLateException.id,
+        employeeName: user.fullName,
+        managerId: user.managerId
+      });
     }
 
     if (reasons.some((item) => item.includes("Perangkat berbeda"))) {
@@ -974,11 +1048,25 @@ app.post("/api/attendance/checkin", async (req, res) => {
   store.attendanceHistory = [historyItem, ...store.attendanceHistory.filter((item) => item.day !== "Hari ini")];
 
   if (validation.exceptionType) {
-    store.exceptions.unshift(createAttendanceException(next, user.id, validation.exceptionType, reasons[0] ?? "Butuh review."));
+    const exception = createAttendanceException(next, user.id, validation.exceptionType, reasons[0] ?? "Butuh review.");
+    store.exceptions.unshift(exception);
+    await notifyAttendanceExceptionCreated({
+      organizationId: localOrganizationId,
+      exceptionId: exception.id,
+      employeeName: user.fullName,
+      managerId: user.managerId
+    });
   }
 
   if (next.status === "Terlambat") {
-    store.exceptions.unshift(createAttendanceException(next, user.id, "Late check-in", "Check-in melebihi toleransi 10 menit dari awal shift."));
+    const exception = createAttendanceException(next, user.id, "Late check-in", "Check-in melebihi toleransi 10 menit dari awal shift.");
+    store.exceptions.unshift(exception);
+    await notifyAttendanceExceptionCreated({
+      organizationId: localOrganizationId,
+      exceptionId: exception.id,
+      employeeName: user.fullName,
+      managerId: user.managerId
+    });
   }
 
   if (reasons.some((item) => item.includes("Perangkat berbeda"))) {
@@ -1192,6 +1280,18 @@ app.post("/api/requests", async (req, res) => {
 
   if (useSupabase && sb) {
     const created = await createEmployeeRequest(sb, user.id, parsed.data);
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (organizationId) {
+      const managerStep = created.approvalSteps?.find((step) => step.approverRole === "manager");
+      await supabaseCreateNotifications(sb, buildRequestNotificationDrafts("REQUEST_CREATED", {
+        organizationId,
+        requestId: created.id!,
+        employeeId: user.id,
+        employeeName: user.fullName,
+        category: created.category!,
+        managerId: managerStep?.approverId
+      }));
+    }
     return res.status(201).json({ request: created });
   }
 
@@ -1208,6 +1308,14 @@ app.post("/api/requests", async (req, res) => {
   };
 
   store.requests = reduceRequests(store.requests, { type: "CREATE", request: nextRequest });
+  createLocalNotifications(buildRequestNotificationDrafts("REQUEST_CREATED", {
+    organizationId: localOrganizationId,
+    requestId: nextRequest.id,
+    employeeId: user.id,
+    employeeName: user.fullName,
+    category: nextRequest.category,
+    managerId: user.managerId
+  }));
   await storage.save(store);
   return res.status(201).json({ request: buildRequestItem(nextRequest) });
 });
@@ -1269,6 +1377,20 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
       ? await approveRequestStep(sb, req.params.id, actionContext)
       : await rejectRequestStep(sb, req.params.id, actionContext);
     if (!updated) return res.status(409).json({ message: "Step approval tidak tersedia untuk role ini." });
+    const organizationId = await getOrganizationIdForUser(user.id);
+    if (organizationId && updated.employeeId && updated.category) {
+      const event = user.role === "manager"
+        ? parsed.data.status === "Disetujui" ? "MANAGER_APPROVED" : "MANAGER_REJECTED"
+        : parsed.data.status === "Disetujui" ? "HR_APPROVED" : "HR_REJECTED";
+      await supabaseCreateNotifications(sb, buildRequestNotificationDrafts(event, {
+        organizationId,
+        requestId: updated.id!,
+        employeeId: updated.employeeId,
+        employeeName: updated.requester ?? "Karyawan",
+        category: updated.category,
+        reviewerNote: parsed.data.adminNote
+      }));
+    }
     await supabaseCreateAuditLog(
       sb,
       createAuditLog(
@@ -1307,6 +1429,19 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
       parsed.data.adminNote ?? `${updated.category} ${parsed.data.status.toLowerCase()}`
     )
   );
+  createLocalNotifications(buildRequestNotificationDrafts(
+    user.role === "manager"
+      ? parsed.data.status === "Disetujui" ? "MANAGER_APPROVED" : "MANAGER_REJECTED"
+      : parsed.data.status === "Disetujui" ? "HR_APPROVED" : "HR_REJECTED",
+    {
+      organizationId: localOrganizationId,
+      requestId: updated.id,
+      employeeId: updated.userId,
+      employeeName: users.find((entry) => entry.id === updated.userId)?.fullName ?? "Karyawan",
+      category: updated.category,
+      reviewerNote: parsed.data.adminNote
+    }
+  ));
   await storage.save(store);
   return res.json({ request: buildRequestItem(updated, users.find((entry) => entry.id === updated.userId)?.fullName) });
 });
@@ -1539,6 +1674,27 @@ app.get("/api/admin/audit-logs", async (req, res) => {
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, 20)
   );
+});
+
+app.get("/api/notifications", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (useSupabase && sb) return res.json(await supabaseGetNotifications(sb, user.id));
+  return res.json(filterNotificationsForRecipient(store.notifications ?? [], user.id));
+});
+
+app.patch("/api/notifications/:id/read", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (useSupabase && sb) {
+    const item = await supabaseMarkNotificationRead(sb, req.params.id, user.id);
+    if (!item) return res.status(404).json({ message: "Notifikasi tidak ditemukan." });
+    return res.json(item);
+  }
+  const item = markNotificationRead(store.notifications ?? [], req.params.id, user.id);
+  if (!item) return res.status(404).json({ message: "Notifikasi tidak ditemukan." });
+  await storage.save(store);
+  return res.json(item);
 });
 
 app.get("/api/departments", async (req, res) => {
@@ -1888,6 +2044,11 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   app.listen(port, () => {
     console.log(`Taptu API listening on http://localhost:${port}`);
   });
+}
+
+export function resetLocalNotificationStoreForTests() {
+  store.notifications = [];
+  store.requests = createInitialStore().requests;
 }
 
 export { app };

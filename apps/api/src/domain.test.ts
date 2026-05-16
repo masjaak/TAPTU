@@ -14,6 +14,9 @@ import {
   createApprovalStepPlan,
   createCheckInRecord,
   createInitialStore,
+  createRequestNotificationDrafts,
+  filterNotificationsForRecipient,
+  markNotificationRead,
   createShiftRecord,
   createWorkLocationItem,
   filterAttendanceHistory,
@@ -301,6 +304,69 @@ describe("request state machine", () => {
         status: "pending"
       }
     ]);
+  });
+
+  it("maps request workflow transitions to recipient-scoped notification drafts", () => {
+    expect(createRequestNotificationDrafts({
+      event: "REQUEST_CREATED",
+      organizationId: "org-01",
+      requestId: "req-777",
+      employeeId: "usr-employee-01",
+      employeeName: "Fikri Maulana",
+      category: "Izin",
+      managerId: "usr-manager-01"
+    })).toEqual([
+      expect.objectContaining({
+        recipientId: "usr-manager-01",
+        type: "request_submitted",
+        entityId: "req-777"
+      })
+    ]);
+
+    expect(createRequestNotificationDrafts({
+      event: "MANAGER_APPROVED",
+      organizationId: "org-01",
+      requestId: "req-777",
+      employeeId: "usr-employee-01",
+      employeeName: "Fikri Maulana",
+      category: "Izin",
+      reviewerNote: "Valid."
+    })).toEqual([
+      expect.objectContaining({ recipientRole: "admin", type: "request_pending_hr" }),
+      expect.objectContaining({ recipientId: "usr-employee-01", type: "request_moved_to_hr" })
+    ]);
+  });
+
+  it("shows only recipient notifications and marks only owned notifications read", () => {
+    const notifications = [
+      {
+        id: "ntf-employee",
+        organizationId: "org-01",
+        recipientId: "usr-employee-01",
+        recipientRole: "employee" as const,
+        type: "request_approved" as const,
+        title: "Disetujui",
+        message: "Izin disetujui.",
+        createdAt: "2026-05-15T08:00:00.000Z",
+        readAt: null
+      },
+      {
+        id: "ntf-manager",
+        organizationId: "org-01",
+        recipientId: "usr-manager-01",
+        recipientRole: "manager" as const,
+        type: "request_submitted" as const,
+        title: "Pengajuan baru",
+        message: "Ada pengajuan.",
+        createdAt: "2026-05-15T08:01:00.000Z",
+        readAt: null
+      }
+    ];
+
+    expect(filterNotificationsForRecipient(notifications, "usr-employee-01")).toHaveLength(1);
+    expect(markNotificationRead(notifications, "ntf-manager", "usr-employee-01", "2026-05-15T09:00:00.000Z")).toBeNull();
+    expect(markNotificationRead(notifications, "ntf-employee", "usr-employee-01", "2026-05-15T09:00:00.000Z")?.readAt)
+      .toBe("2026-05-15T09:00:00.000Z");
   });
 });
 

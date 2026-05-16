@@ -213,6 +213,15 @@ export async function fetchRequestDetail(token: string, id: string) {
   return requestJson<LeaveRequestItem>(`/requests/${id}`, {}, token);
 }
 
+export async function fetchNotifications(token: string) {
+  if (isDemoToken(token)) return Promise.resolve([]);
+  return requestJson<import("@taptu/shared").NotificationItem[]>("/notifications", {}, token);
+}
+
+export async function markNotificationRead(token: string, id: string) {
+  return requestJson<import("@taptu/shared").NotificationItem>(`/notifications/${id}/read`, { method: "PATCH" }, token);
+}
+
 export async function cancelRequest(token: string, id: string) {
   if (isDemoToken(token)) return Promise.resolve({ id, removed: true });
   return requestJson<{ id: string; removed: boolean }>(

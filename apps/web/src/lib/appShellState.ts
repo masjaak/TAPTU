@@ -1,6 +1,7 @@
 import type { UserRole } from "@taptu/shared";
 import {
   BarChart3,
+  Bell,
   Building2,
   CalendarDays,
   Clock3,
@@ -25,6 +26,7 @@ export type AppSectionKey =
   | "attendance"
   | "history"
   | "requests"
+  | "notifications"
   | "exceptions"
   | "schedule"
   | "payslip"
@@ -43,6 +45,7 @@ export type AppShellEvent =
   | { type: "OPEN_ATTENDANCE" }
   | { type: "OPEN_HISTORY" }
   | { type: "OPEN_REQUESTS" }
+  | { type: "OPEN_NOTIFICATIONS" }
   | { type: "OPEN_EXCEPTIONS" }
   | { type: "OPEN_SCHEDULE" }
   | { type: "OPEN_PAYSLIP" }
@@ -67,6 +70,7 @@ const sections: Record<AppSectionKey, AppTabDefinition> = {
   attendance: { key: "attendance", label: "Presensi", icon: Clock3, path: "/app/attendance", description: "Check-in dan validasi" },
   history: { key: "history", label: "Riwayat", icon: History, path: "/app/history", description: "Histori absensi pribadi" },
   requests: { key: "requests", label: "Pengajuan", icon: TimerReset, path: "/app/requests", description: "Pengajuan dan approval" },
+  notifications: { key: "notifications", label: "Notifikasi", icon: Bell, path: "/app/notifications", description: "Update workflow" },
   exceptions: { key: "exceptions", label: "Pengecualian", icon: ShieldCheck, path: "/app/exceptions", description: "Validasi kehadiran tim" },
   schedule: { key: "schedule", label: "Jadwal", icon: CalendarDays, path: "/app/schedule", description: "Shift kerja pribadi" },
   payslip: { key: "payslip", label: "Slip Gaji", icon: WalletCards, path: "/app/payslip", description: "Ringkasan payroll pribadi" },
@@ -78,10 +82,10 @@ const sections: Record<AppSectionKey, AppTabDefinition> = {
 };
 
 const roleNavigation: Record<NavigationRole, AppSectionKey[]> = {
-  superadmin: ["home", "team", "structure", "attendance", "requests", "locations", "reports", "settings", "profile"],
-  admin: ["home", "team", "structure", "attendance", "requests", "locations", "reports", "profile"],
-  manager: ["home", "team", "attendance", "requests", "exceptions", "profile"],
-  employee: ["home", "attendance", "history", "requests", "schedule", "payslip", "profile"],
+  superadmin: ["home", "team", "structure", "attendance", "requests", "notifications", "locations", "reports", "settings", "profile"],
+  admin: ["home", "team", "structure", "attendance", "requests", "notifications", "locations", "reports", "profile"],
+  manager: ["home", "team", "attendance", "requests", "notifications", "exceptions", "profile"],
+  employee: ["home", "attendance", "history", "requests", "notifications", "schedule", "payslip", "profile"],
   scanner: ["scanner", "profile"]
 };
 
@@ -108,6 +112,7 @@ const eventMap: Record<AppShellEvent["type"], AppSectionKey> = {
   OPEN_ATTENDANCE: "attendance",
   OPEN_HISTORY: "history",
   OPEN_REQUESTS: "requests",
+  OPEN_NOTIFICATIONS: "notifications",
   OPEN_EXCEPTIONS: "exceptions",
   OPEN_SCHEDULE: "schedule",
   OPEN_PAYSLIP: "payslip",

@@ -101,6 +101,7 @@ export interface AttendanceTimelineItem {
 
 export interface LeaveRequestItem {
   id?: string;
+  employeeId?: string;
   requester?: string;
   category?: ApprovalRequestType;
   startDate?: string;
@@ -118,6 +119,28 @@ export interface LeaveRequestItem {
   statusLabel?: string;
   completedAt?: string | null;
   approvalSteps?: ApprovalStepItem[];
+}
+
+export type NotificationType =
+  | "request_submitted"
+  | "request_pending_hr"
+  | "request_moved_to_hr"
+  | "request_rejected"
+  | "request_approved"
+  | "attendance_exception_created";
+
+export interface NotificationItem {
+  id: string;
+  organizationId: string;
+  recipientId: string;
+  recipientRole?: UserRole;
+  type: NotificationType;
+  title: string;
+  message: string;
+  entityType?: string;
+  entityId?: string;
+  readAt?: string | null;
+  createdAt: string;
 }
 
 export interface ApprovalStepItem {

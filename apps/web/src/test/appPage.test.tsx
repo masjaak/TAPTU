@@ -37,7 +37,9 @@ const apiMocks = vi.hoisted(() => ({
   fetchDepartments: vi.fn(),
   createDepartment: vi.fn(),
   updateDepartment: vi.fn(),
-  reassignEmployeeDepartment: vi.fn()
+  reassignEmployeeDepartment: vi.fn(),
+  fetchNotifications: vi.fn(),
+  markNotificationRead: vi.fn()
 }));
 
 vi.mock("../lib/api", () => apiMocks);
@@ -126,6 +128,8 @@ describe("AppPage", () => {
     apiMocks.createDepartment.mockResolvedValue({ id: "dep-new", name: "New", managerId: null, managerName: null, isActive: true, memberCount: 0 });
     apiMocks.updateDepartment.mockResolvedValue({ id: "dep-ops", name: "Updated", managerId: null, managerName: null, isActive: true, memberCount: 0 });
     apiMocks.reassignEmployeeDepartment.mockResolvedValue({ id: "e1", fullName: "Fikri Maulana", email: "fikri@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service" });
+    apiMocks.fetchNotifications.mockResolvedValue([]);
+    apiMocks.markNotificationRead.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -3254,5 +3258,131 @@ describe("HR Divisi & Penempatan", () => {
     const statusFilter = screen.getByRole("combobox", { name: "Status absensi" });
     expect(divisionFilter.tagName).not.toBe("SELECT");
     expect(statusFilter.tagName).not.toBe("SELECT");
+  });
+
+  describe("notification inbox", () => {
+    function setupAdminSession() {
+      localStorage.setItem(
+        "taptu-session",
+        JSON.stringify({
+          token: "real:admin",
+          user: {
+            id: "usr-admin-01",
+            fullName: "Nadia Putri",
+            email: "admin@taptu.app",
+            organizationName: "TAPTU HQ",
+            role: "admin"
+          }
+        })
+      );
+      apiMocks.getDashboard.mockResolvedValue({
+        greeting: "Halo, Nadia Putri",
+        stats: [],
+        schedule: [],
+        attendance: [],
+        attendanceState: "idle",
+        requests: []
+      });
+      apiMocks.fetchAdminOverview.mockResolvedValue({
+        totalEmployees: 10,
+        checkedInToday: 8,
+        onTimeToday: 7,
+        lateToday: 1,
+        pendingRequests: 0,
+        absentToday: 2,
+        exceptionCount: 0,
+        recentActivity: []
+      });
+    }
+
+    const UNREAD_NOTIF = {
+      id: "notif-01",
+      organizationId: "org-01",
+      recipientId: "usr-admin-01",
+      type: "leave_request_created" as const,
+      title: "Pengajuan cuti baru",
+      message: "Fikri mengajukan cuti 3 hari",
+      readAt: null,
+      createdAt: "2026-05-15T08:00:00.000Z"
+    };
+
+    const READ_NOTIF = {
+      id: "notif-02",
+      organizationId: "org-01",
+      recipientId: "usr-admin-01",
+      type: "leave_request_approved" as const,
+      title: "Cuti disetujui",
+      message: "Pengajuan cuti Anda disetujui",
+      readAt: "2026-05-15T09:00:00.000Z",
+      createdAt: "2026-05-14T08:00:00.000Z"
+    };
+
+    it("shows polished empty state when there are no notifications", async () => {
+      setupAdminSession();
+      apiMocks.fetchNotifications.mockResolvedValue([]);
+      renderRoute("/app/notifications");
+
+      expect(await screen.findByText("Belum ada notifikasi")).toBeTruthy();
+      expect(screen.getByText(/update pengajuan/i)).toBeTruthy();
+    });
+
+    it("renders unread notification with unread indicator", async () => {
+      setupAdminSession();
+      apiMocks.fetchNotifications.mockResolvedValue([UNREAD_NOTIF]);
+      renderRoute("/app/notifications");
+
+      await screen.findByText("Pengajuan cuti baru");
+      const card = screen.getByRole("article");
+      expect(card.getAttribute("data-read-state")).toBe("unread");
+    });
+
+    it("renders read notification without unread indicator", async () => {
+      setupAdminSession();
+      apiMocks.fetchNotifications.mockResolvedValue([READ_NOTIF]);
+      renderRoute("/app/notifications");
+
+      await screen.findByText("Cuti disetujui");
+      const card = screen.getByRole("article");
+      expect(card.getAttribute("data-read-state")).toBe("read");
+    });
+
+    it("shows mark-as-read button only for unread notifications", async () => {
+      setupAdminSession();
+      apiMocks.fetchNotifications.mockResolvedValue([UNREAD_NOTIF, READ_NOTIF]);
+      renderRoute("/app/notifications");
+
+      await screen.findByText("Pengajuan cuti baru");
+      const buttons = screen.getAllByRole("button", { name: /tandai dibaca/i });
+      expect(buttons).toHaveLength(1);
+    });
+
+    it("marks notification as read when button is clicked", async () => {
+      setupAdminSession();
+      const updatedNotif = { ...UNREAD_NOTIF, readAt: "2026-05-15T10:00:00.000Z" };
+      apiMocks.fetchNotifications.mockResolvedValue([UNREAD_NOTIF]);
+      apiMocks.markNotificationRead.mockResolvedValue(updatedNotif);
+      renderRoute("/app/notifications");
+
+      await screen.findByText("Pengajuan cuti baru");
+      fireEvent.click(screen.getByRole("button", { name: /tandai dibaca/i }));
+
+      await waitFor(() => {
+        expect(apiMocks.markNotificationRead).toHaveBeenCalledWith(expect.any(String), "notif-01");
+      });
+      await waitFor(() => {
+        const card = screen.getByRole("article");
+        expect(card.getAttribute("data-read-state")).toBe("read");
+      });
+    });
+
+    it("shows unread badge count on notifications nav item in sidebar", async () => {
+      setupAdminSession();
+      apiMocks.fetchNotifications.mockResolvedValue([UNREAD_NOTIF, READ_NOTIF]);
+      renderRoute("/app/notifications");
+
+      await screen.findByText("Pengajuan cuti baru");
+      expect(screen.getByTestId("nav-badge-notifications")).toBeTruthy();
+      expect(screen.getByTestId("nav-badge-notifications").textContent).toBe("1");
+    });
   });
 });

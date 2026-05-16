@@ -16,6 +16,7 @@ export interface AppNavItem {
   icon: LucideIcon;
   path: string;
   description?: string;
+  badge?: number;
 }
 
 export interface AppShellUser {
@@ -105,7 +106,15 @@ export function AppShell({
                 className={navButtonClass(item.key)}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
-                <span className="min-w-0 break-words">{item.label}</span>
+                <span className="min-w-0 flex-1 break-words text-left">{item.label}</span>
+                {item.badge && item.badge > 0 ? (
+                  <span
+                    data-testid={`nav-badge-${item.key}`}
+                    className="ml-auto shrink-0 rounded-full bg-[#1769ff] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
               </button>
             ))}
           </nav>
@@ -154,7 +163,12 @@ export function AppShell({
               {navigation.map((item) => (
                 <button key={item.key} type="button" onClick={() => handleNavigate(item)} className={navButtonClass(item.key)}>
                   <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 break-words">{item.label}</span>
+                  <span className="min-w-0 flex-1 break-words text-left">{item.label}</span>
+                  {item.badge && item.badge > 0 ? (
+                    <span className="ml-auto shrink-0 rounded-full bg-[#1769ff] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </nav>

@@ -21,6 +21,7 @@ import type {
   UserRole,
   WorkLocation,
   WorkLocationItem
+  , NotificationItem
 } from "@taptu/shared";
 
 export type AttendanceMode = "QR" | "GPS" | "Selfie" | "Manual";
@@ -133,10 +134,22 @@ export interface DemoStore {
   scanner: ScannerRecord;
   exceptions: ExceptionRecord[];
   auditLogs: AuditLogRecord[];
+  notifications: NotificationItem[];
   workLocations: WorkLocation[];
   workLocationItems: WorkLocationItem[];
   shifts: ShiftRecord[];
 }
+
+export type RequestNotificationEvent =
+  | "REQUEST_CREATED"
+  | "MANAGER_APPROVED"
+  | "MANAGER_REJECTED"
+  | "HR_APPROVED"
+  | "HR_REJECTED";
+
+export type NotificationDraft = Omit<NotificationItem, "id" | "recipientId" | "createdAt"> & {
+  recipientId?: string;
+};
 
 export interface ValidationContext {
   locationLat?: number;
@@ -541,6 +554,106 @@ export function createAuditLog(action: AuditLogRecord["action"], actorName: stri
   };
 }
 
+export function createRequestNotificationDrafts(input: {
+  event: RequestNotificationEvent;
+  organizationId: string;
+  requestId: string;
+  employeeId: string;
+  employeeName: string;
+  category: ApprovalRequestType;
+  managerId?: string | null;
+  reviewerNote?: string;
+}): NotificationDraft[] {
+  const entity = { entityType: "approval_request", entityId: input.requestId };
+  if (input.event === "REQUEST_CREATED") {
+    if (input.managerId) {
+      return [{
+        organizationId: input.organizationId,
+        recipientId: input.managerId,
+        recipientRole: "manager",
+        type: "request_submitted",
+        title: "Pengajuan baru",
+        message: `${input.employeeName} mengajukan ${input.category}.`,
+        ...entity
+      }];
+    }
+    return [{
+      organizationId: input.organizationId,
+      recipientRole: "admin",
+      type: "request_submitted",
+      title: "Pengajuan baru",
+      message: `${input.employeeName} mengajukan ${input.category}.`,
+      ...entity
+    }];
+  }
+  if (input.event === "MANAGER_APPROVED") {
+    return [
+      {
+        organizationId: input.organizationId,
+        recipientRole: "admin",
+        type: "request_pending_hr",
+        title: "Menunggu review HR",
+        message: `${input.category} dari ${input.employeeName} sudah disetujui manager.`,
+        ...entity
+      },
+      {
+        organizationId: input.organizationId,
+        recipientId: input.employeeId,
+        recipientRole: "employee",
+        type: "request_moved_to_hr",
+        title: "Pengajuan diteruskan ke HR",
+        message: `${input.category} Anda sudah disetujui manager dan menunggu HR.`,
+        ...entity
+      }
+    ];
+  }
+  const rejected = input.event === "MANAGER_REJECTED" || input.event === "HR_REJECTED";
+  return [{
+    organizationId: input.organizationId,
+    recipientId: input.employeeId,
+    recipientRole: "employee",
+    type: rejected ? "request_rejected" : "request_approved",
+    title: rejected ? "Pengajuan ditolak" : "Pengajuan disetujui",
+    message: rejected
+      ? `${input.category} Anda ditolak.${input.reviewerNote ? ` Catatan: ${input.reviewerNote}` : ""}`
+      : `${input.category} Anda sudah disetujui HR.`,
+    ...entity
+  }];
+}
+
+export function createAttendanceExceptionNotificationDraft(input: {
+  organizationId: string;
+  exceptionId: string;
+  employeeName: string;
+  managerId?: string | null;
+}): NotificationDraft {
+  return {
+    organizationId: input.organizationId,
+    ...(input.managerId ? { recipientId: input.managerId, recipientRole: "manager" as const } : { recipientRole: "admin" as const }),
+    type: "attendance_exception_created",
+    title: "Validasi kehadiran perlu ditinjau",
+    message: `Catatan kehadiran ${input.employeeName} perlu ditinjau.`,
+    entityType: "attendance_exception",
+    entityId: input.exceptionId
+  };
+}
+
+export function filterNotificationsForRecipient(notifications: NotificationItem[], recipientId: string) {
+  return notifications.filter((notification) => notification.recipientId === recipientId);
+}
+
+export function markNotificationRead(
+  notifications: NotificationItem[],
+  notificationId: string,
+  recipientId: string,
+  readAt = new Date().toISOString()
+) {
+  const notification = notifications.find((item) => item.id === notificationId && item.recipientId === recipientId);
+  if (!notification) return null;
+  notification.readAt = notification.readAt ?? readAt;
+  return notification;
+}
+
 export function refreshScannerToken(previous: ScannerRecord): ScannerRecord {
   const nextToken = generateScannerToken();
   const nextExpiry = new Date(Date.now() + 30_000).toISOString();
@@ -844,6 +957,7 @@ export function createInitialStore(): DemoStore {
         createdAt: "2026-05-02T08:09:00.000Z"
       }
     ],
+    notifications: [],
     workLocations: [DEFAULT_LOCATION],
     workLocationItems: [
       {
