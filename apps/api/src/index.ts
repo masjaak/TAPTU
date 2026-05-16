@@ -661,6 +661,11 @@ export function resetLocalOrganizationStructureForTests() {
   }
 }
 
+export function resetLocalAttendanceStoreForTests() {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) return;
+  store = createInitialStore();
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",

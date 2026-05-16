@@ -1,0 +1,290 @@
+{
+  "attendance": {
+    "usr-employee-01": {
+      "id": "att-usr-employee-01-2026-05-02",
+      "userId": "usr-employee-01",
+      "shiftId": "shift-pagi",
+      "shiftName": "Shift Pagi",
+      "shiftStartTime": "08:00",
+      "shiftEndTime": "17:00",
+      "locationId": "loc-hq",
+      "locationName": "Kantor Pusat",
+      "state": "checked_in",
+      "status": "Tepat waktu",
+      "checkInAt": "2026-05-02T08:03:00.000Z",
+      "checkInMethod": "QR",
+      "locationLat": -6.2087,
+      "locationLng": 106.8457,
+      "validationStatus": "verified",
+      "validationReasons": [],
+      "selfieUrl": "placeholder://selfie-fikri",
+      "deviceId": "ios-15pm-demo",
+      "scannerTokenId": "scanner-default",
+      "createdAt": "2026-05-02T08:03:00.000Z",
+      "updatedAt": "2026-05-02T08:03:00.000Z"
+    },
+    "usr-employee-02": {
+      "id": "att-usr-employee-02-2026-05-02",
+      "userId": "usr-employee-02",
+      "shiftId": "shift-pagi",
+      "shiftName": "Shift Pagi",
+      "shiftStartTime": "08:00",
+      "shiftEndTime": "17:00",
+      "locationId": "loc-hq",
+      "locationName": "Kantor Pusat",
+      "state": "checked_in",
+      "status": "Terlambat",
+      "checkInAt": "2026-05-02T08:24:00.000Z",
+      "checkInMethod": "GPS",
+      "locationLat": -6.206,
+      "locationLng": 106.851,
+      "validationStatus": "needs_review",
+      "validationReasons": [
+        "Di luar radius lokasi kerja (603 m).",
+        "Perangkat berbeda dari riwayat sebelumnya."
+      ],
+      "selfieUrl": "",
+      "deviceId": "android-hr-02-new",
+      "createdAt": "2026-05-02T08:24:00.000Z",
+      "updatedAt": "2026-05-02T08:24:00.000Z"
+    },
+    "usr-employee-03": {
+      "id": "att-usr-employee-03-2026-05-02",
+      "userId": "usr-employee-03",
+      "shiftId": "shift-pagi",
+      "shiftName": "Shift Pagi",
+      "shiftStartTime": "08:00",
+      "shiftEndTime": "17:00",
+      "locationId": "loc-hq",
+      "locationName": "Kantor Pusat",
+      "state": "checked_out",
+      "status": "Selesai",
+      "validationStatus": "needs_review",
+      "validationReasons": [
+        "Lokasi belum terekam."
+      ],
+      "selfieUrl": "",
+      "deviceId": "android-ops-03",
+      "createdAt": "2026-05-02T07:30:00.000Z",
+      "updatedAt": "2026-05-16T05:27:17.493Z",
+      "checkInAt": "2026-05-16T05:27:17.477Z",
+      "checkInMethod": "Manual",
+      "checkOutAt": "2026-05-16T05:27:17.493Z",
+      "checkOutMethod": "Manual"
+    }
+  },
+  "attendanceHistory": [
+    {
+      "id": "att-usr-employee-03-2026-05-02",
+      "day": "Hari ini",
+      "status": "Tepat waktu",
+      "time": "05:27",
+      "method": "Manual",
+      "checkInTime": "2026-05-16T05:27:17.477Z",
+      "checkOutTime": "2026-05-16T05:27:17.493Z",
+      "duration": "0j 00m",
+      "locationName": "Kantor Pusat"
+    },
+    {
+      "id": "att-002",
+      "day": "Kemarin",
+      "status": "Tepat waktu",
+      "time": "07:55",
+      "method": "Selfie"
+    },
+    {
+      "id": "att-003",
+      "day": "Senin",
+      "status": "Izin",
+      "time": "08:00",
+      "method": "Manual"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req-001",
+      "userId": "usr-employee-01",
+      "category": "Izin",
+      "startDate": "2026-05-03",
+      "endDate": "2026-05-03",
+      "title": "Izin pribadi",
+      "detail": "Perlu keluar kantor pukul 15.00 untuk urusan keluarga.",
+      "status": "Menunggu",
+      "createdAt": "2026-05-02T08:30:00.000Z"
+    },
+    {
+      "id": "req-002",
+      "userId": "usr-employee-02",
+      "category": "Koreksi Absensi",
+      "startDate": "2026-05-02",
+      "endDate": "2026-05-02",
+      "title": "Koreksi check-in",
+      "detail": "GPS valid, tetapi token QR kadaluarsa saat scan pertama.",
+      "status": "Menunggu",
+      "createdAt": "2026-05-02T07:50:00.000Z"
+    }
+  ],
+  "scanner": {
+    "id": "scanner-default",
+    "token": "HDR-31A-7XZ",
+    "locationId": "loc-hq",
+    "locationName": "Kantor Pusat",
+    "expiresAt": "2026-05-16T05:27:47.353Z",
+    "status": "active",
+    "scansToday": 124,
+    "recentScans": [
+      {
+        "id": "scan-01",
+        "employeeId": "usr-employee-01",
+        "employeeName": "Fikri Maulana",
+        "status": "success",
+        "detail": "QR valid di Gerbang Utama",
+        "createdAt": "2026-05-02T08:03:00.000Z"
+      },
+      {
+        "id": "scan-02",
+        "employeeId": "usr-employee-03",
+        "employeeName": "Leo Pratama",
+        "status": "expired",
+        "detail": "Token sudah lewat masa aktif.",
+        "createdAt": "2026-05-02T08:09:00.000Z"
+      }
+    ]
+  },
+  "exceptions": [
+    {
+      "id": "exc-att-usr-employee-03-2026-05-02-1778909237493",
+      "attendanceRecordId": "att-usr-employee-03-2026-05-02",
+      "employeeId": "usr-employee-03",
+      "exceptionType": "Outside radius",
+      "reason": "Lokasi belum terekam.",
+      "status": "Need Review",
+      "createdAt": "2026-05-16T05:27:17.493Z"
+    },
+    {
+      "id": "exc-att-usr-employee-03-2026-05-02-1778909237478",
+      "attendanceRecordId": "att-usr-employee-03-2026-05-02",
+      "employeeId": "usr-employee-03",
+      "exceptionType": "Outside radius",
+      "reason": "Lokasi belum terekam.",
+      "status": "Need Review",
+      "createdAt": "2026-05-16T05:27:17.478Z"
+    },
+    {
+      "id": "exc-001",
+      "attendanceRecordId": "att-usr-employee-02-2026-05-02",
+      "employeeId": "usr-employee-02",
+      "exceptionType": "Outside radius",
+      "reason": "Di luar radius lokasi kerja (603 m).",
+      "status": "Need Review",
+      "createdAt": "2026-05-02T08:24:00.000Z"
+    },
+    {
+      "id": "exc-002",
+      "attendanceRecordId": "att-usr-employee-02-2026-05-02",
+      "employeeId": "usr-employee-02",
+      "exceptionType": "Different device",
+      "reason": "Perangkat berbeda dari riwayat sebelumnya.",
+      "status": "Need Review",
+      "createdAt": "2026-05-02T08:24:00.000Z"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit-001",
+      "action": "scanner_token_invalid_attempt",
+      "actorName": "System",
+      "actorRole": "scanner",
+      "targetId": "scan-02",
+      "detail": "Scan gagal karena token sudah expired.",
+      "createdAt": "2026-05-02T08:09:00.000Z"
+    }
+  ],
+  "notifications": [
+    {
+      "organizationId": "org-demo",
+      "recipientRole": "superadmin",
+      "type": "attendance_exception_created",
+      "title": "Validasi kehadiran perlu ditinjau",
+      "message": "Catatan kehadiran Leo Pratama perlu ditinjau.",
+      "entityType": "attendance_exception",
+      "entityId": "exc-att-usr-employee-03-2026-05-02-1778909237478",
+      "recipientId": "usr-superadmin-01",
+      "id": "ntf-1778909237479-05stc",
+      "createdAt": "2026-05-16T05:27:17.479Z",
+      "readAt": null
+    },
+    {
+      "organizationId": "org-demo",
+      "recipientRole": "admin",
+      "type": "attendance_exception_created",
+      "title": "Validasi kehadiran perlu ditinjau",
+      "message": "Catatan kehadiran Leo Pratama perlu ditinjau.",
+      "entityType": "attendance_exception",
+      "entityId": "exc-att-usr-employee-03-2026-05-02-1778909237478",
+      "recipientId": "usr-admin-01",
+      "id": "ntf-1778909237479-jbe3y",
+      "createdAt": "2026-05-16T05:27:17.479Z",
+      "readAt": null
+    }
+  ],
+  "workLocations": [
+    {
+      "id": "loc-hq",
+      "name": "Kantor Pusat",
+      "latitude": -6.2088,
+      "longitude": 106.8456,
+      "radiusMeters": 150
+    }
+  ],
+  "workLocationItems": [
+    {
+      "id": "loc-hq",
+      "name": "Kantor Pusat",
+      "address": "Jl. Sudirman No. 1, Jakarta Pusat",
+      "latitude": -6.2088,
+      "longitude": 106.8456,
+      "radiusMeters": 150,
+      "status": "active",
+      "createdAt": "2026-05-01T00:00:00.000Z"
+    },
+    {
+      "id": "loc-branch",
+      "name": "Kantor Cabang Selatan",
+      "address": "Jl. TB Simatupang No. 88, Jakarta Selatan",
+      "latitude": -6.295,
+      "longitude": 106.814,
+      "radiusMeters": 100,
+      "status": "active",
+      "createdAt": "2026-05-01T00:00:00.000Z"
+    }
+  ],
+  "shifts": [
+    {
+      "id": "shift-pagi",
+      "name": "Shift Pagi",
+      "startTime": "08:00",
+      "endTime": "17:00",
+      "gracePeriodMinutes": 10,
+      "workLocationId": "loc-hq",
+      "workLocationName": "Kantor Pusat",
+      "breakStartTime": "12:00",
+      "breakEndTime": "13:00",
+      "status": "active",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "updatedAt": "2026-05-01T00:00:00.000Z"
+    },
+    {
+      "id": "shift-sore",
+      "name": "Shift Sore",
+      "startTime": "13:00",
+      "endTime": "22:00",
+      "gracePeriodMinutes": 10,
+      "workLocationId": "loc-hq",
+      "workLocationName": "Kantor Pusat",
+      "status": "active",
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "updatedAt": "2026-05-01T00:00:00.000Z"
+    }
+  ]
+}

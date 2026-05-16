@@ -47,42 +47,27 @@ describe("api client", () => {
   });
 });
 
-describe("demo mode login", () => {
+describe("shared demo-account login", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("returns session for superadmin demo credentials without calling fetch", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const result = await login({ email: "superadmin@taptu.app", password: "Taptu123!" });
-    expect(result.user.role).toBe("superadmin");
-    expect(result.token).toMatch(/^demo:/);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("returns session for admin demo credentials without calling fetch", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const result = await login({ email: "admin@taptu.app", password: "Taptu123!" });
-    expect(result.user.role).toBe("admin");
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("returns session for employee demo credentials without calling fetch", async () => {
-    const fetchSpy = vi.fn();
+  it("routes demo credentials through the shared API by default", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        token: "token:employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee" }
+      })
+    });
     vi.stubGlobal("fetch", fetchSpy);
     const result = await login({ email: "employee@taptu.app", password: "Taptu123!" });
     expect(result.user.role).toBe("employee");
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("returns session for manager demo credentials without calling fetch", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const result = await login({ email: "manager@taptu.app", password: "Taptu123!" });
-    expect(result.user.role).toBe("manager");
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.token).toBe("token:employee");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/auth/login",
+      expect.objectContaining({ method: "POST" })
+    );
   });
 
   it("falls through to API when demo email is used with wrong password", async () => {

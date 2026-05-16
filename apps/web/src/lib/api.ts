@@ -48,10 +48,13 @@ import {
 } from "./demo";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const useBrowserLocalDemo = import.meta.env.VITE_BROWSER_LOCAL_DEMO === "true";
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
-  const demo = tryDemoLogin(payload.email, payload.password);
-  if (demo) return Promise.resolve(demo);
+  if (useBrowserLocalDemo) {
+    const demo = tryDemoLogin(payload.email, payload.password);
+    if (demo) return Promise.resolve(demo);
+  }
   return requestJson<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload)
