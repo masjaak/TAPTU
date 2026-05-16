@@ -117,6 +117,34 @@ const structureCards = [
   }
 ];
 
+const useCaseCards = [
+  {
+    title: "Kantor & Back Office",
+    copy: "Absensi harian dengan shift, lokasi kerja, dan approval izin."
+  },
+  {
+    title: "Outlet / Cabang",
+    copy: "Pantau tim di beberapa lokasi tanpa mencampur data antar cabang."
+  },
+  {
+    title: "Hotel & Operasional",
+    copy: "Cocok untuk shift pagi, sore, malam, dan tim yang berpindah area."
+  },
+  {
+    title: "Tim Lapangan",
+    copy: "Check-in mobile tetap divalidasi dengan lokasi, waktu, dan perangkat."
+  }
+];
+
+const productionChecklist = [
+  "Data karyawan",
+  "Divisi dan manager",
+  "Shift kerja",
+  "Lokasi kerja",
+  "Aturan approval",
+  "Kebijakan validasi"
+];
+
 const faqs = [
   {
     question: "Apakah Taptu hanya untuk tim lapangan?",
@@ -352,7 +380,7 @@ export function LandingPage() {
                   </div>
                   <h1
                     aria-label="Absensi tim yang dicek sebelum masuk laporan."
-                    className="mt-10 max-w-4xl text-[38px] font-black leading-[1.08] tracking-[-0.03em] text-[#0f1115] sm:text-[42px] md:text-5xl lg:text-[68px]"
+                    className="mt-10 max-w-4xl text-[34px] font-black leading-[1.08] tracking-[-0.03em] text-[#0f1115] min-[390px]:text-[38px] sm:text-[42px] md:text-5xl lg:text-[68px]"
                     data-lines="2"
                   >
                     <span className="block" data-line="1">Absensi tim yang dicek</span>
@@ -480,13 +508,45 @@ export function LandingPage() {
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 md:py-16 lg:px-12 lg:py-20"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
               variants={stagger}
             >
-              <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+              <motion.div className="max-w-3xl" variants={fadeUp}>
+                <SectionLabel>Use case</SectionLabel>
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                  Cocok untuk tim yang punya banyak cara hadir.
+                </h2>
+                <p className="mt-5 text-base leading-8 text-[#596172]">
+                  Taptu bisa dipakai untuk kantor pusat, outlet, hotel, restoran, tim lapangan, dan lokasi kerja yang butuh
+                  validasi kehadiran lebih rapi.
+                </p>
+              </motion.div>
+              <div className="mt-8 grid gap-4 md:mt-10 md:grid-cols-2 xl:grid-cols-4">
+                {useCaseCards.map((item) => (
+                  <motion.article
+                    key={item.title}
+                    className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-6"
+                    variants={fadeUp}
+                    whileHover={{ y: -5 }}
+                  >
+                    <h3 className="text-xl font-black tracking-[-0.03em]">{item.title}</h3>
+                    <p className="mt-3 text-sm leading-6 text-[#596172]">{item.copy}</p>
+                  </motion.article>
+                ))}
+              </div>
+            </motion.section>
+
+            <motion.section
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 md:py-16 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-10">
                 <motion.div variants={fadeUp}>
                   <SectionLabel>Struktur & Approval</SectionLabel>
                   <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
@@ -510,6 +570,33 @@ export function LandingPage() {
                     </motion.article>
                   ))}
                 </div>
+              </div>
+            </motion.section>
+
+            <motion.section
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+                <motion.div variants={fadeUp}>
+                  <SectionLabel>Siap produksi</SectionLabel>
+                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Yang perlu disiapkan sebelum Taptu dipakai.
+                  </h2>
+                </motion.div>
+                <motion.div className="grid gap-3 sm:grid-cols-2 sm:gap-4" variants={fadeUp}>
+                  {productionChecklist.map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-[20px] border border-[#edf0f5] bg-[#f9fafc] px-4 py-3.5 text-sm font-bold text-[#101217] sm:px-5 sm:py-4 sm:text-base"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </motion.div>
               </div>
             </motion.section>
 
@@ -579,14 +666,14 @@ export function LandingPage() {
               viewport={revealViewport}
               variants={fadeUp}
             >
-              <div className="flex flex-col items-start gap-10 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
                 <div className="max-w-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Mulai dari demo</p>
                   <h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
                     Coba alur Taptu dari check-in sampai review HR.
                   </h2>
                   <p data-testid="cta-sub-copy" className="mt-4 text-base leading-7 text-white/70">
-                    Masuk sebagai Employee, Manager, HR, atau Scanner untuk melihat bagaimana data kehadiran diproses sebelum
+                    Coba sebagai Employee, Manager, HR, atau Scanner untuk melihat bagaimana data kehadiran diproses sebelum
                     masuk laporan.
                   </p>
                 </div>

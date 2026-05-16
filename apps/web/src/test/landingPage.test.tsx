@@ -38,7 +38,9 @@ describe("landing page", () => {
     expect(screen.getByRole("heading", { name: /attendance desk untuk tim operasional/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /dari check-in sampai laporan/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /ruang kerja berbeda untuk tiap peran/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /cocok untuk tim yang punya banyak cara hadir/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /approval mengikuti struktur tim/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /yang perlu disiapkan sebelum taptu dipakai/i })).toBeTruthy();
   });
 
   it("does not show the old product name", () => {
@@ -119,6 +121,20 @@ describe("landing page", () => {
     expect(screen.getByText(/apa yang perlu disiapkan sebelum produksi/i)).toBeTruthy();
   });
 
+  it("shows operational use cases and production readiness", () => {
+    renderAt("/");
+    expect(screen.getByText(/kantor & back office/i)).toBeTruthy();
+    expect(screen.getByText(/outlet \/ cabang/i)).toBeTruthy();
+    expect(screen.getByText(/hotel & operasional/i)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^tim lapangan$/i })).toBeTruthy();
+    expect(screen.getByText(/^data karyawan$/i)).toBeTruthy();
+    expect(screen.getByText(/^divisi dan manager$/i)).toBeTruthy();
+    expect(screen.getByText(/^shift kerja$/i)).toBeTruthy();
+    expect(screen.getByText(/^lokasi kerja$/i)).toBeTruthy();
+    expect(screen.getByText(/^aturan approval$/i)).toBeTruthy();
+    expect(screen.getByText(/^kebijakan validasi$/i)).toBeTruthy();
+  });
+
   it("CTA section uses a visually distinct action link, not the primary blue-on-blue pattern", () => {
     renderAt("/");
     expect(screen.getByTestId("cta-demo-action")).toBeTruthy();
@@ -127,6 +143,7 @@ describe("landing page", () => {
   it("CTA section has supporting sub-copy to reduce hesitation", () => {
     renderAt("/");
     expect(screen.getByTestId("cta-sub-copy")).toBeTruthy();
+    expect(screen.getByText(/coba sebagai employee, manager, hr, atau scanner/i)).toBeTruthy();
   });
 
   it("footer has nav links matching the primary navigation", () => {
