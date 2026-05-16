@@ -44,7 +44,8 @@ import {
   updateDemoDepartment,
   updateDemoShift,
   updateDemoWorkLocation,
-  tryDemoLogin
+  tryDemoLogin,
+  getDemoRoleFromToken
 } from "./demo";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -173,7 +174,7 @@ export async function createRequest(
 
 export async function approveRequest(token: string, id: string, status: "Disetujui" | "Ditolak", adminNote?: string) {
   if (isDemoToken(token)) {
-    const role = token.split(":")[1];
+    const role = getDemoRoleFromToken(token);
     const isRejection = status === "Ditolak";
     const isManagerRole = role === "manager";
 

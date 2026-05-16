@@ -180,13 +180,24 @@ const ADMIN_ACTIVITY: AttendanceActivityItem[] = [
   { id: "act-03", employeeName: "Leo Pratama", event: "Check-out", time: "17:09", status: "Selesai", detail: "Shift sore ditutup dari perangkat iPhone" }
 ];
 
+const DEMO_ROLES = new Set<UserRole>(["superadmin", "admin", "manager", "employee", "scanner"]);
+
+export function getDemoRoleFromToken(token: string): UserRole | null {
+  if (!token.startsWith("demo:")) {
+    return null;
+  }
+
+  const role = token.slice("demo:".length);
+  return DEMO_ROLES.has(role as UserRole) ? role as UserRole : null;
+}
+
 function demoUserByToken(token: string) {
-  const role = token.slice(5) as UserRole;
-  return DEMO_USERS.find((user) => user.role === role) ?? DEMO_USERS[0];
+  const role = getDemoRoleFromToken(token);
+  return role ? DEMO_USERS.find((user) => user.role === role) ?? null : null;
 }
 
 export function isDemoToken(token: string): boolean {
-  return token.startsWith("demo:");
+  return getDemoRoleFromToken(token) !== null;
 }
 
 export function tryDemoLogin(email: string, password: string): LoginResponse | null {
@@ -200,7 +211,7 @@ export function tryDemoLogin(email: string, password: string): LoginResponse | n
 }
 
 export function getDemoDashboard(token: string): DashboardPayload {
-  const user = demoUserByToken(token);
+  const user = demoUserByToken(token) ?? DEMO_USERS.find((candidate) => candidate.role === "employee")!;
 
   return {
     greeting: `Halo, ${user.fullName}`,
@@ -214,12 +225,14 @@ export function getDemoDashboard(token: string): DashboardPayload {
 }
 
 export function getDemoAttendanceHistory(token: string): AttendanceTimelineItem[] {
-  const role = token.slice(5) as UserRole;
+  const role = getDemoRoleFromToken(token);
+  if (!role) return [];
   return ATTENDANCE[role] ?? [];
 }
 
 export function getDemoRequests(token: string): LeaveRequestItem[] {
-  const role = token.slice(5) as UserRole;
+  const role = getDemoRoleFromToken(token);
+  if (!role) return [];
   return REQUESTS[role] ?? [];
 }
 

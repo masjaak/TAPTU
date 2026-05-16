@@ -176,6 +176,14 @@ const users: Array<AuthUser & { password: string }> = [
   }
 ];
 
+export function findLocalDemoUserByCredentials(email: string, password: string): AuthUser | null {
+  const found = users.find((user) => user.email === email && user.password === password);
+  if (!found) return null;
+
+  const { password: _password, ...user } = found;
+  return user;
+}
+
 const apiDir = dirname(fileURLToPath(import.meta.url));
 const storePath = join(apiDir, "..", "data", "demo-store.json");
 const apiConfig = getApiConfig();
@@ -739,7 +747,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
   }
 
-  const found = users.find((user) => user.email === parsed.data.email && user.password === parsed.data.password);
+  const found = findLocalDemoUserByCredentials(parsed.data.email, parsed.data.password);
 
   if (!found) {
     return res.status(401).json({
@@ -747,10 +755,9 @@ app.post("/api/auth/login", async (req, res) => {
     });
   }
 
-  const { password: _password, ...user } = found;
   const response: LoginResponse = {
-    token: signUser(user),
-    user
+    token: signUser(found),
+    user: found
   };
 
   return res.json(response);

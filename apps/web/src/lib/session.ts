@@ -1,4 +1,5 @@
 import type { LoginResponse } from "@taptu/shared";
+import { getDemoRoleFromToken } from "./demo";
 
 const key = "taptu-session";
 
@@ -14,7 +15,15 @@ export function readSession(): LoginResponse | null {
   }
 
   try {
-    return JSON.parse(raw) as LoginResponse;
+    const session = JSON.parse(raw) as LoginResponse;
+    const demoRole = getDemoRoleFromToken(session.token);
+
+    if (session.token.startsWith("demo:") && demoRole !== session.user.role) {
+      localStorage.removeItem(key);
+      return null;
+    }
+
+    return session;
   } catch {
     localStorage.removeItem(key);
     return null;
