@@ -24,7 +24,7 @@ describe("landing page", () => {
 
   it("positions Taptu inside a focused attendance hero", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /validasi absensi tim sebelum masuk laporan hr/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /absensi tim yang dicek sebelum masuk laporan/i })).toBeTruthy();
   });
 
   it("shows conversion paths for demo and workflow review", () => {
@@ -35,10 +35,10 @@ describe("landing page", () => {
 
   it("explains the landing page trust sequence", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /attendance desk yang siap dipakai/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /dari scan sampai laporan/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /dibuat untuk lima peran kerja/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /alur approval mengikuti struktur tim/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /attendance desk untuk tim operasional/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /dari check-in sampai laporan/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /ruang kerja berbeda untuk tiap peran/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /approval mengikuti struktur tim/i })).toBeTruthy();
   });
 
   it("does not show the old product name", () => {
@@ -48,8 +48,8 @@ describe("landing page", () => {
 
   it("includes completion sections for rollout confidence", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /sinyal yang membuat admin percaya/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /pertanyaan sebelum mulai/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /data hadir yang lebih mudah dipercaya/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /pertanyaan sebelum mencoba/i })).toBeTruthy();
     expect(screen.getByRole("contentinfo")).toBeTruthy();
   });
 
@@ -74,7 +74,7 @@ describe("landing page", () => {
 
   it("hero headline is structured as exactly two explicit lines", () => {
     renderAt("/");
-    const h1 = screen.getByRole("heading", { name: /validasi absensi tim sebelum masuk laporan hr/i });
+    const h1 = screen.getByRole("heading", { name: /absensi tim yang dicek sebelum masuk laporan/i });
     expect(h1.getAttribute("data-lines")).toBe("2");
     const lines = h1.querySelectorAll("span[data-line]");
     expect(lines).toHaveLength(2);
@@ -96,7 +96,7 @@ describe("landing page", () => {
     expect(screen.getByLabelText("30s - QR token refresh")).toBeTruthy();
     expect(screen.getByLabelText("5 role - Employee, Manager, HR, Superadmin, Scanner")).toBeTruthy();
     expect(screen.getByLabelText("2 tahap - Approval Manager → HR")).toBeTruthy();
-    expect(screen.getByLabelText("1 queue - Pengecualian tervalidasi")).toBeTruthy();
+    expect(screen.getByLabelText("1 antrian - Pengecualian untuk direview")).toBeTruthy();
   });
 
   it("describes the current role and approval model", () => {
@@ -112,10 +112,11 @@ describe("landing page", () => {
 
   it("answers the updated workflow questions", () => {
     renderAt("/");
-    expect(screen.getByText(/apakah manager punya dashboard sendiri/i)).toBeTruthy();
+    expect(screen.getByText(/apa yang bisa dicoba di demo/i)).toBeTruthy();
     expect(screen.getByText(/apakah hr bisa mengatur divisi/i)).toBeTruthy();
     expect(screen.getByText(/apakah pengajuan langsung disetujui hr/i)).toBeTruthy();
     expect(screen.getByText(/apakah data absensi langsung masuk laporan/i)).toBeTruthy();
+    expect(screen.getByText(/apa yang perlu disiapkan sebelum produksi/i)).toBeTruthy();
   });
 
   it("CTA section uses a visually distinct action link, not the primary blue-on-blue pattern", () => {

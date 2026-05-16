@@ -33,25 +33,25 @@ const deskItems = [
   {
     icon: QrCode,
     title: "QR refresh otomatis",
-    copy: "Token scanner berubah berkala supaya check-in tetap cepat tanpa membuka celah titip scan."
+    copy: "Token scanner berganti berkala agar check-in tetap cepat tanpa membuka celah titip scan."
   },
   {
     icon: MapPin,
     title: "Lokasi punya guard",
-    copy: "Check-in di luar radius tidak langsung masuk laporan HR. Tim review melihatnya sebagai antrian validasi."
+    copy: "Check-in di luar radius tidak langsung jadi data final. HR melihatnya sebagai antrian review."
   },
   {
     icon: Fingerprint,
     title: "Bukti hadir berlapis",
-    copy: "QR, waktu, lokasi, dan selfie bisa dipakai sebagai konteks sebelum data masuk laporan HR."
+    copy: "QR, waktu, lokasi, perangkat, dan selfie membantu HR membaca konteks kehadiran."
   }
 ];
 
 const workflowSteps = [
-  ["01", "Scan", "Tim check-in dari PWA atau gate scanner."],
-  ["02", "Validasi", "Sistem membaca lokasi, waktu, perangkat, dan status shift."],
-  ["03", "Review", "Anomali dan pengajuan masuk ke Manager atau HR sesuai struktur tim."],
-  ["04", "Laporan", "Data yang lolos guard siap dipakai dalam laporan HR."]
+  ["01", "Check-in", "Karyawan check-in dari mobile atau scanner gate."],
+  ["02", "Validasi", "Sistem membaca waktu, lokasi, perangkat, shift, dan metode absensi."],
+  ["03", "Review", "Anomali masuk ke Manager atau HR sesuai struktur tim."],
+  ["04", "Laporan", "Data yang lolos review siap masuk rekap kehadiran."]
 ];
 
 const validationProgress = [
@@ -71,27 +71,27 @@ const roleCards = [
   {
     icon: Smartphone,
     title: "Employee",
-    copy: "Check-in, check-out, riwayat, pengajuan, jadwal, slip gaji, dan profil."
+    copy: "Check-in, check-out, riwayat, pengajuan, jadwal, slip gaji, dan profil pribadi."
   },
   {
     icon: UsersRound,
     title: "Manager",
-    copy: "Memantau tim, review pengajuan, dan menangani pengecualian sebelum masuk HR."
+    copy: "Melihat tim sendiri, meninjau pengajuan, dan mengecek pengecualian sebelum masuk HR."
   },
   {
     icon: ShieldCheck,
     title: "HR/Admin",
-    copy: "Mengelola karyawan, struktur tim, approval akhir, lokasi, shift, dan laporan."
+    copy: "Mengelola karyawan, struktur tim, lokasi, shift, approval akhir, dan laporan."
   },
   {
     icon: Fingerprint,
     title: "Superadmin",
-    copy: "Menjaga konfigurasi organisasi, role, dan batas akses sistem."
+    copy: "Mengatur organisasi, role, dan batas akses agar fitur tidak bocor ke peran yang salah."
   },
   {
     icon: RadioTower,
     title: "Scanner",
-    copy: "Mode gate khusus untuk check-in cepat memakai QR token yang terus refresh."
+    copy: "Mode gate khusus untuk scan cepat dengan QR token yang terus diperbarui."
   }
 ];
 
@@ -99,32 +99,32 @@ const trustSignals = [
   { value: "30s", label: "QR token refresh" },
   { value: "5 role", label: "Employee, Manager, HR, Superadmin, Scanner" },
   { value: "2 tahap", label: "Approval Manager → HR" },
-  { value: "1 queue", label: "Pengecualian tervalidasi" }
+  { value: "1 antrian", label: "Pengecualian untuk direview" }
 ];
 
 const structureCards = [
   {
     title: "Divisi & Penempatan",
-    copy: "Kelompokkan karyawan berdasarkan divisi, lokasi, dan manager."
+    copy: "Kelompokkan karyawan berdasarkan divisi, manager, dan lokasi kerja."
   },
   {
     title: "Approval dua tahap",
-    copy: "Pengajuan dapat melewati Manager terlebih dahulu sebelum keputusan final HR."
+    copy: "Manager memberi review awal. HR memberi keputusan final."
   },
   {
     title: "Catatan reviewer",
-    copy: "Alasan penolakan atau keputusan tampil kembali ke karyawan."
+    copy: "Alasan penolakan atau koreksi bisa dilihat kembali oleh karyawan."
   }
 ];
 
 const faqs = [
   {
     question: "Apakah Taptu hanya untuk tim lapangan?",
-    answer: "Tidak. Taptu cocok untuk tim hybrid yang punya kantor, gate scanner, lokasi lapangan, dan karyawan mobile."
+    answer: "Tidak. Taptu cocok untuk tim kantor, outlet, lapangan, dan karyawan mobile yang butuh validasi lokasi atau scanner gate."
   },
   {
-    question: "Apakah manager punya dashboard sendiri?",
-    answer: "Ya. Manager hanya melihat timnya sendiri, termasuk presensi, pengajuan, dan pengecualian yang perlu ditinjau."
+    question: "Apa yang bisa dicoba di demo?",
+    answer: "Kamu bisa mencoba alur sebagai Employee, Manager, HR, dan Scanner untuk melihat perbedaan akses tiap peran."
   },
   {
     question: "Apakah HR bisa mengatur divisi?",
@@ -136,7 +136,11 @@ const faqs = [
   },
   {
     question: "Apakah data absensi langsung masuk laporan?",
-    answer: "Tidak semua. Data yang bermasalah masuk antrian review agar HR bisa mengambil keputusan dengan jejak audit."
+    answer: "Data normal bisa masuk rekap. Data yang bermasalah masuk antrian review agar HR punya jejak keputusan."
+  },
+  {
+    question: "Apa yang perlu disiapkan sebelum produksi?",
+    answer: "Data karyawan, struktur divisi, shift, lokasi kerja, aturan approval, dan kebijakan validasi."
   }
 ];
 
@@ -254,7 +258,7 @@ export function LandingPage() {
                   whileHover={{ rotate: -3, scale: 1.03, y: -10 }}
                 >
                   <p className="text-sm font-black leading-6 text-[#37321a]">Catatan shift</p>
-                  <p className="mt-2 text-sm leading-6 text-[#5f5623]">Review scan luar radius sebelum masuk laporan HR.</p>
+                  <p className="mt-2 text-sm leading-6 text-[#5f5623]">Scan di luar radius perlu review sebelum masuk laporan.</p>
                 </motion.div>
 
                 <motion.div
@@ -277,7 +281,7 @@ export function LandingPage() {
                       <p className="text-xs text-[#7a8495]">Approval izin</p>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-2xl bg-[#f6f8fb] p-3 text-xs font-bold text-[#596172]">14 request menunggu</div>
+                  <div className="mt-4 rounded-2xl bg-[#f6f8fb] p-3 text-xs font-bold text-[#596172]">14 pengajuan menunggu keputusan.</div>
                 </motion.div>
 
                 <motion.div
@@ -285,6 +289,7 @@ export function LandingPage() {
                   variants={fadeUp}
                 >
                   <p className="text-sm font-black">Validasi hari ini</p>
+                  <p className="mt-2 text-xs leading-5 text-[#7a8495]">QR gate dan GPS kantor perlu dicek berkala.</p>
                   <div className="mt-4 space-y-3">
                     {validationProgress.map((item) => (
                       <div key={item.label}>
@@ -346,16 +351,16 @@ export function LandingPage() {
                     <span className="text-2xl font-black tracking-[-0.02em] text-white">T</span>
                   </div>
                   <h1
-                    aria-label="Validasi absensi tim sebelum masuk laporan HR."
-                    className="mt-12 max-w-5xl text-[46px] font-black uppercase leading-[1.08] tracking-[-0.03em] text-[#0f1115] md:text-5xl lg:text-[72px]"
+                    aria-label="Absensi tim yang dicek sebelum masuk laporan."
+                    className="mt-10 max-w-4xl text-[38px] font-black leading-[1.08] tracking-[-0.03em] text-[#0f1115] sm:text-[42px] md:text-5xl lg:text-[68px]"
                     data-lines="2"
                   >
-                    <span className="block" data-line="1">Validasi absensi tim</span>
-                    <span className="block text-[#9aa1ad]" data-line="2">sebelum masuk laporan HR.</span>
+                    <span className="block" data-line="1">Absensi tim yang dicek</span>
+                    <span className="block text-[#9aa1ad]" data-line="2">sebelum masuk laporan.</span>
                   </h1>
-                  <p className="mt-8 max-w-xl text-base leading-7 text-[#596172] md:text-lg">
-                    Taptu menyatukan check-in mobile, scanner gate, validasi lokasi, approval izin, struktur tim, dan laporan
-                    HR dalam satu workspace yang ringan.
+                  <p className="mt-7 max-w-2xl text-base leading-8 text-[#596172] md:text-lg">
+                    Taptu membantu HR mengelola check-in, validasi lokasi, pengajuan izin, struktur tim, dan laporan kehadiran
+                    tanpa memaksa semua peran memakai dashboard yang sama.
                   </p>
                   <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                     <PrimaryLink to="/login">
@@ -370,7 +375,7 @@ export function LandingPage() {
 
             <motion.section
               id="desk"
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -380,23 +385,23 @@ export function LandingPage() {
                 <motion.div variants={fadeUp}>
                   <SectionLabel>Platform</SectionLabel>
                   <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Attendance desk yang siap dipakai.
+                    Attendance desk untuk tim operasional.
                   </h2>
                   <p className="mt-5 max-w-lg text-base leading-8 text-[#596172]">
-                    Satu layar untuk semua sinyal kehadiran: siapa hadir, siapa terlambat, dan apa yang butuh keputusan.
-                    Admin bisa ambil tindakan tanpa berpindah aplikasi.
+                    Satu tempat untuk melihat siapa sudah hadir, siapa terlambat, pengajuan apa yang menunggu, dan data mana
+                    yang perlu diperiksa sebelum masuk laporan.
                   </p>
                 </motion.div>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-5 md:grid-cols-3">
                   {deskItems.map((item) => (
                     <motion.article
                       key={item.title}
-                      className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-6"
+                      className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-7"
                       variants={fadeUp}
                       whileHover={{ y: -5 }}
                     >
                       <item.icon className="h-11 w-11 rounded-2xl bg-white p-2.5 text-[#1769ff] shadow-[0_14px_30px_rgba(20,24,31,0.08)]" />
-                      <h3 className="mt-6 text-xl font-black tracking-[-0.03em]">{item.title}</h3>
+                      <h3 className="mt-5 text-xl font-black tracking-[-0.03em]">{item.title}</h3>
                       <p className="mt-3 text-sm leading-7 text-[#596172]">{item.copy}</p>
                     </motion.article>
                   ))}
@@ -406,7 +411,7 @@ export function LandingPage() {
 
             <motion.section
               id="workflow"
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl overflow-hidden rounded-[32px] bg-[#101217] px-5 py-14 text-white shadow-[0_24px_70px_rgba(20,24,31,0.18)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl overflow-hidden rounded-[32px] bg-[#101217] px-5 py-16 text-white shadow-[0_24px_70px_rgba(20,24,31,0.18)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -416,17 +421,18 @@ export function LandingPage() {
                 <motion.div variants={fadeUp}>
                   <SectionLabel>Workflow</SectionLabel>
                   <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Dari scan sampai laporan.
+                    Dari check-in sampai laporan.
                   </h2>
                   <p className="mt-5 max-w-lg text-base leading-8 text-[#b7bfca]">
-                    Setiap check-in punya status. Alur ini menjaga data tetap jelas sejak scan pertama sampai masuk laporan HR.
+                    Setiap absensi punya status. Data yang normal bisa langsung dipakai, sementara data yang bermasalah masuk ke
+                    antrian review.
                   </p>
                 </motion.div>
-                <div className="grid gap-4">
+                <div className="grid gap-5">
                   {workflowSteps.map(([number, title, copy]) => (
                     <motion.article
                       key={title}
-                      className="grid gap-5 rounded-[26px] border border-white/10 bg-white/[0.07] p-5 md:grid-cols-[72px_1fr]"
+                      className="grid gap-5 rounded-[26px] border border-white/10 bg-white/[0.07] p-6 md:grid-cols-[72px_1fr]"
                       variants={fadeUp}
                     >
                       <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#1769ff] text-lg font-black">{number}</div>
@@ -442,7 +448,7 @@ export function LandingPage() {
 
             <motion.section
               id="roles"
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -451,30 +457,30 @@ export function LandingPage() {
               <motion.div className="mx-auto max-w-3xl text-center" variants={fadeUp}>
                 <SectionLabel>Roles</SectionLabel>
                 <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                  Dibuat untuk lima peran kerja.
+                  Ruang kerja berbeda untuk tiap peran.
                 </h2>
                 <p className="mt-5 text-base leading-8 text-[#596172]">
-                  Setiap peran melihat interface yang sesuai konteks, bukan dashboard yang dipaksakan sama untuk semua orang.
+                  Employee, Manager, HR, Superadmin, dan Scanner hanya melihat hal yang perlu mereka kerjakan.
                 </p>
               </motion.div>
-              <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
                 {roleCards.map((role) => (
                   <motion.article
                     key={role.title}
-                    className="rounded-[28px] border border-[#edf0f5] bg-[#f9fafc] p-7"
+                    className="rounded-[28px] border border-[#edf0f5] bg-[#f9fafc] p-7 xl:p-6 2xl:p-7"
                     variants={fadeUp}
                     whileHover={{ y: -5 }}
                   >
                     <role.icon className="h-12 w-12 rounded-2xl bg-white p-2.5 text-[#1769ff] shadow-[0_14px_30px_rgba(20,24,31,0.08)]" />
-                    <h3 className="mt-7 text-2xl font-black tracking-[-0.04em]">{role.title}</h3>
-                    <p className="mt-3 text-base leading-8 text-[#596172]">{role.copy}</p>
+                    <h3 className="mt-6 text-2xl font-black tracking-[-0.04em]">{role.title}</h3>
+                    <p className="mt-3 text-base leading-7 text-[#596172]">{role.copy}</p>
                   </motion.article>
                 ))}
               </div>
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -484,18 +490,18 @@ export function LandingPage() {
                 <motion.div variants={fadeUp}>
                   <SectionLabel>Struktur & Approval</SectionLabel>
                   <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Alur approval mengikuti struktur tim.
+                    Approval mengikuti struktur tim.
                   </h2>
                   <p className="mt-5 max-w-lg text-base leading-8 text-[#596172]">
-                    Karyawan mengajukan izin atau cuti, manager divisi melakukan review pertama, lalu HR memberi keputusan
-                    final. Semua status dan catatan tetap tercatat.
+                    Pengajuan tidak selalu langsung ke HR. Jika karyawan punya manager, request masuk ke manager lebih dulu
+                    sebelum keputusan final dari HR.
                   </p>
                 </motion.div>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-5 md:grid-cols-3">
                   {structureCards.map((item) => (
                     <motion.article
                       key={item.title}
-                      className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-6"
+                      className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-7"
                       variants={fadeUp}
                       whileHover={{ y: -5 }}
                     >
@@ -508,7 +514,7 @@ export function LandingPage() {
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-[#f9fafc] px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-[#f9fafc] px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -517,10 +523,10 @@ export function LandingPage() {
               <motion.div className="mx-auto max-w-3xl text-center" variants={fadeUp}>
                 <SectionLabel>Trust signals</SectionLabel>
                 <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                  Sinyal yang membuat admin percaya.
+                  Data hadir yang lebih mudah dipercaya.
                 </h2>
                 <p data-testid="trust-signals-copy" className="mt-5 text-base leading-8 text-[#596172]">
-                  Setiap angka di bawah adalah jaminan bahwa data yang masuk Taptu melewati validasi sebelum dianggap final.
+                  Setiap angka berasal dari proses validasi, bukan hanya tombol check-in.
                 </p>
               </motion.div>
               <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -542,7 +548,7 @@ export function LandingPage() {
 
             <motion.section
               id="faq"
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-white px-5 py-16 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -552,12 +558,12 @@ export function LandingPage() {
                 <motion.div variants={fadeUp}>
                   <SectionLabel>FAQ</SectionLabel>
                   <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Pertanyaan sebelum mulai.
+                    Pertanyaan sebelum mencoba.
                   </h2>
                 </motion.div>
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {faqs.map((faq) => (
-                    <motion.article key={faq.question} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-6" variants={fadeUp}>
+                    <motion.article key={faq.question} className="rounded-[24px] border border-[#edf0f5] bg-[#f9fafc] p-7" variants={fadeUp}>
                       <h3 className="text-lg font-black tracking-[-0.02em]">{faq.question}</h3>
                       <p className="mt-3 text-base leading-7 text-[#596172]">{faq.answer}</p>
                     </motion.article>
@@ -567,7 +573,7 @@ export function LandingPage() {
             </motion.section>
 
             <motion.section
-              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-16 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12 lg:py-24"
+              className="mx-auto mt-6 sm:mt-8 max-w-7xl rounded-[32px] bg-[#1769ff] px-5 py-16 text-white shadow-[0_24px_70px_rgba(23,105,255,0.22)] md:px-8 lg:px-12 lg:py-24"
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
@@ -577,11 +583,11 @@ export function LandingPage() {
                 <div className="max-w-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Mulai dari demo</p>
                   <h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Coba alur Taptu dari Employee sampai HR.
+                    Coba alur Taptu dari check-in sampai review HR.
                   </h2>
                   <p data-testid="cta-sub-copy" className="mt-4 text-base leading-7 text-white/70">
-                    Masuk sebagai employee, manager, HR, atau scanner untuk melihat bagaimana data absensi divalidasi sebelum
-                    menjadi laporan.
+                    Masuk sebagai Employee, Manager, HR, atau Scanner untuk melihat bagaimana data kehadiran diproses sebelum
+                    masuk laporan.
                   </p>
                 </div>
                 <div className="shrink-0">
