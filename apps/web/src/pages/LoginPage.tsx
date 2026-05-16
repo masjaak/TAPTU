@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { login } from "../lib/api";
-import { saveSession } from "../lib/session";
+import { clearSession, saveSession } from "../lib/session";
 
 const inputClass =
   "w-full rounded-2xl border border-[#e2e7f0] bg-[#f9fafc] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#1769ff] focus:bg-white focus:ring-2 focus:ring-[#1769ff]/10";
@@ -21,6 +21,7 @@ export function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    clearSession();
 
     try {
       const session = await login({ email, password });

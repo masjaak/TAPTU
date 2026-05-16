@@ -67,11 +67,11 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     });
 
     if (!error && data.session) {
-      // For known demo accounts, use the local seed profile to avoid an extra API round-trip.
+      // Demo accounts always use the local demo token so isDemoToken() stays true for all
+      // subsequent API calls. Using the Supabase JWT here would break the demo data layer.
       const demoMatch = tryDemoLogin(payload.email, payload.password);
-      if (demoMatch) {
-        return { token: data.session.access_token, user: demoMatch.user };
-      }
+      if (demoMatch) return demoMatch;
+
       // For real Supabase users, fetch the normalized profile from the API.
       const { user } = await requestJson<{ user: AuthUser }>("/auth/me", {}, data.session.access_token);
       return { token: data.session.access_token, user };
@@ -84,10 +84,18 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     throw new Error(error?.message ?? "Akun tidak ditemukan atau password salah.");
   }
 
-  return requestJson<LoginResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
+  // No Supabase client — try the Express API server. If the server is unreachable (e.g. static
+  // Vercel deployment without a backend), fall back to demo credentials so demo login still works.
+  try {
+    return await requestJson<LoginResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    const demo = tryDemoLogin(payload.email, payload.password);
+    if (demo) return demo;
+    throw err;
+  }
 }
 
 export async function register(payload: RegisterRequest): Promise<LoginResponse> {
@@ -504,6 +512,7 @@ async function requestJson<T>(path: string, init: RequestInit = {}, token?: stri
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({ message: "Permintaan gagal." }));
+    console.error(`[taptu] API ${init.method ?? "GET"} ${path} → ${response.status}`, data);
     throw new Error(data.message ?? "Permintaan gagal.");
   }
 

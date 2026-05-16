@@ -23,7 +23,9 @@ describe("supabase-enabled login", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns Supabase access token with demo profile when Supabase auth succeeds for a demo account", async () => {
+  it("returns demo:role token (not Supabase JWT) when Supabase auth succeeds for a demo account", async () => {
+    // Demo accounts must always use the demo:role token so isDemoToken() stays true and all
+    // subsequent API calls use the local demo data layer instead of hitting the backend.
     mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
       data: {
         user: { id: "usr-employee-01" },
@@ -34,7 +36,7 @@ describe("supabase-enabled login", () => {
 
     const result = await login({ email: "employee@taptu.app", password: "Taptu123!" });
 
-    expect(result.token).toBe("sbp_supabase_jwt_xyz");
+    expect(result.token).toBe("demo:employee");
     expect(result.user.id).toBe("usr-employee-01");
     expect(result.user.role).toBe("employee");
     expect(result.user.fullName).toBe("Fikri Maulana");
@@ -44,7 +46,7 @@ describe("supabase-enabled login", () => {
     });
   });
 
-  it("returns Supabase access token with matching profile for all demo roles", async () => {
+  it("returns demo:role token for all demo roles even when Supabase auth succeeds", async () => {
     const cases: Array<{ email: string; id: string; role: string; fullName: string }> = [
       { email: "superadmin@taptu.app", id: "usr-superadmin-01", role: "superadmin", fullName: "Super Admin" },
       { email: "admin@taptu.app", id: "usr-admin-01", role: "admin", fullName: "Nadia Putri" },
@@ -59,7 +61,7 @@ describe("supabase-enabled login", () => {
       });
 
       const result = await login({ email, password: "Taptu123!" });
-      expect(result.token).toBe(`sbp_${role}`);
+      expect(result.token).toBe(`demo:${role}`);
       expect(result.user.role).toBe(role);
       expect(result.user.fullName).toBe(fullName);
     }
