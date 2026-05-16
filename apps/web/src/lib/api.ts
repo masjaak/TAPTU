@@ -6,6 +6,7 @@ import type {
   AttendanceReportRow,
   AttendanceTimelineItem,
   AuditLogItem,
+  AuthUser,
   DashboardPayload,
   DepartmentItem,
   EmployeeListItem,
@@ -48,6 +49,8 @@ import {
   getDemoRoleFromToken
 } from "./demo";
 
+import { supabase } from "./supabase";
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 const useBrowserLocalDemo = import.meta.env.VITE_BROWSER_LOCAL_DEMO === "true";
 
@@ -56,6 +59,31 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     const demo = tryDemoLogin(payload.email, payload.password);
     if (demo) return Promise.resolve(demo);
   }
+
+  if (supabase) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: payload.email,
+      password: payload.password
+    });
+
+    if (!error && data.session) {
+      // For known demo accounts, use the local seed profile to avoid an extra API round-trip.
+      const demoMatch = tryDemoLogin(payload.email, payload.password);
+      if (demoMatch) {
+        return { token: data.session.access_token, user: demoMatch.user };
+      }
+      // For real Supabase users, fetch the normalized profile from the API.
+      const { user } = await requestJson<{ user: AuthUser }>("/auth/me", {}, data.session.access_token);
+      return { token: data.session.access_token, user };
+    }
+
+    // Supabase auth failed — fall back to local demo credentials so demo accounts always work.
+    const demo = tryDemoLogin(payload.email, payload.password);
+    if (demo) return demo;
+
+    throw new Error(error?.message ?? "Akun tidak ditemukan atau password salah.");
+  }
+
   return requestJson<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload)

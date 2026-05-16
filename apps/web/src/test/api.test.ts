@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// These tests exercise the Express-API path. Stub supabase as null so
+// the Supabase auth branch in login() is not triggered.
+vi.mock("../lib/supabase", () => ({ supabase: null, isSupabaseEnabled: () => false }));
+
 import {
   approveRequest,
   createDepartment,
