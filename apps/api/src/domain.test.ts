@@ -114,7 +114,12 @@ describe("attendance state machine", () => {
   });
 
   it("updates check-out while preserving validation context", () => {
-    const current = createInitialStore().attendance["usr-employee-01"];
+    const current = createCheckInRecord(createInitialStore().attendance["usr-employee-01"], {
+      type: "CHECK_IN",
+      method: "QR",
+      at: "2026-05-02T08:03:00.000Z",
+      validationStatus: "verified"
+    });
     const next = updateCheckOutRecord(current, {
       type: "CHECK_OUT",
       method: "Selfie",
@@ -408,7 +413,7 @@ describe("overview and summary", () => {
       "usr-employee-02": "Anisa Rahma"
     });
 
-    expect(overview.checkedInToday).toBe(2);
+    expect(overview.checkedInToday).toBe(1);
     expect(overview.exceptionCount).toBe(2);
     expect(overview.recentActivity[0]?.employeeName).toBe("Anisa Rahma");
   });
@@ -416,7 +421,7 @@ describe("overview and summary", () => {
   it("returns employee summary with today validation fields", () => {
     const summary = computeEmployeeSummary(createInitialStore(), "usr-employee-01");
 
-    expect(summary.currentAttendanceState).toBe("checked_in");
+    expect(summary.currentAttendanceState).toBe("idle");
     expect(summary.assignedShift.name).toBe("Shift Pagi");
     expect(summary.todayRecord.validationStatus).toBe("verified");
   });
@@ -473,14 +478,14 @@ describe("computeEmployeeList", () => {
     });
   });
 
-  it("returns present for checked-in employee", () => {
+  it("returns absent for Fikri before the connected demo check-in", () => {
     const store = createInitialStore();
     const users = [
       { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee" as UserRole }
     ];
     const result = computeEmployeeList(store, users);
-    expect(result[0].todayStatus).toBe("present");
-    expect(result[0].checkInTime).toBe("08:03");
+    expect(result[0].todayStatus).toBe("absent");
+    expect(result[0].checkInTime).toBeUndefined();
   });
 
   it("returns late for terlambat employee", () => {

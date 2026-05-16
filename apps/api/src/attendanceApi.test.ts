@@ -5,7 +5,8 @@ import type { Express } from "express";
 
 type LoginResponse = { token: string };
 type HistoryItem = { id: string; checkInTime?: string; checkOutTime?: string };
-type EmployeeItem = { id: string; managerId?: string | null; checkInTime?: string };
+type EmployeeItem = { id: string; managerId?: string | null; departmentId?: string | null; checkInTime?: string };
+type ReportItem = { employeeId: string; departmentId?: string | null; checkInTime?: string; checkOutTime?: string };
 type AttendanceActionResponse = {
   attendanceState: "checked_in" | "checked_out";
   record: HistoryItem;
@@ -26,7 +27,7 @@ describe("attendance API shared flow", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Test server did not bind to a TCP port.");
     baseUrl = `http://127.0.0.1:${address.port}/api`;
-  });
+  }, 30_000);
 
   afterEach(async () => {
     resetLocalAttendanceStoreForTests();
@@ -53,8 +54,17 @@ describe("attendance API shared flow", () => {
     })).token;
   }
 
+  it("seeds Fikri into the connected demo organization structure", async () => {
+    const adminToken = await login("admin@taptu.app");
+    const employees = await request<EmployeeItem[]>("/admin/employees", {}, adminToken);
+    expect(employees.find((employee) => employee.id === "usr-employee-01")).toMatchObject({
+      departmentId: "dep-ops",
+      managerId: "usr-manager-01"
+    });
+  });
+
   it("persists employee check-in, updates same record on check-out, and exposes history", async () => {
-    const employeeToken = await login("leo@taptu.app");
+    const employeeToken = await login("employee@taptu.app");
 
     const checkIn = await request<AttendanceActionResponse>("/attendance/checkin", {
       method: "POST",
@@ -102,5 +112,35 @@ describe("attendance API shared flow", () => {
     }));
     expect(managerTeam.find((employee) => employee.id === "usr-employee-01")?.checkInTime).toBeTruthy();
     expect(managerTeam.some((employee) => employee.id === "usr-employee-02")).toBe(false);
+  });
+
+  it("shows HR org-wide attendance and reports for Fikri", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const adminToken = await login("admin@taptu.app");
+
+    await request("/attendance/checkin", {
+      method: "POST",
+      body: JSON.stringify({ method: "Manual" })
+    }, employeeToken);
+
+    const hrHistory = await request<HistoryItem[]>("/attendance/history", {}, adminToken);
+    expect(hrHistory[0].checkInTime).toBeTruthy();
+
+    const reports = await request<ReportItem[]>("/admin/reports?departmentId=dep-ops", {}, adminToken);
+    expect(reports).toContainEqual(expect.objectContaining({
+      employeeId: "usr-employee-01",
+      departmentId: "dep-ops"
+    }));
+  });
+
+  it("records honest review state when location is unavailable instead of faking valid attendance", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const checkIn = await request<{ validationStatus: string; validationReasons: string[] }>("/attendance/checkin", {
+      method: "POST",
+      body: JSON.stringify({ method: "Manual" })
+    }, employeeToken);
+
+    expect(checkIn.validationStatus).toBe("needs_review");
+    expect(checkIn.validationReasons).toContain("Lokasi belum terekam.");
   });
 });

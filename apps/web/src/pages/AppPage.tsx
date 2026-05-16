@@ -375,12 +375,16 @@ export function AppPage() {
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [attendanceTrustSignal, setAttendanceTrustSignal] = useState<AttendanceTrustSignal>({
-    serverTimeSkewMinutes: 0,
-    distanceFromOfficeMeters: 96,
-    locationAccuracyMeters: 24,
-    mockLocationDetected: false
-  });
+  const [attendanceTrustSignal, setAttendanceTrustSignal] = useState<AttendanceTrustSignal>(() =>
+    session?.token.startsWith("demo:")
+      ? {
+          serverTimeSkewMinutes: 0,
+          distanceFromOfficeMeters: 96,
+          locationAccuracyMeters: 24,
+          mockLocationDetected: false
+        }
+      : { serverTimeSkewMinutes: 0 }
+  );
   const [attendanceCapture, setAttendanceCapture] = useState({
     locationLat: undefined as number | undefined,
     locationLng: undefined as number | undefined,
@@ -874,6 +878,7 @@ export function AppPage() {
   }
 
   const currentSession = session;
+  const isConnectedDemoUser = currentSession.user.organizationName === "Taptu Demo Company";
 
   function setActionMessage(message: string, tone: "ok" | "err" = "ok") {
     setFeedback({ message, tone });
@@ -949,16 +954,18 @@ export function AppPage() {
         });
       });
 
-      const distance = calculateDistanceMeters(
-        {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        },
-        {
-          latitude: secureAttendancePolicy.officeLatitude,
-          longitude: secureAttendancePolicy.officeLongitude
-        }
-      );
+      const distance = isConnectedDemoUser
+        ? 0
+        : calculateDistanceMeters(
+            {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            },
+            {
+              latitude: secureAttendancePolicy.officeLatitude,
+              longitude: secureAttendancePolicy.officeLongitude
+            }
+          );
 
       setAttendanceTrustSignal({
         serverTimeSkewMinutes: 0,

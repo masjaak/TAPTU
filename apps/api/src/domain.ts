@@ -841,19 +841,13 @@ export function createInitialStore(): DemoStore {
         shiftEndTime: DEFAULT_SHIFT.endTime,
         locationId: DEFAULT_LOCATION.id,
         locationName: DEFAULT_LOCATION.name,
-        state: "checked_in",
-        status: "Tepat waktu",
-        checkInAt: "2026-05-02T08:03:00.000Z",
-        checkInMethod: "QR",
-        locationLat: -6.2087,
-        locationLng: 106.8457,
+        state: "idle",
+        status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        selfieUrl: "placeholder://selfie-fikri",
-        deviceId: "ios-15pm-demo",
-        scannerTokenId: scanner.id,
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        selfieUrl: "",
+        createdAt: "2026-05-02T07:30:00.000Z",
+        updatedAt: "2026-05-02T07:30:00.000Z"
       },
       "usr-employee-02": {
         id: "att-usr-employee-02-2026-05-02",
@@ -897,7 +891,6 @@ export function createInitialStore(): DemoStore {
       }
     },
     attendanceHistory: [
-      { id: "att-usr-employee-01-2026-05-02", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" },
       { id: "att-002", day: "Kemarin", status: "Tepat waktu", time: "07:55", method: "Selfie" },
       { id: "att-003", day: "Senin", status: "Izin", time: "08:00", method: "Manual" }
     ],

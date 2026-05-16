@@ -120,7 +120,7 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Super Admin",
     email: "superadmin@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "superadmin"
   },
   {
@@ -128,7 +128,7 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Nadia Putri",
     email: "admin@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "admin"
   },
   {
@@ -136,7 +136,7 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Raka Saputra",
     email: "manager@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "manager"
   },
   {
@@ -144,8 +144,10 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Fikri Maulana",
     email: "employee@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "employee",
+    departmentId: "dep-ops",
+    departmentName: "Operasional",
     managerId: "usr-manager-01"
   },
   {
@@ -153,7 +155,7 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Anisa Rahma",
     email: "anisa@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "employee"
   },
   {
@@ -161,7 +163,7 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Leo Pratama",
     email: "leo@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "employee"
   },
   {
@@ -169,7 +171,7 @@ const users: Array<AuthUser & { password: string }> = [
     fullName: "Front Gate Scanner",
     email: "scanner@taptu.app",
     password: "Taptu123!",
-    organizationName: "TAPTU HQ",
+    organizationName: "Taptu Demo Company",
     role: "scanner"
   }
 ];
@@ -179,7 +181,17 @@ const storePath = join(apiDir, "..", "data", "demo-store.json");
 const apiConfig = getApiConfig();
 const storage = createStorageAdapter(apiConfig, storePath);
 let store = await storage.load();
-let localDepartments: DepartmentItem[] = [];
+const seededLocalDepartments: DepartmentItem[] = [
+  {
+    id: "dep-ops",
+    name: "Operasional",
+    managerId: "usr-manager-01",
+    managerName: "Raka Saputra",
+    isActive: true,
+    memberCount: 1
+  }
+];
+let localDepartments: DepartmentItem[] = seededLocalDepartments.map((department) => ({ ...department }));
 const localOrganizationId = "org-demo";
 
 const useSupabase = apiConfig.storageMode === "supabase";
@@ -632,6 +644,25 @@ function listLocalDepartments(): DepartmentItem[] {
   }));
 }
 
+function calibrateLocalDemoLocationFromDevice(locationLat?: number, locationLng?: number) {
+  if (locationLat === undefined || locationLng === undefined) return;
+  const current = store.workLocations[0];
+  if (!current || current.id !== "loc-hq") return;
+
+  const calibrated = {
+    ...current,
+    latitude: locationLat,
+    longitude: locationLng,
+    radiusMeters: Math.max(current.radiusMeters, 250)
+  };
+  store.workLocations = [calibrated, ...store.workLocations.slice(1)];
+  store.workLocationItems = store.workLocationItems.map((item) =>
+    item.id === calibrated.id
+      ? { ...item, latitude: calibrated.latitude, longitude: calibrated.longitude, radiusMeters: calibrated.radiusMeters }
+      : item
+  );
+}
+
 function updateLocalEmployeeStructure(employeeId: string, patch: { departmentId?: string | null; managerId?: string | null }) {
   const employee = users.find((entry) => entry.id === employeeId);
   if (!employee) return null;
@@ -664,6 +695,20 @@ export function resetLocalOrganizationStructureForTests() {
 export function resetLocalAttendanceStoreForTests() {
   if (process.env.NODE_ENV !== "test" && !process.env.VITEST) return;
   store = createInitialStore();
+  localDepartments = seededLocalDepartments.map((department) => ({ ...department }));
+  for (const user of users) {
+    user.departmentId = null;
+    user.departmentName = null;
+    user.managerId = null;
+    user.managerName = null;
+  }
+  const fikri = users.find((user) => user.id === "usr-employee-01");
+  if (fikri) {
+    fikri.departmentId = "dep-ops";
+    fikri.departmentName = "Operasional";
+    fikri.managerId = "usr-manager-01";
+    fikri.managerName = "Raka Saputra";
+  }
 }
 
 app.get("/api/health", (_req, res) => {
@@ -993,6 +1038,9 @@ app.post("/api/attendance/checkin", async (req, res) => {
   }
 
   const current = store.attendance[user.id] ?? createEmptyAttendanceRecord(user.id);
+  if (current.state === "idle") {
+    calibrateLocalDemoLocationFromDevice(parsed.data.locationLat, parsed.data.locationLng);
+  }
   const selfie = await resolveAttendanceSelfie(user.id, parsed.data);
   const validation = validateAttendanceSubmission({
     locationLat: parsed.data.locationLat,
