@@ -17,8 +17,8 @@
       ],
       "selfieUrl": "",
       "createdAt": "2026-05-02T07:30:00.000Z",
-      "updatedAt": "2026-05-16T09:11:18.862Z",
-      "checkInAt": "2026-05-16T09:11:18.862Z",
+      "updatedAt": "2026-05-16T09:44:30.314Z",
+      "checkInAt": "2026-05-16T09:44:30.314Z",
       "checkInMethod": "Manual"
     },
     "usr-employee-02": {
@@ -72,9 +72,9 @@
       "id": "att-usr-employee-01-2026-05-02",
       "day": "Hari ini",
       "status": "Terlambat",
-      "time": "09:11",
+      "time": "09:44",
       "method": "Manual",
-      "checkInTime": "2026-05-16T09:11:18.862Z",
+      "checkInTime": "2026-05-16T09:44:30.314Z",
       "duration": "Belum selesai",
       "locationName": "Kantor Pusat"
     },
@@ -122,7 +122,7 @@
     "token": "HDR-31A-7XZ",
     "locationId": "loc-hq",
     "locationName": "Kantor Pusat",
-    "expiresAt": "2026-05-16T09:11:48.848Z",
+    "expiresAt": "2026-05-16T09:45:00.307Z",
     "status": "active",
     "scansToday": 124,
     "recentScans": [
@@ -146,22 +146,22 @@
   },
   "exceptions": [
     {
-      "id": "exc-att-usr-employee-01-2026-05-02-1778922678862",
+      "id": "exc-att-usr-employee-01-2026-05-02-1778924670314",
       "attendanceRecordId": "att-usr-employee-01-2026-05-02",
       "employeeId": "usr-employee-01",
       "exceptionType": "Late check-in",
       "reason": "Check-in melebihi toleransi 10 menit dari awal shift.",
       "status": "Need Review",
-      "createdAt": "2026-05-16T09:11:18.862Z"
+      "createdAt": "2026-05-16T09:44:30.314Z"
     },
     {
-      "id": "exc-att-usr-employee-01-2026-05-02-1778922678862",
+      "id": "exc-att-usr-employee-01-2026-05-02-1778924670314",
       "attendanceRecordId": "att-usr-employee-01-2026-05-02",
       "employeeId": "usr-employee-01",
       "exceptionType": "Outside radius",
       "reason": "Lokasi belum terekam.",
       "status": "Need Review",
-      "createdAt": "2026-05-16T09:11:18.862Z"
+      "createdAt": "2026-05-16T09:44:30.314Z"
     },
     {
       "id": "exc-001",
@@ -202,9 +202,9 @@
       "title": "Validasi kehadiran perlu ditinjau",
       "message": "Catatan kehadiran Fikri Maulana perlu ditinjau.",
       "entityType": "attendance_exception",
-      "entityId": "exc-att-usr-employee-01-2026-05-02-1778922678862",
-      "id": "ntf-1778922678862-gp18q",
-      "createdAt": "2026-05-16T09:11:18.862Z",
+      "entityId": "exc-att-usr-employee-01-2026-05-02-1778924670314",
+      "id": "ntf-1778924670314-v81n8",
+      "createdAt": "2026-05-16T09:44:30.314Z",
       "readAt": null
     },
     {
@@ -215,9 +215,9 @@
       "title": "Validasi kehadiran perlu ditinjau",
       "message": "Catatan kehadiran Fikri Maulana perlu ditinjau.",
       "entityType": "attendance_exception",
-      "entityId": "exc-att-usr-employee-01-2026-05-02-1778922678862",
-      "id": "ntf-1778922678862-9otrx",
-      "createdAt": "2026-05-16T09:11:18.862Z",
+      "entityId": "exc-att-usr-employee-01-2026-05-02-1778924670314",
+      "id": "ntf-1778924670314-hadgg",
+      "createdAt": "2026-05-16T09:44:30.314Z",
       "readAt": null
     }
   ],
