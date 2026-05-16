@@ -38,20 +38,20 @@ const deskItems = [
   {
     icon: MapPin,
     title: "Lokasi punya guard",
-    copy: "Check-in di luar radius tidak langsung masuk laporan final. Admin melihatnya sebagai antrian review."
+    copy: "Check-in di luar radius tidak langsung masuk laporan HR. Tim review melihatnya sebagai antrian validasi."
   },
   {
     icon: Fingerprint,
     title: "Bukti hadir berlapis",
-    copy: "QR, waktu, lokasi, dan selfie bisa dipakai sebagai konteks sebelum data masuk payroll."
+    copy: "QR, waktu, lokasi, dan selfie bisa dipakai sebagai konteks sebelum data masuk laporan HR."
   }
 ];
 
 const workflowSteps = [
   ["01", "Scan", "Tim check-in dari PWA atau gate scanner."],
   ["02", "Validasi", "Sistem membaca lokasi, waktu, perangkat, dan status shift."],
-  ["03", "Review", "Anomali masuk queue admin, bukan laporan final."],
-  ["04", "Laporan", "Data yang lolos guard siap dipakai HR dan payroll."]
+  ["03", "Review", "Anomali dan pengajuan masuk ke Manager atau HR sesuai struktur tim."],
+  ["04", "Laporan", "Data yang lolos guard siap dipakai dalam laporan HR."]
 ];
 
 const validationProgress = [
@@ -69,27 +69,52 @@ const validationProgress = [
 
 const roleCards = [
   {
-    icon: UsersRound,
-    title: "Admin HR",
-    copy: "Dashboard ringan untuk melihat siapa hadir, siapa terlambat, dan apa yang perlu keputusan."
+    icon: Smartphone,
+    title: "Employee",
+    copy: "Check-in, check-out, riwayat, pengajuan, jadwal, slip gaji, dan profil."
   },
   {
-    icon: Smartphone,
-    title: "Karyawan mobile",
-    copy: "Check-in dibuat secepat membuka app, tanpa formulir internal yang berat."
+    icon: UsersRound,
+    title: "Manager",
+    copy: "Memantau tim, review pengajuan, dan menangani pengecualian sebelum masuk HR."
+  },
+  {
+    icon: ShieldCheck,
+    title: "HR/Admin",
+    copy: "Mengelola karyawan, struktur tim, approval akhir, lokasi, shift, dan laporan."
+  },
+  {
+    icon: Fingerprint,
+    title: "Superadmin",
+    copy: "Menjaga konfigurasi organisasi, role, dan batas akses sistem."
   },
   {
     icon: RadioTower,
-    title: "Scanner gate",
-    copy: "Mode scanner fokus pada scan, refresh token, dan status lokasi kerja."
+    title: "Scanner",
+    copy: "Mode gate khusus untuk check-in cepat memakai QR token yang terus refresh."
   }
 ];
 
 const trustSignals = [
   { value: "30s", label: "QR token refresh" },
-  { value: "3 mode", label: "Admin, mobile, scanner" },
-  { value: "1 queue", label: "Review pengecualian" },
-  { value: "24/7", label: "Siap untuk shift" }
+  { value: "5 role", label: "Employee, Manager, HR, Superadmin, Scanner" },
+  { value: "2 tahap", label: "Approval Manager → HR" },
+  { value: "1 queue", label: "Pengecualian tervalidasi" }
+];
+
+const structureCards = [
+  {
+    title: "Divisi & Penempatan",
+    copy: "Kelompokkan karyawan berdasarkan divisi, lokasi, dan manager."
+  },
+  {
+    title: "Approval dua tahap",
+    copy: "Pengajuan dapat melewati Manager terlebih dahulu sebelum keputusan final HR."
+  },
+  {
+    title: "Catatan reviewer",
+    copy: "Alasan penolakan atau keputusan tampil kembali ke karyawan."
+  }
 ];
 
 const faqs = [
@@ -98,12 +123,20 @@ const faqs = [
     answer: "Tidak. Taptu cocok untuk tim hybrid yang punya kantor, gate scanner, lokasi lapangan, dan karyawan mobile."
   },
   {
-    question: "Apa yang bisa dicoba di demo?",
-    answer: "Kamu bisa masuk sebagai admin, karyawan, atau scanner untuk melihat alur utama dari sisi yang berbeda."
+    question: "Apakah manager punya dashboard sendiri?",
+    answer: "Ya. Manager hanya melihat timnya sendiri, termasuk presensi, pengajuan, dan pengecualian yang perlu ditinjau."
   },
   {
-    question: "Apa yang perlu disiapkan sebelum produksi?",
-    answer: "Aturan lokasi, struktur shift, kebijakan approval, database produksi, OTP, dan integrasi payroll jika dibutuhkan."
+    question: "Apakah HR bisa mengatur divisi?",
+    answer: "Ya. HR dapat membuat divisi, menetapkan manager, dan mengatur penempatan karyawan."
+  },
+  {
+    question: "Apakah pengajuan langsung disetujui HR?",
+    answer: "Tidak selalu. Jika karyawan memiliki manager, pengajuan masuk ke manager terlebih dahulu sebelum diteruskan ke HR."
+  },
+  {
+    question: "Apakah data absensi langsung masuk laporan?",
+    answer: "Tidak semua. Data yang bermasalah masuk antrian review agar HR bisa mengambil keputusan dengan jejak audit."
   }
 ];
 
@@ -221,7 +254,7 @@ export function LandingPage() {
                   whileHover={{ rotate: -3, scale: 1.03, y: -10 }}
                 >
                   <p className="text-sm font-black leading-6 text-[#37321a]">Catatan shift</p>
-                  <p className="mt-2 text-sm leading-6 text-[#5f5623]">Review scan luar radius sebelum tutup payroll.</p>
+                  <p className="mt-2 text-sm leading-6 text-[#5f5623]">Review scan luar radius sebelum masuk laporan HR.</p>
                 </motion.div>
 
                 <motion.div
@@ -313,15 +346,16 @@ export function LandingPage() {
                     <span className="text-2xl font-black tracking-[-0.02em] text-white">T</span>
                   </div>
                   <h1
+                    aria-label="Validasi absensi tim sebelum masuk laporan HR."
                     className="mt-12 max-w-5xl text-[46px] font-black uppercase leading-[1.08] tracking-[-0.03em] text-[#0f1115] md:text-5xl lg:text-[72px]"
                     data-lines="2"
                   >
-                    <span className="block" data-line="1">Kelola absensi tim</span>
-                    <span className="block text-[#9aa1ad]" data-line="2">dalam satu alur kerja</span>
+                    <span className="block" data-line="1">Validasi absensi tim</span>
+                    <span className="block text-[#9aa1ad]" data-line="2">sebelum masuk laporan HR.</span>
                   </h1>
                   <p className="mt-8 max-w-xl text-base leading-7 text-[#596172] md:text-lg">
-                    Taptu menyatukan check-in mobile, scanner gate, validasi lokasi, approval izin, dan laporan admin dalam
-                    satu workspace yang terasa ringan.
+                    Taptu menyatukan check-in mobile, scanner gate, validasi lokasi, approval izin, struktur tim, dan laporan
+                    HR dalam satu workspace yang ringan.
                   </p>
                   <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                     <PrimaryLink to="/login">
@@ -385,8 +419,7 @@ export function LandingPage() {
                     Dari scan sampai laporan.
                   </h2>
                   <p className="mt-5 max-w-lg text-base leading-8 text-[#b7bfca]">
-                    Setiap check-in punya status. Alur ini membuat data yang masuk payroll lebih bersih dan lebih mudah
-                    dipertanggungjawabkan.
+                    Setiap check-in punya status. Alur ini menjaga data tetap jelas sejak scan pertama sampai masuk laporan HR.
                   </p>
                 </motion.div>
                 <div className="grid gap-4">
@@ -418,13 +451,13 @@ export function LandingPage() {
               <motion.div className="mx-auto max-w-3xl text-center" variants={fadeUp}>
                 <SectionLabel>Roles</SectionLabel>
                 <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                  Dibuat untuk tiga mode kerja.
+                  Dibuat untuk lima peran kerja.
                 </h2>
                 <p className="mt-5 text-base leading-8 text-[#596172]">
                   Setiap peran melihat interface yang sesuai konteks, bukan dashboard yang dipaksakan sama untuk semua orang.
                 </p>
               </motion.div>
-              <div className="mt-10 grid gap-4 lg:grid-cols-3">
+              <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 {roleCards.map((role) => (
                   <motion.article
                     key={role.title}
@@ -437,6 +470,40 @@ export function LandingPage() {
                     <p className="mt-3 text-base leading-8 text-[#596172]">{role.copy}</p>
                   </motion.article>
                 ))}
+              </div>
+            </motion.section>
+
+            <motion.section
+              className="mx-auto mt-4 sm:mt-6 max-w-7xl rounded-[32px] bg-white px-5 py-14 shadow-[0_24px_70px_rgba(20,24,31,0.09)] md:px-8 lg:px-12 lg:py-20"
+              initial="hidden"
+              whileInView="visible"
+              viewport={revealViewport}
+              variants={stagger}
+            >
+              <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+                <motion.div variants={fadeUp}>
+                  <SectionLabel>Struktur & Approval</SectionLabel>
+                  <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
+                    Alur approval mengikuti struktur tim.
+                  </h2>
+                  <p className="mt-5 max-w-lg text-base leading-8 text-[#596172]">
+                    Karyawan mengajukan izin atau cuti, manager divisi melakukan review pertama, lalu HR memberi keputusan
+                    final. Semua status dan catatan tetap tercatat.
+                  </p>
+                </motion.div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {structureCards.map((item) => (
+                    <motion.article
+                      key={item.title}
+                      className="rounded-[26px] border border-[#edf0f5] bg-[#f9fafc] p-6"
+                      variants={fadeUp}
+                      whileHover={{ y: -5 }}
+                    >
+                      <h3 className="text-xl font-black tracking-[-0.03em]">{item.title}</h3>
+                      <p className="mt-3 text-sm leading-7 text-[#596172]">{item.copy}</p>
+                    </motion.article>
+                  ))}
+                </div>
               </div>
             </motion.section>
 
@@ -510,10 +577,11 @@ export function LandingPage() {
                 <div className="max-w-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Mulai dari demo</p>
                   <h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                    Coba alur Taptu sebelum masuk produksi.
+                    Coba alur Taptu dari Employee sampai HR.
                   </h2>
                   <p data-testid="cta-sub-copy" className="mt-4 text-base leading-7 text-white/70">
-                    Masuk sebagai admin, karyawan, atau scanner. Tidak perlu install, tidak perlu setup.
+                    Masuk sebagai employee, manager, HR, atau scanner untuk melihat bagaimana data absensi divalidasi sebelum
+                    menjadi laporan.
                   </p>
                 </div>
                 <div className="shrink-0">
