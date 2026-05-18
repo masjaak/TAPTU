@@ -45,12 +45,15 @@ import {
   reassignDemoEmployeeDepartment,
   recordDemoCheckIn,
   recordDemoCheckOut,
+  resetDemoAttendanceState,
   updateDemoDepartment,
   updateDemoShift,
   updateDemoWorkLocation,
   tryDemoLogin,
   getDemoRoleFromToken
 } from "./demo";
+
+export { resetDemoAttendanceState };
 
 import { supabase } from "./supabase";
 

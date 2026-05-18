@@ -327,7 +327,7 @@ const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
 ];
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
-  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", checkInMethod: "GPS", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
   { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
@@ -578,4 +578,13 @@ export function recordDemoCheckOut(employeeId: string): void {
     if (r.day !== "Hari ini") return r;
     return { ...r, checkOutTime: isoTime };
   });
+}
+
+/**
+ * Resets employee attendance state to initial values — used in tests to guarantee
+ * a clean starting state before each test case that depends on Fikri being absent.
+ */
+export function resetDemoAttendanceState(): void {
+  demoEmployees = INITIAL_DEMO_EMPLOYEES.map((e) => ({ ...e }));
+  demoEmployeeAttendanceHistory = [];
 }

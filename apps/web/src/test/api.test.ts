@@ -23,6 +23,7 @@ import {
   login,
   markNotificationRead,
   reassignEmployeeDepartment,
+  resetDemoAttendanceState,
   updateDepartment
 } from "../lib/api";
 
@@ -482,5 +483,135 @@ describe("PHASE 10.5 — HR report shows method detail after demo check-in", () 
     const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
     expect(fikri?.checkInTime).toBeTruthy();
     expect(fikri?.checkInMethod).toBe("Selfie");
+  });
+});
+
+describe("PHASE 10.8 — HR/Manager demo attendance source sync", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  // --- Employee → Manager ---
+
+  it("Manager Presensi Tim shows Fikri as absent before any check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.todayStatus).toBe("absent");
+    expect(fikri?.checkInTime).toBeUndefined();
+  });
+
+  it("Manager Presensi Tim shows Fikri Selfie check-in matching Employee Riwayat", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const todayEntry = history.find((r) => r.day === "Hari ini");
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkInMethod).toBe("Selfie");
+    expect(fikri?.checkInTime).toBeTruthy();
+    expect(todayEntry?.checkInTime).toBeTruthy();
+    expect(["present", "late"]).toContain(fikri?.todayStatus);
+  });
+
+  it("Manager does not show stale 08:03 QR for Fikri after Selfie check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkInMethod).not.toBe("QR");
+    expect(fikri?.checkInTime).not.toBe("08:03");
+  });
+
+  it("check-out updates same record and Manager Presensi Tim shows check-out time", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    await checkOut("demo:employee", { method: "Selfie" });
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkOutTime).toBeTruthy();
+  });
+
+  // --- Employee → HR ---
+
+  it("HR Presensi shows Fikri as Belum check-in before any check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.status).toBe("Belum check-in");
+    expect(fikri?.checkInTime).toBeUndefined();
+  });
+
+  it("HR Presensi shows Fikri Selfie check-in matching Employee Riwayat", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInMethod).toBe("Selfie");
+    expect(fikri?.checkInTime).toBeTruthy();
+    expect(["Tepat waktu", "Terlambat"]).toContain(fikri?.status);
+  });
+
+  it("HR does not show stale 08:03 QR for Fikri after Selfie check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInMethod).not.toBe("QR");
+  });
+
+  it("HR Laporan shows Fikri Selfie check-in after employee check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInMethod).toBe("Selfie");
+    expect(["Tepat waktu", "Terlambat"]).toContain(fikri?.status);
+  });
+
+  it("check-out updates same record and HR shows check-out time", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    await checkOut("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkOutTime).toBeTruthy();
+  });
+
+  // --- No duplicate row ---
+
+  it("HR Presensi has exactly one row for Fikri after check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikriRows = rows.filter((r) => r.employeeId === "usr-employee-01");
+    expect(fikriRows).toHaveLength(1);
+  });
+
+  // --- Empty/reset state ---
+
+  it("after reset, HR does not show stale seeded attendance for Fikri", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInTime).toBeUndefined();
+    expect(fikri?.status).toBe("Belum check-in");
+  });
+
+  it("after reset, Manager does not show stale seeded attendance for Fikri", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkInTime).toBeUndefined();
+    expect(fikri?.todayStatus).toBe("absent");
+  });
+
+  it("Employee Riwayat is empty after reset, consistent with HR/Manager showing Belum check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const history = await fetchAttendanceHistory("demo:employee");
+    const todayEntries = history.filter((r) => r.day === "Hari ini");
+    expect(todayEntries).toHaveLength(0);
   });
 });
