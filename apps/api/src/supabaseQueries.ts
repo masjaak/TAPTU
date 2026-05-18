@@ -637,11 +637,16 @@ export function supabaseBuildAttendanceReportRows(rows: SupabaseAttendanceReport
   });
 }
 
+const REPORT_MAX_LIMIT = 500;
+const REPORT_DEFAULT_LIMIT = 100;
+
 export async function supabaseGetAttendanceReportRows(
   sb: SupabaseAdmin,
   organizationId: string,
-  filters: AttendanceReportFilters = {}
-): Promise<AttendanceReportRow[]> {
+  filters: AttendanceReportFilters = {},
+  limit = REPORT_DEFAULT_LIMIT,
+  offset = 0
+): Promise<{ rows: AttendanceReportRow[]; hasMore: boolean }> {
   let usersQuery = sb
     .from("profiles")
     .select("id")
@@ -656,14 +661,17 @@ export async function supabaseGetAttendanceReportRows(
   }
 
   const userIds = (orgUsers ?? []).map((user) => user.id);
-  if (userIds.length === 0) return [];
+  if (userIds.length === 0) return { rows: [], hasMore: false };
 
+  const safeLimit = Math.min(Math.max(1, limit), REPORT_MAX_LIMIT);
+
+  // Fetch one extra row to detect whether more pages exist without a separate count query.
   let query = sb
     .from("attendance_records")
     .select("*, profiles(full_name, department_id, departments(name)), work_locations(name), attendance_exceptions(status)")
     .in("employee_id", userIds)
     .order("attendance_date", { ascending: false })
-    .limit(500);
+    .range(offset, offset + safeLimit);
 
   if (filters.dateFrom) query = query.gte("attendance_date", filters.dateFrom);
   if (filters.dateTo) query = query.lte("attendance_date", filters.dateTo);
@@ -679,7 +687,12 @@ export async function supabaseGetAttendanceReportRows(
     throw new Error(`Failed to fetch attendance report: ${error.message}`);
   }
 
-  return supabaseBuildAttendanceReportRows((data ?? []) as SupabaseAttendanceReportRow[]);
+  const fetched = data ?? [];
+  const hasMore = fetched.length > safeLimit;
+  const rows = supabaseBuildAttendanceReportRows(
+    fetched.slice(0, safeLimit) as SupabaseAttendanceReportRow[]
+  );
+  return { rows, hasMore };
 }
 
 // ─── Requests ───────────────────────────────────────────────

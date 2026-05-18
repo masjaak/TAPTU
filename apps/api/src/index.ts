@@ -2019,16 +2019,36 @@ app.get("/api/admin/reports", async (req, res) => {
     status: typeof req.query.status === "string" ? req.query.status : undefined
   };
 
+  const rawLimit = parseInt(req.query.limit as string, 10);
+  const rawOffset = parseInt(req.query.offset as string, 10);
+  const pageLimit = isNaN(rawLimit) || rawLimit <= 0 ? 100 : Math.min(rawLimit, 500);
+  const pageOffset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset;
+
   const organizationId = useSupabase && sb ? await getOrganizationIdForUser(user.id) : undefined;
-  const rows =
-    useSupabase && sb && organizationId
-      ? await supabaseGetAttendanceReportRows(sb, organizationId, filters)
-      : buildAttendanceReportRows(
-          store,
-          Object.fromEntries(users.map((u) => [u.id, u.fullName])),
-          filters,
-          Object.fromEntries(users.map((u) => [u.id, { departmentId: u.departmentId, departmentName: u.departmentName }]))
-        );
+
+  if (useSupabase && sb && organizationId) {
+    const { rows, hasMore } = await supabaseGetAttendanceReportRows(sb, organizationId, filters, pageLimit, pageOffset);
+
+    if (req.query.format === "csv") {
+      const csv = generateCsvFromRows(rows);
+      const today = new Date().toISOString().slice(0, 7);
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="taptu-attendance-report-${today}.csv"`);
+      return res.send(csv);
+    }
+
+    res.setHeader("X-Has-More", String(hasMore));
+    res.setHeader("X-Pagination-Limit", String(pageLimit));
+    res.setHeader("X-Pagination-Offset", String(pageOffset));
+    return res.json(rows);
+  }
+
+  const rows = buildAttendanceReportRows(
+    store,
+    Object.fromEntries(users.map((u) => [u.id, u.fullName])),
+    filters,
+    Object.fromEntries(users.map((u) => [u.id, { departmentId: u.departmentId, departmentName: u.departmentName }]))
+  );
 
   if (req.query.format === "csv") {
     const csv = generateCsvFromRows(rows);
@@ -2038,6 +2058,9 @@ app.get("/api/admin/reports", async (req, res) => {
     return res.send(csv);
   }
 
+  res.setHeader("X-Has-More", "false");
+  res.setHeader("X-Pagination-Limit", String(pageLimit));
+  res.setHeader("X-Pagination-Offset", String(pageOffset));
   return res.json(rows);
 });
 

@@ -22,7 +22,8 @@ import {
   supabaseGetAllAttendanceHistory,
   supabaseGetExceptions,
   supabaseGetAdminOverview,
-  supabaseGetNotifications
+  supabaseGetNotifications,
+  supabaseGetAttendanceReportRows
 } from "./supabaseQueries";
 
 function createCheckedInRecord(): AttendanceRecord {
@@ -1764,5 +1765,96 @@ describe("Supabase query defaults — performance safeguards", () => {
     const overview = await supabaseGetAdminOverview(sb, "org-01");
     expect(capturedExceptionEmployeeIds).toEqual(["usr-employee-01", "usr-employee-02"]);
     expect(overview.exceptionCount).toBe(3);
+  });
+});
+
+describe("Supabase attendance report pagination", () => {
+  function makeReportSb(attendanceRows: unknown[], capturedRange?: { from: number; to: number }) {
+    return {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() { return this; },
+            eq() { return Promise.resolve({ data: [{ id: "usr-employee-01" }], error: null }); }
+          };
+        }
+        // attendance_records
+        return {
+          select() { return this; },
+          in() { return this; },
+          order() { return this; },
+          range(from: number, to: number) {
+            if (capturedRange) {
+              capturedRange.from = from;
+              capturedRange.to = to;
+            }
+            return Promise.resolve({ data: attendanceRows, error: null });
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+  }
+
+  function makeMinimalRow(id: string) {
+    return {
+      id,
+      employee_id: "usr-employee-01",
+      attendance_date: "2026-05-11",
+      shift_id: "shift-pagi",
+      status: "Selesai",
+      state: "checked_out",
+      check_in_time: "2026-05-11T01:00:00.000Z",
+      check_out_time: "2026-05-11T09:00:00.000Z",
+      validation_status: "verified",
+      validation_reasons: [],
+      location_lat: null,
+      location_lng: null,
+      selfie_url: null,
+      device_id: null,
+      profiles: { full_name: "Fikri Maulana" },
+      work_locations: { name: "Kantor Pusat" },
+      attendance_exceptions: []
+    };
+  }
+
+  it("returns hasMore: true when Supabase returns more rows than the limit", async () => {
+    // limit=2, so we request 3 rows (limit+1); if all 3 come back → hasMore=true
+    const threeRows = [makeMinimalRow("r1"), makeMinimalRow("r2"), makeMinimalRow("r3")];
+    const sb = makeReportSb(threeRows);
+
+    const result = await supabaseGetAttendanceReportRows(sb, "org-01", {}, 2, 0);
+
+    expect(result.hasMore).toBe(true);
+    expect(result.rows).toHaveLength(2);
+  });
+
+  it("returns hasMore: false when result fits within the limit", async () => {
+    const oneRow = [makeMinimalRow("r1")];
+    const sb = makeReportSb(oneRow);
+
+    const result = await supabaseGetAttendanceReportRows(sb, "org-01", {}, 2, 0);
+
+    expect(result.hasMore).toBe(false);
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("passes offset to the range call for second-page fetches", async () => {
+    const captured = { from: -1, to: -1 };
+    const sb = makeReportSb([], captured);
+
+    await supabaseGetAttendanceReportRows(sb, "org-01", {}, 10, 20);
+
+    expect(captured.from).toBe(20);
+    expect(captured.to).toBe(30);
+  });
+
+  it("uses limit 100 and offset 0 by default", async () => {
+    const captured = { from: -1, to: -1 };
+    const sb = makeReportSb([], captured);
+
+    await supabaseGetAttendanceReportRows(sb, "org-01");
+
+    expect(captured.from).toBe(0);
+    expect(captured.to).toBe(100);
   });
 });
