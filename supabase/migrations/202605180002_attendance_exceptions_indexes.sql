@@ -1,0 +1,44 @@
+-- ============================================================
+-- attendance_exceptions performance indexes
+-- 2026-05-18
+--
+-- Columns checked but skipped:
+--   attendance_exceptions.organization_id — column does not exist; org scope
+--     flows through employee_id → profiles.organization_id.
+--   attendance_exceptions.attendance_date — column does not exist; that field
+--     lives on attendance_records, not on attendance_exceptions.
+--   notifications.read_at  — never appears in a WHERE clause; unread
+--     filtering is done client-side in JS after fetch.
+--   notifications.recipient_id / created_at — already covered by the
+--     composite notifications_recipient_created_idx (phase 9.1).
+--   departments.organization_id — already covered by
+--     departments_organization_id_idx (phase 7.1).
+--   work_locations.organization_id — table is small and every query uses
+--     .limit(1).maybeSingle(); sequential scan cost is negligible.
+--   shifts.organization_id — shifts table has no Supabase query paths in the
+--     current codebase; all routes use the local in-memory store.
+-- ============================================================
+
+-- attendance_exceptions (employee_id, status)
+--
+-- Covers the two count queries that run on every admin and manager
+-- dashboard load:
+--
+--   supabaseGetAdminOverview:
+--     .in("employee_id", orgEmployeeIds)
+--     .in("status", ["Need Review", "Request Correction"])
+--
+--   supabaseGetManagerOverview:
+--     .in("employee_id", employeeIds)
+--     .in("status", ["Need Review", "Request Correction"])
+--
+-- employee_id is the leading column because it is the more selective
+-- predicate (org-scoped list vs two-value status enum).
+-- The trailing status column turns the count into an index-only scan.
+--
+-- The list queries (supabaseGetExceptions / supabaseGetManagerExceptions)
+-- also use .in("employee_id", ...).order("created_at", desc).limit(50);
+-- those are served by the leading employee_id column of this index and
+-- are already bounded by the .limit(50) added in the query-safeguard pass.
+create index if not exists attendance_exceptions_employee_id_status_idx
+  on public.attendance_exceptions (employee_id, status);
