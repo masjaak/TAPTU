@@ -459,6 +459,8 @@ export function AppPage() {
   const qrStreamRef = useRef<MediaStream | null>(null);
   const departmentActionMenuRef = useRef<HTMLDivElement | null>(null);
   const departmentActionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // Tracks the previous tab so the invalidation effect can detect tab-change direction.
+  const prevTabRef = useRef<string>(tab);
 
   const appNavigation = useMemo(() => {
     const unreadCount = notifications.filter((n) => !n.readAt).length;
@@ -490,6 +492,20 @@ export function AppPage() {
       stopQrCameraStream();
     }
   }, [tab]);
+
+  // Invalidate attendance/report cache on tab re-entry so demo check-ins are always
+  // visible without requiring a full page reload.  Runs only when tab changes.
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    prevTabRef.current = tab;
+    if (tab === "attendance" && prev !== "attendance") {
+      if (isAdmin) setAdminAttendanceLoaded(false);
+      if (isManager) setEmployeeListLoaded(false);
+    }
+    if (tab === "reports" && prev !== "reports") {
+      setReportLoaded(false);
+    }
+  }, [tab, isAdmin, isManager]);
 
   useEffect(() => {
     return () => {

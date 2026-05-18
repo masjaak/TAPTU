@@ -4151,3 +4151,139 @@ describe("PHASE 10.6 — Camera stream lifecycle on mode switch", () => {
     await waitFor(() => expect(mockStop).toHaveBeenCalled());
   });
 });
+
+describe("PHASE 10.9 — Attendance cache refresh on tab re-entry", () => {
+  beforeEach(() => {
+    cleanup();
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 10, checkedInToday: 8, onTimeToday: 7, lateToday: 1, pendingRequests: 2, absentToday: 2, exceptionCount: 1, recentActivity: [] });
+    apiMocks.fetchManagerOverview.mockResolvedValue({ totalEmployees: 5, checkedInToday: 4, onTimeToday: 4, lateToday: 0, pendingRequests: 1, absentToday: 1, exceptionCount: 0, recentActivity: [] });
+    apiMocks.fetchReportRows.mockResolvedValue([
+      { id: "att-live-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-18", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-18T11:41:00.000Z", status: "Terlambat", validationStatus: "verified", validationReasons: [], isLate: true, hasException: false, selfieProof: true, deviceValidated: true, checkInMethod: "Selfie" }
+    ]);
+    apiMocks.fetchEmployeeList.mockResolvedValue([]);
+    apiMocks.fetchManagerEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operasional", managerId: "usr-manager-01", todayStatus: "late", checkInTime: "11:41", checkInMethod: "Selfie", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+    ]);
+    apiMocks.fetchAuditLogs.mockResolvedValue([]);
+    apiMocks.fetchDepartments.mockResolvedValue([]);
+    apiMocks.fetchNotifications.mockResolvedValue([]);
+    apiMocks.fetchManagerRequests.mockResolvedValue([]);
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("HR Presensi re-fetches fetchReportRows when admin returns to attendance tab", async () => {
+    localStorage.setItem("taptu-session", JSON.stringify({
+      token: "admin-api-token",
+      user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", organizationName: "TAPTU HQ", role: "admin" }
+    }));
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Nadia Putri", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+
+    renderRoute("/app");
+
+    // Navigate to Presensi (attendance)
+    fireEvent.click(await screen.findByRole("button", { name: "Presensi" }));
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(1));
+
+    // Navigate away to Beranda (home)
+    fireEvent.click(screen.getByRole("button", { name: "Beranda" }));
+    await waitFor(() => expect(apiMocks.fetchAdminOverview).toHaveBeenCalled());
+
+    // Return to Presensi — cache was invalidated, must re-fetch
+    fireEvent.click(screen.getByRole("button", { name: "Presensi" }));
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(2));
+  });
+
+  it("HR Presensi does not fetch infinitely — exactly 2 calls after one away-and-back cycle", async () => {
+    localStorage.setItem("taptu-session", JSON.stringify({
+      token: "admin-api-token",
+      user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", organizationName: "TAPTU HQ", role: "admin" }
+    }));
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Nadia Putri", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+
+    renderRoute("/app");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Presensi" }));
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Beranda" }));
+    await waitFor(() => expect(apiMocks.fetchAdminOverview).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Presensi" }));
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(2));
+
+    // Allow state to settle — no third fetch
+    await new Promise((r) => setTimeout(r, 200));
+    expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(2);
+  });
+
+  it("Manager Presensi Tim re-fetches fetchManagerEmployeeList when manager returns to attendance tab", async () => {
+    localStorage.setItem("taptu-session", JSON.stringify({
+      token: "manager-api-token",
+      user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+    }));
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Raka Saputra", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+
+    renderRoute("/app");
+
+    // Navigate to Presensi Tim (attendance for manager)
+    fireEvent.click(await screen.findByRole("button", { name: "Presensi Tim" }));
+    await waitFor(() => expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledTimes(1));
+
+    // Navigate away to Beranda
+    fireEvent.click(screen.getByRole("button", { name: "Beranda" }));
+    await waitFor(() => expect(apiMocks.fetchManagerOverview).toHaveBeenCalled());
+
+    // Return to Presensi Tim — must re-fetch
+    fireEvent.click(screen.getByRole("button", { name: "Presensi Tim" }));
+    await waitFor(() => expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledTimes(2));
+  });
+
+  it("Manager Presensi Tim does not fetch infinitely — exactly 2 calls after one away-and-back cycle", async () => {
+    localStorage.setItem("taptu-session", JSON.stringify({
+      token: "manager-api-token",
+      user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", organizationName: "TAPTU HQ", role: "manager" }
+    }));
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Raka Saputra", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+
+    renderRoute("/app");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Presensi Tim" }));
+    await waitFor(() => expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Beranda" }));
+    await waitFor(() => expect(apiMocks.fetchManagerOverview).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Presensi Tim" }));
+    await waitFor(() => expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledTimes(2));
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(apiMocks.fetchManagerEmployeeList).toHaveBeenCalledTimes(2);
+  });
+
+  it("HR Laporan re-fetches fetchReportRows when admin returns to reports tab", async () => {
+    localStorage.setItem("taptu-session", JSON.stringify({
+      token: "admin-api-token",
+      user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", organizationName: "TAPTU HQ", role: "admin" }
+    }));
+    apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Nadia Putri", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+
+    renderRoute("/app/reports");
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(1));
+
+    // Navigate away to Beranda
+    fireEvent.click(screen.getByRole("button", { name: "Beranda" }));
+    await waitFor(() => expect(apiMocks.fetchAdminOverview).toHaveBeenCalled());
+
+    // Return to Laporan — must re-fetch
+    fireEvent.click(screen.getByRole("button", { name: "Laporan" }));
+    await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(2));
+  });
+});
