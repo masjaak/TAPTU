@@ -281,7 +281,9 @@ describe("post-login design system", () => {
       "src/components/StatusPill.tsx",
       "tailwind.config.js"
     ];
-    const source = files.map((file) => readFileSync(resolve(process.cwd(), file), "utf8")).join("\n");
+    const cwd = process.cwd();
+    const webRoot = cwd.endsWith("apps/web") ? cwd : resolve(cwd, "apps/web");
+    const source = files.map((file) => readFileSync(resolve(webRoot, file), "utf8")).join("\n");
 
     const oldTokenPattern = new RegExp(
       [

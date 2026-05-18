@@ -2,8 +2,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Tests run from apps/web/, so process.cwd() is already the web root
-const webRoot = resolve(process.cwd());
+// Support running from monorepo root or from apps/web/ directly
+const cwd = process.cwd();
+const webRoot = cwd.endsWith("apps/web") ? cwd : resolve(cwd, "apps/web");
 
 const indexHtml = readFileSync(resolve(webRoot, "index.html"), "utf8");
 
