@@ -18,7 +18,11 @@ import {
   supabaseGetManagerOverview,
   supabaseReassignEmployeeDepartment,
   supabaseUpdateDepartment,
-  supabaseUpdateCheckOutRecord
+  supabaseUpdateCheckOutRecord,
+  supabaseGetAllAttendanceHistory,
+  supabaseGetExceptions,
+  supabaseGetAdminOverview,
+  supabaseGetNotifications
 } from "./supabaseQueries";
 
 function createCheckedInRecord(): AttendanceRecord {
@@ -511,20 +515,24 @@ describe("Supabase manager-scoped data access", () => {
             return this;
           },
           order() {
-            return Promise.resolve({
-              data: [
-                {
-                  id: "exc-01",
-                  attendance_record_id: "att-01",
-                  employee_id: "usr-employee-01",
-                  exception_type: "Outside radius",
-                  reason: "Outside office radius.",
-                  status: "Need Review",
-                  created_at: "2026-05-12T08:00:00.000Z"
-                }
-              ],
-              error: null
-            });
+            return {
+              limit() {
+                return Promise.resolve({
+                  data: [
+                    {
+                      id: "exc-01",
+                      attendance_record_id: "att-01",
+                      employee_id: "usr-employee-01",
+                      exception_type: "Outside radius",
+                      reason: "Outside office radius.",
+                      status: "Need Review",
+                      created_at: "2026-05-12T08:00:00.000Z"
+                    }
+                  ],
+                  error: null
+                });
+              }
+            };
           }
         };
       }
@@ -1603,5 +1611,158 @@ describe("Supabase request approvals", () => {
     });
 
     expect(result).toBeNull();
+  });
+});
+
+describe("Supabase query defaults — performance safeguards", () => {
+  it("notifications are limited to 50 most recent per recipient", async () => {
+    let capturedLimit: number | null = null;
+    const sb = {
+      from(table: string) {
+        expect(table).toBe("notifications");
+        return {
+          select() { return this; },
+          eq() { return this; },
+          order() {
+            return {
+              limit(n: number) {
+                capturedLimit = n;
+                return Promise.resolve({ data: [], error: null });
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    await supabaseGetNotifications(sb, "usr-employee-01");
+    expect(capturedLimit).toBe(50);
+  });
+
+  it("attendance history applies a 30-day date range filter", async () => {
+    let capturedGteColumn: string | null = null;
+    let capturedGteValue: string | null = null;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() { return this; },
+            eq() { return Promise.resolve({ data: [{ id: "usr-employee-01" }], error: null }); }
+          };
+        }
+        expect(table).toBe("attendance_records");
+        return {
+          select() { return this; },
+          in() { return this; },
+          gte(col: string, val: string) {
+            capturedGteColumn = col;
+            capturedGteValue = val;
+            return this;
+          },
+          order() {
+            return {
+              limit() {
+                return Promise.resolve({ data: [], error: null });
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    await supabaseGetAllAttendanceHistory(sb, "org-01");
+    expect(capturedGteColumn).toBe("attendance_date");
+    expect(capturedGteValue).toBe(thirtyDaysAgo);
+  });
+
+  it("org-level exceptions are limited to 50 most recent", async () => {
+    let capturedLimit: number | null = null;
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          return {
+            select() { return this; },
+            eq() { return Promise.resolve({ data: [{ id: "usr-employee-01", full_name: "Fikri" }], error: null }); }
+          };
+        }
+        expect(table).toBe("attendance_exceptions");
+        return {
+          select() { return this; },
+          in() { return this; },
+          order() {
+            return {
+              limit(n: number) {
+                capturedLimit = n;
+                return Promise.resolve({ data: [], error: null });
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    await supabaseGetExceptions(sb, "org-01");
+    expect(capturedLimit).toBe(50);
+  });
+
+  it("admin overview exception count is scoped to org employees only", async () => {
+    const capturedExceptionEmployeeIds: unknown[] = [];
+    let profilesCallCount = 0;
+
+    const sb = {
+      from(table: string) {
+        if (table === "profiles") {
+          profilesCallCount++;
+          return {
+            select() { return this; },
+            eq(col: string) {
+              if (col === "role") {
+                if (profilesCallCount === 1) {
+                  return Promise.resolve({ count: 2, data: null, error: null });
+                }
+                return Promise.resolve({
+                  count: null,
+                  data: [{ id: "usr-employee-01" }, { id: "usr-employee-02" }],
+                  error: null
+                });
+              }
+              return this;
+            }
+          };
+        }
+
+        if (table === "attendance_records") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            in() { return Promise.resolve({ data: [], error: null }); }
+          };
+        }
+
+        if (table === "approval_requests") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            in() { return Promise.resolve({ count: 0, error: null }); }
+          };
+        }
+
+        expect(table).toBe("attendance_exceptions");
+        return {
+          select() { return this; },
+          in(col: string, vals: unknown[]) {
+            if (col === "employee_id") capturedExceptionEmployeeIds.push(...vals);
+            if (col === "status") return Promise.resolve({ count: 3, error: null });
+            return this;
+          }
+        };
+      }
+    } as unknown as SupabaseAdmin;
+
+    const overview = await supabaseGetAdminOverview(sb, "org-01");
+    expect(capturedExceptionEmployeeIds).toEqual(["usr-employee-01", "usr-employee-02"]);
+    expect(overview.exceptionCount).toBe(3);
   });
 });

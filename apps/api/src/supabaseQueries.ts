@@ -383,7 +383,8 @@ export async function supabaseGetNotifications(sb: SupabaseAdmin, recipientId: s
     .from("notifications")
     .select("*")
     .eq("recipient_id", recipientId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(50);
   if (error) throw new Error(`Failed to fetch notifications: ${error.message}`);
   return (data ?? []).map(toNotificationItem);
 }
@@ -560,10 +561,13 @@ export async function supabaseGetAllAttendanceHistory(
   const userIds = (orgUsers ?? []).map((u) => u.id);
   if (userIds.length === 0) return [];
 
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const query = sb
     .from("attendance_records")
     .select("*, profiles(full_name), work_locations(name)")
     .in("employee_id", userIds)
+    .gte("attendance_date", thirtyDaysAgo)
     .order("attendance_date", { ascending: false })
     .limit(100);
 
@@ -1217,12 +1221,19 @@ export async function supabaseGetAdminOverview(
 ) {
   const today = new Date().toISOString().slice(0, 10);
 
-  // Total employees in org
+  // Total employees in org (also fetch IDs for exception scoping)
   const { count: totalEmployees } = await sb
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("role", "employee");
+
+  const { data: orgEmployeeProfiles } = await sb
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("role", "employee");
+  const orgEmployeeIds = (orgEmployeeProfiles ?? []).map((r) => r.id);
 
   // Today's attendance
   const { data: todayAtt } = await sb
@@ -1254,6 +1265,7 @@ export async function supabaseGetAdminOverview(
   const { count: exceptionCount } = await sb
     .from("attendance_exceptions")
     .select("id", { count: "exact", head: true })
+    .in("employee_id", orgEmployeeIds.length > 0 ? orgEmployeeIds : ["_"])
     .in("status", ["Need Review", "Request Correction"]);
 
   return {
@@ -1830,7 +1842,8 @@ export async function supabaseGetExceptions(
     .from("attendance_exceptions")
     .select("*")
     .in("employee_id", userIds)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   if (error) {
     throw new Error(`Failed to fetch exceptions: ${error.message}`);
@@ -1871,7 +1884,8 @@ export async function supabaseGetManagerExceptions(
     .from("attendance_exceptions")
     .select("*")
     .in("employee_id", userIds)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   if (error) {
     throw new Error(`Failed to fetch manager exceptions: ${error.message}`);
