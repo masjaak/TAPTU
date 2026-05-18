@@ -276,10 +276,10 @@ describe("post-login design system", () => {
 
   it("does not keep old dashboard theme traces in active post-login source", () => {
     const files = [
-      "apps/web/src/pages/AppPage.tsx",
-      "apps/web/src/components/app.tsx",
-      "apps/web/src/components/StatusPill.tsx",
-      "apps/web/tailwind.config.js"
+      "src/pages/AppPage.tsx",
+      "src/components/app.tsx",
+      "src/components/StatusPill.tsx",
+      "tailwind.config.js"
     ];
     const source = files.map((file) => readFileSync(resolve(process.cwd(), file), "utf8")).join("\n");
 

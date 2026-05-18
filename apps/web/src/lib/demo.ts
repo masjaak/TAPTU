@@ -249,6 +249,37 @@ export function getDemoAdminOverview(): AdminOverview {
   };
 }
 
+// Manager overview is derived from the demo employee list so that mutations
+// (e.g. check-in via the employee account) are reflected here.
+export function getDemoManagerOverview(): AdminOverview {
+  const managerId = "usr-manager-01";
+  const teamMembers = demoEmployees.filter((e) => e.managerId === managerId);
+  const checkedIn = teamMembers.filter((e) => e.todayStatus === "present" || e.todayStatus === "late");
+  const onTime = teamMembers.filter((e) => e.todayStatus === "present");
+  const late = teamMembers.filter((e) => e.todayStatus === "late");
+  const absent = teamMembers.filter((e) => e.todayStatus === "absent");
+
+  const recentActivity: AttendanceActivityItem[] = checkedIn.map((e) => ({
+    id: `act-mgr-${e.id}`,
+    employeeName: e.fullName,
+    event: "Check-in",
+    time: e.checkInTime ?? "--:--",
+    status: e.todayStatus === "late" ? "Terlambat" : "Tepat waktu",
+    detail: `${e.shiftName ?? "Shift"} · ${e.locationName ?? "Kantor"}`
+  }));
+
+  return {
+    totalEmployees: teamMembers.length,
+    checkedInToday: checkedIn.length,
+    onTimeToday: onTime.length,
+    lateToday: late.length,
+    pendingRequests: REQUESTS.manager.filter((r) => r.status === "Menunggu").length,
+    absentToday: absent.length,
+    exceptionCount: 0,
+    recentActivity
+  };
+}
+
 export function getDemoEmployeeSummary(): EmployeeSummary {
   return {
     totalDays: 0,
@@ -319,13 +350,49 @@ const INITIAL_DEMO_SHIFTS: ShiftRecord[] = [
 let demoWorkLocations: WorkLocationItem[] = INITIAL_DEMO_WORK_LOCATIONS.map((location) => ({ ...location }));
 let demoShifts: ShiftRecord[] = INITIAL_DEMO_SHIFTS.map((shift) => ({ ...shift }));
 
-const DEMO_REPORT_ROWS: AttendanceReportRow[] = [
-  { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", checkOutTime: "2026-05-02T17:05:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], locationLat: -6.2087, locationLng: 106.8457, isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
-  { id: "att-demo-02", employeeName: "Anisa Rahma", employeeId: "usr-employee-02", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:24:00.000Z", status: "Terlambat", validationStatus: "needs_review", validationReasons: ["Di luar radius lokasi kerja (603 m).", "Perangkat berbeda dari riwayat sebelumnya."], locationLat: -6.206, locationLng: 106.851, isLate: true, hasException: true, selfieProof: false, deviceValidated: true },
-  { id: "att-demo-03", employeeName: "Leo Pratama", employeeId: "usr-employee-03", date: "2026-05-02", shiftName: "Shift Sore", workLocationName: "Kantor Pusat", status: "Belum check-in", validationStatus: "blocked", validationReasons: ["Belum masuk geofence"], isLate: false, hasException: false, selfieProof: false, deviceValidated: false },
-  { id: "att-demo-04", employeeName: "Budi Santoso", employeeId: "usr-employee-05", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T07:58:00.000Z", checkOutTime: "2026-05-02T17:01:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
-  { id: "att-demo-05", employeeName: "Dina Fitriani", employeeId: "usr-employee-04", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Cabang Selatan", status: "Izin", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: false, deviceValidated: false, approvalStatus: "Disetujui" }
-];
+// Derive live report rows from demoEmployees so that check-ins are reflected immediately.
+function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceReportRow {
+  let status: string;
+  let checkInTime: string | undefined;
+
+  if (e.todayStatus === "leave") {
+    status = "Izin";
+  } else if (e.todayStatus === "absent") {
+    status = "Belum check-in";
+  } else if (e.todayStatus === "late") {
+    status = "Terlambat";
+    checkInTime = e.checkInTime ? `${today}T${e.checkInTime}:00.000Z` : undefined;
+  } else if (e.todayStatus === "present") {
+    status = "Tepat waktu";
+    checkInTime = e.checkInTime ? `${today}T${e.checkInTime}:00.000Z` : undefined;
+  } else {
+    status = "Belum check-in";
+  }
+
+  const isLate = e.todayStatus === "late";
+  const hasException = e.validationStatus === "needs_review";
+
+  return {
+    id: `att-live-${e.id}`,
+    employeeName: e.fullName,
+    employeeId: e.id,
+    departmentId: e.departmentId ?? null,
+    departmentName: e.departmentName ?? null,
+    date: today,
+    shiftName: e.shiftName,
+    workLocationName: e.locationName,
+    checkInTime,
+    checkOutTime: undefined,
+    status,
+    validationStatus: (e.validationStatus ?? "verified") as AttendanceReportRow["validationStatus"],
+    validationReasons: [],
+    isLate,
+    hasException,
+    selfieProof: false,
+    deviceValidated: false,
+    approvalStatus: e.todayStatus === "leave" ? "Disetujui" : undefined
+  };
+}
 
 export function getDemoEmployeeList(): EmployeeListItem[] {
   return demoEmployees.map((employee) => ({ ...employee }));
@@ -439,5 +506,30 @@ export function updateDemoShift(id: string, patch: Partial<ShiftRecord>): ShiftR
 }
 
 export function getDemoReportRows(): AttendanceReportRow[] {
-  return DEMO_REPORT_ROWS;
+  const today = new Date().toISOString().slice(0, 10);
+  // Exclude manager/admin roles — only employee-role members appear in attendance reports
+  return demoEmployees
+    .filter((e) => e.role === "employee")
+    .map((e) => employeeToReportRow(e, today));
+}
+
+/**
+ * Records an employee check-in in the demo in-memory store so that
+ * getDemoManagerOverview() reflects live check-ins without requiring a real backend.
+ */
+export function recordDemoCheckIn(employeeId: string, method: string): void {
+  const time = new Date().toTimeString().slice(0, 5);
+  demoEmployees = demoEmployees.map((e) => {
+    if (e.id !== employeeId) return e;
+    // Determine if late — shift pagi starts 08:00 with 10 min grace
+    const [h, m] = time.split(":").map(Number);
+    const minutesSinceMidnight = h * 60 + m;
+    const isLate = minutesSinceMidnight > 8 * 60 + 10;
+    return {
+      ...e,
+      todayStatus: isLate ? "late" : "present",
+      checkInTime: time,
+      validationStatus: "verified"
+    } as typeof e;
+  });
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
@@ -235,21 +235,6 @@ function normalizeAttendanceStatus(value: unknown): AttendanceTimelineItem["stat
   return "Tepat waktu";
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-
-      reject(new Error("Selfie belum bisa diproses."));
-    };
-    reader.onerror = () => reject(new Error("Selfie belum bisa diproses."));
-    reader.readAsDataURL(file);
-  });
-}
 
 function formatAttendanceDateLabel(value?: string) {
   if (!value) {
@@ -462,7 +447,16 @@ export function AppPage() {
   const [locationFormError, setLocationFormError] = useState<string | null>(null);
   const [shiftFormError, setShiftFormError] = useState<string | null>(null);
   const [reportFilterError, setReportFilterError] = useState<string | null>(null);
-  const selfieInputRef = useRef<HTMLInputElement | null>(null);
+  // Camera stream state for getUserMedia (replaces file input)
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  // QR camera stream state — separate from face camera
+  const [qrCameraActive, setQrCameraActive] = useState(false);
+  const [qrCameraError, setQrCameraError] = useState<string | null>(null);
+  const qrVideoRef = useRef<HTMLVideoElement | null>(null);
+  const qrStreamRef = useRef<MediaStream | null>(null);
   const departmentActionMenuRef = useRef<HTMLDivElement | null>(null);
   const departmentActionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -488,6 +482,22 @@ export function AppPage() {
   useEffect(() => {
     setTab(activeSection);
   }, [activeSection]);
+
+  // Stop camera streams when leaving attendance tab or on unmount to avoid memory leaks
+  useEffect(() => {
+    if (tab !== "attendance") {
+      stopCameraStream();
+      stopQrCameraStream();
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+      stopQrCameraStream();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -1053,13 +1063,105 @@ export function AppPage() {
     setActionMessage("QR terbaca. Cek ringkasan sebelum submit.");
   }
 
-  function handleOpenFaceCamera() {
-    const input = selfieInputRef.current;
-    if (!input) {
-      setActionMessage("Kamera belum siap. Muat ulang tab Presensi lalu coba lagi.", "err");
+  function stopQrCameraStream() {
+    if (qrStreamRef.current) {
+      qrStreamRef.current.getTracks().forEach((track) => track.stop());
+      qrStreamRef.current = null;
+    }
+    setQrCameraActive(false);
+  }
+
+  async function handleOpenQrCamera() {
+    setQrCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setActionMessage("Kamera tidak tersedia di perangkat ini.", "err");
       return;
     }
-    input.click();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      qrStreamRef.current = stream;
+      setQrCameraActive(true);
+      setTimeout(() => {
+        if (qrVideoRef.current) {
+          qrVideoRef.current.srcObject = stream;
+        }
+      }, 0);
+    } catch {
+      setQrCameraError("Izin kamera ditolak. Izinkan akses kamera lalu coba lagi.");
+      setActionMessage("Izin kamera ditolak. Izinkan akses kamera lalu coba lagi.", "err");
+    }
+  }
+
+  function stopCameraStream() {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    setCameraActive(false);
+  }
+
+  async function handleOpenFaceCamera() {
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setActionMessage("Kamera tidak tersedia di perangkat ini.", "err");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      cameraStreamRef.current = stream;
+      setCameraActive(true);
+      // Attach stream to video element on next tick after render
+      setTimeout(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+        }
+      }, 0);
+    } catch {
+      setCameraError("Izin kamera ditolak. Izinkan akses kamera lalu coba lagi.");
+      setActionMessage("Izin kamera ditolak. Izinkan akses kamera lalu coba lagi.", "err");
+    }
+  }
+
+  function handleCaptureSelfie() {
+    const video = cameraVideoRef.current;
+    if (!video) {
+      setActionMessage("Video kamera belum siap.", "err");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setActionMessage("Tidak dapat mengambil frame kamera.", "err");
+      return;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    const previewUrl = dataUrl;
+    stopCameraStream();
+
+    const capturedSelfie: CapturedSelfie = {
+      previewUrl,
+      dataUrl,
+      fileName: `selfie-${Date.now()}.jpg`,
+      contentType: "image/jpeg"
+    };
+
+    setAttendanceCapture((current) => ({
+      ...current,
+      selfieUrl: previewUrl,
+      selfieData: dataUrl,
+      selfieFileName: capturedSelfie.fileName,
+      selfieContentType: "image/jpeg"
+    }));
+
+    const pending = buildPendingCheckIn("Selfie", capturedSelfie);
+    if (!pending) return;
+    setPendingCheckIn(pending);
+    setSubmittedCheckIn(null);
+    setCheckInFlowState("face_captured");
+    setActionMessage("Selfie tersimpan sebagai bukti hadir.");
   }
 
   function handleUseCapturedFace() {
@@ -1189,44 +1291,7 @@ export function AppPage() {
     }
   }
 
-  async function handleSelfieUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setCheckInFlowState("idle");
-      setActionMessage("Selfie belum diambil. Coba check-in lagi lalu izinkan kamera.", "err");
-      return;
-    }
-
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const previewUrl = URL.createObjectURL(file);
-      const capturedSelfie = {
-        previewUrl,
-        dataUrl,
-        fileName: file.name,
-        contentType: file.type || "image/jpeg"
-      };
-
-      setAttendanceCapture((current) => ({
-        ...current,
-        selfieUrl: previewUrl,
-        selfieData: dataUrl,
-        selfieFileName: file.name,
-        selfieContentType: file.type || "image/jpeg"
-      }));
-      const pending = buildPendingCheckIn("Selfie", capturedSelfie);
-      if (!pending) {
-        return;
-      }
-      setPendingCheckIn(pending);
-      setSubmittedCheckIn(null);
-      setCheckInFlowState("face_captured");
-      setActionMessage("Foto wajah siap. Gunakan foto ini untuk lanjut.");
-    } catch (error) {
-      setCheckInFlowState("idle");
-      setActionMessage(error instanceof Error ? error.message : "Selfie belum bisa diproses.", "err");
-    }
-  }
+  // handleSelfieUpload removed — camera is now handled via getUserMedia + handleCaptureSelfie
 
   async function handleCreateRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2059,15 +2124,8 @@ export function AppPage() {
               </div>
             </div>
 
-            <input
-              ref={selfieInputRef}
-              type="file"
-              accept="image/*"
-              capture="user"
-              onChange={handleSelfieUpload}
-              className="sr-only"
-              aria-label="Ambil selfie check-in"
-            />
+            {/* Hidden canvas for selfie capture — used by handleCaptureSelfie */}
+            <canvas ref={null} className="sr-only" aria-hidden="true" />
 
             {effectiveState === "idle" && checkInFlowState !== "success" ? (
               <div className="mt-5">
@@ -2097,18 +2155,37 @@ export function AppPage() {
                 {checkInMode === "qr" ? (
                   <div className="mt-4">
                     <p className="text-[15px] font-semibold text-[#111827]">Check-in dengan QR</p>
-                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Gunakan QR aktif di kiosk untuk memulai check-in.</p>
+                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Arahkan kamera ke QR code di kiosk. Deteksi otomatis belum aktif — tekan Scan QR setelah QR terlihat jelas di frame.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
-                        <div className="absolute inset-5 rounded-[20px] border-2 border-dashed border-[#8bb8ff]/60" />
-                        <div className="absolute left-8 top-8 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-[#8bb8ff]" />
-                        <div className="absolute right-8 top-8 h-10 w-10 rounded-tr-2xl border-r-4 border-t-4 border-[#8bb8ff]" />
-                        <div className="absolute bottom-8 left-8 h-10 w-10 rounded-bl-2xl border-b-4 border-l-4 border-[#8bb8ff]" />
-                        <div className="absolute bottom-8 right-8 h-10 w-10 rounded-br-2xl border-b-4 border-r-4 border-[#8bb8ff]" />
-                        <QrCode className="h-16 w-16 text-[#8bb8ff]" />
-                        <span className="absolute bottom-5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">Scanner siap</span>
+                        {qrCameraActive ? (
+                          // Live rear-camera stream via getUserMedia (environment)
+                          <video
+                            ref={qrVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="absolute inset-0 h-full w-full object-cover"
+                            aria-label="Kamera QR aktif"
+                          />
+                        ) : (
+                          <>
+                            <div className="absolute inset-5 rounded-[20px] border-2 border-dashed border-[#8bb8ff]/60" />
+                            <div className="absolute left-8 top-8 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-[#8bb8ff]" />
+                            <div className="absolute right-8 top-8 h-10 w-10 rounded-tr-2xl border-r-4 border-t-4 border-[#8bb8ff]" />
+                            <div className="absolute bottom-8 left-8 h-10 w-10 rounded-bl-2xl border-b-4 border-l-4 border-[#8bb8ff]" />
+                            <div className="absolute bottom-8 right-8 h-10 w-10 rounded-br-2xl border-b-4 border-r-4 border-[#8bb8ff]" />
+                            <QrCode className="h-16 w-16 text-[#8bb8ff]" />
+                          </>
+                        )}
+                        <span className="absolute bottom-5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">
+                          {qrCameraActive ? "Kamera aktif" : "Kamera belum dibuka"}
+                        </span>
                       </div>
                     </div>
+                    {qrCameraError && (
+                      <p role="alert" className="mt-3 text-sm text-red-600">{qrCameraError}</p>
+                    )}
                     {checkInFlowState === "qr_scanned" && pendingCheckIn ? (
                       <div className="mt-4 rounded-[24px] border border-[#d6def0] bg-white p-4">
                         <div className="flex items-start gap-3">
@@ -2134,25 +2211,49 @@ export function AppPage() {
                         </div>
                       </div>
                     ) : (
-                      <PrimaryButton className="mt-4 w-full" onClick={handleQrScan}>
-                        <QrCode className="mr-2 h-4 w-4" />
-                        Scan QR
-                      </PrimaryButton>
+                      <div className="mt-4 flex flex-col gap-3">
+                        {!qrCameraActive ? (
+                          <SecondaryButton onClick={handleOpenQrCamera}>
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Buka kamera QR
+                          </SecondaryButton>
+                        ) : null}
+                        <PrimaryButton onClick={handleQrScan}>
+                          <QrCode className="mr-2 h-4 w-4" />
+                          Scan QR
+                        </PrimaryButton>
+                      </div>
                     )}
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <p className="text-[15px] font-semibold text-[#111827]">Verifikasi wajah</p>
+                    <p className="text-[15px] font-semibold text-[#111827]">Selfie untuk bukti hadir</p>
                     <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
                     <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
                       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
-                        {pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl ? (
-                          <img src={pendingCheckIn?.selfie?.previewUrl ?? attendanceCapture.selfieUrl} alt="Preview verifikasi wajah" className="absolute inset-0 h-full w-full object-cover" />
+                        {cameraActive ? (
+                          // Live front-camera stream via getUserMedia
+                          <video
+                            ref={cameraVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="absolute inset-0 h-full w-full object-cover"
+                            aria-label="Kamera selfie aktif"
+                          />
+                        ) : (pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl) ? (
+                          <img src={pendingCheckIn?.selfie?.previewUrl ?? attendanceCapture.selfieUrl} alt="Preview selfie" className="absolute inset-0 h-full w-full object-cover" />
                         ) : null}
-                        <div className="absolute h-[70%] w-[54%] rounded-[50%] border-2 border-dashed border-[#8bb8ff]/60 bg-white/5" />
-                        <ScanFace className="relative h-16 w-16 text-[#8bb8ff]" />
+                        <div className="absolute h-[70%] w-[54%] rounded-[50%] border-2 border-dashed border-[#8bb8ff]/60 bg-white/5 pointer-events-none" />
+                        {!cameraActive && !(pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl) && (
+                          <ScanFace className="relative h-16 w-16 text-[#8bb8ff]" />
+                        )}
                         <div className="absolute bottom-4 flex flex-wrap justify-center gap-2 px-4">
-                          <StatusBadge tone="info">Kamera siap</StatusBadge>
+                          {cameraActive ? (
+                            <StatusBadge tone="info">Kamera aktif</StatusBadge>
+                          ) : (
+                            <StatusBadge tone="info">Kamera siap</StatusBadge>
+                          )}
                           {checkInFlowState === "face_captured" ? (
                             <StatusBadge tone="success">Selfie siap</StatusBadge>
                           ) : (
@@ -2161,7 +2262,15 @@ export function AppPage() {
                         </div>
                       </div>
                     </div>
-                    {checkInFlowState === "face_captured" && pendingCheckIn ? (
+                    {cameraError && (
+                      <p role="alert" className="mt-3 rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">{cameraError}</p>
+                    )}
+                    {cameraActive ? (
+                      <PrimaryButton className="mt-4 w-full" onClick={handleCaptureSelfie}>
+                        <Camera className="mr-2 h-4 w-4" />
+                        Ambil selfie untuk bukti hadir
+                      </PrimaryButton>
+                    ) : checkInFlowState === "face_captured" && pendingCheckIn ? (
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         <SecondaryButton onClick={handleOpenFaceCamera}>
                           <Camera className="mr-2 h-4 w-4" />
@@ -2174,7 +2283,7 @@ export function AppPage() {
                     ) : (
                       <PrimaryButton className="mt-4 w-full" onClick={handleOpenFaceCamera}>
                         <Camera className="mr-2 h-4 w-4" />
-                        Ambil foto wajah
+                        Ambil selfie untuk bukti hadir
                       </PrimaryButton>
                     )}
                   </div>
@@ -3299,11 +3408,17 @@ export function AppPage() {
               {/* TODO(backend): tampilkan metode validasi dan status perangkat terdaftar dari device registry API */}
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Metode validasi</dt>
-                <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
+                <dd className="mt-1 flex items-center gap-2 text-[13px] text-[#b0b8c8]">
+                  Belum tersedia
+                  <span title="Fitur segera hadir" className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span>
+                </dd>
               </div>
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Perangkat terdaftar</dt>
-                <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
+                <dd className="mt-1 flex items-center gap-2 text-[13px] text-[#b0b8c8]">
+                  Belum tersedia
+                  <span title="Fitur segera hadir" className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span>
+                </dd>
               </div>
             </dl>
           ) : (
@@ -3380,10 +3495,11 @@ export function AppPage() {
               />
               {changePasswordError ? <ErrorState title="Tidak bisa menyimpan password" description={changePasswordError} /> : null}
               <div className="rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
-                Ganti password akan aktif setelah auth production disambungkan.
+                {/* TODO(backend): sambungkan ke PATCH /auth/password */}
+                Ganti password · <span className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span> — akan aktif setelah auth production disambungkan.
               </div>
               <div className="flex gap-3">
-                <PrimaryButton type="submit">Simpan password</PrimaryButton>
+                <PrimaryButton type="submit" disabled title="Fitur segera hadir — sambungkan ke PATCH /auth/password">Simpan password</PrimaryButton>
                 <SecondaryButton
                   type="button"
                   onClick={() => {
@@ -3402,7 +3518,10 @@ export function AppPage() {
                 {/* TODO(backend): tampilkan last login dari session API */}
                 <div>
                   <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Login terakhir</dt>
-                  <dd className="mt-1 text-[13px] text-[#b0b8c8]">Belum tersedia</dd>
+                  <dd className="mt-1 flex items-center gap-2 text-[13px] text-[#b0b8c8]">
+                    Belum tersedia
+                    <span title="Fitur segera hadir" className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span>
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Perangkat aktif</dt>
@@ -3426,9 +3545,9 @@ export function AppPage() {
         <Panel eyebrow="Kontak" title="Informasi kontak">
           <div className="grid gap-4">
             <div className="rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
-              Data kontak dapat diedit setelah employee profile API aktif.
+              {/* TODO(backend): sambungkan ke employee profile API untuk nomor HP dan kontak darurat */}
+              Data kontak · <span className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span> — dapat diedit setelah employee profile API aktif.
             </div>
-            {/* TODO(backend): sambungkan ke employee profile API untuk nomor HP dan kontak darurat */}
             <dl className="grid gap-4">
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Nomor HP</dt>

@@ -17,8 +17,8 @@
       ],
       "selfieUrl": "",
       "createdAt": "2026-05-02T07:30:00.000Z",
-      "updatedAt": "2026-05-18T04:31:36.271Z",
-      "checkInAt": "2026-05-18T04:31:36.271Z",
+      "updatedAt": "2026-05-18T08:03:50.394Z",
+      "checkInAt": "2026-05-18T08:03:50.394Z",
       "checkInMethod": "Manual"
     },
     "usr-employee-02": {
@@ -72,9 +72,9 @@
       "id": "att-usr-employee-01-2026-05-02",
       "day": "Hari ini",
       "status": "Tepat waktu",
-      "time": "04:31",
+      "time": "08:03",
       "method": "Manual",
-      "checkInTime": "2026-05-18T04:31:36.271Z",
+      "checkInTime": "2026-05-18T08:03:50.394Z",
       "duration": "Belum selesai",
       "locationName": "Kantor Pusat"
     },
@@ -122,7 +122,7 @@
     "token": "HDR-31A-7XZ",
     "locationId": "loc-hq",
     "locationName": "Kantor Pusat",
-    "expiresAt": "2026-05-18T04:32:06.259Z",
+    "expiresAt": "2026-05-18T08:04:20.388Z",
     "status": "active",
     "scansToday": 124,
     "recentScans": [
@@ -146,13 +146,13 @@
   },
   "exceptions": [
     {
-      "id": "exc-att-usr-employee-01-2026-05-02-1779078696271",
+      "id": "exc-att-usr-employee-01-2026-05-02-1779091430394",
       "attendanceRecordId": "att-usr-employee-01-2026-05-02",
       "employeeId": "usr-employee-01",
       "exceptionType": "Outside radius",
       "reason": "Lokasi belum terekam.",
       "status": "Need Review",
-      "createdAt": "2026-05-18T04:31:36.271Z"
+      "createdAt": "2026-05-18T08:03:50.394Z"
     },
     {
       "id": "exc-001",
@@ -193,9 +193,9 @@
       "title": "Validasi kehadiran perlu ditinjau",
       "message": "Catatan kehadiran Fikri Maulana perlu ditinjau.",
       "entityType": "attendance_exception",
-      "entityId": "exc-att-usr-employee-01-2026-05-02-1779078696271",
-      "id": "ntf-1779078696271-87urd",
-      "createdAt": "2026-05-18T04:31:36.271Z",
+      "entityId": "exc-att-usr-employee-01-2026-05-02-1779091430394",
+      "id": "ntf-1779091430394-2cmcw",
+      "createdAt": "2026-05-18T08:03:50.394Z",
       "readAt": null
     }
   ],

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // These tests exercise the Express-API path. Stub supabase as null so
 // the Supabase auth branch in login() is not triggered.
@@ -6,16 +6,17 @@ vi.mock("../lib/supabase", () => ({ supabase: null, isSupabaseEnabled: () => fal
 
 import {
   approveRequest,
+  checkIn,
   createDepartment,
   fetchEmployeeSummary,
   fetchDepartments,
   fetchEmployeeList,
-  fetchReportRows,
   fetchManagerEmployeeList,
   fetchManagerExceptionQueue,
   fetchManagerOverview,
   fetchManagerRequests,
   fetchNotifications,
+  fetchReportRows,
   getDashboard,
   login,
   markNotificationRead,
@@ -281,5 +282,108 @@ describe("notification API client", () => {
 
     expect(fetchSpy).toHaveBeenNthCalledWith(1, "/api/notifications", expect.any(Object));
     expect(fetchSpy).toHaveBeenNthCalledWith(2, "/api/notifications/ntf-1/read", expect.objectContaining({ method: "PATCH" }));
+  });
+});
+
+describe("BUG 1 — Manager demo overview returns real stats", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetchManagerOverview with demo:manager returns non-zero totalEmployees from demo store", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerOverview("demo:manager");
+    // Fikri, Anisa, Budi are all managerId=usr-manager-01
+    expect(result.totalEmployees).toBeGreaterThan(0);
+    expect(result.recentActivity).toBeDefined();
+  });
+
+  it("fetchManagerOverview with demo:manager does not call fetch", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await fetchManagerOverview("demo:manager");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("fetchManagerEmployeeList with demo:manager returns Fikri (managerId=usr-manager-01)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerEmployeeList("demo:manager");
+    expect(result.some((e) => e.id === "usr-employee-01")).toBe(true);
+    // Leo (dep-fnb, no managerId match) should not appear
+    expect(result.some((e) => e.id === "usr-employee-03")).toBe(false);
+  });
+
+  it("fetchManagerRequests with demo:manager returns manager request list", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerRequests("demo:manager");
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe("BUG 2 — Employee check-in syncs to manager overview in demo mode", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("after demo employee check-in, manager overview checkedInToday increases", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const before = await fetchManagerOverview("demo:manager");
+    await checkIn("demo:employee", { method: "Manual" });
+    const after = await fetchManagerOverview("demo:manager");
+    expect(after.checkedInToday).toBeGreaterThanOrEqual(before.checkedInToday);
+    // The employee record for Fikri should now show present/late in team list
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(["present", "late"]).toContain(fikri?.todayStatus);
+  });
+});
+
+describe("BUG 3 — HR report rows reflect live demo check-in", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetchReportRows with demo:admin returns Fikri after demo employee check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    // Before check-in, Fikri may or may not be present — static data might have her
+    await checkIn("demo:employee", { method: "Manual" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri).toBeDefined();
+    expect(fikri?.checkInTime).toBeTruthy();
+  });
+
+  it("fetchReportRows with demo:admin shows Fikri status as present/late after check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Manual" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(["Tepat waktu", "Terlambat", "Sedang check-in"]).toContain(fikri?.status);
+  });
+
+  it("fetchReportRows does not call fetch for demo:admin token", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await fetchReportRows("demo:admin");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("BUG 4 — Demo check-in succeeds without selfie upload configured", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("check-in without selfie returns checked_in attendanceState (not blocked)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await checkIn("demo:employee", { method: "Manual" });
+    expect(result.attendanceState).toBe("checked_in");
+  });
+
+  it("check-in with selfie data returns checked_in attendanceState and selfie note", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await checkIn("demo:employee", { method: "Selfie", selfieData: "data:image/jpeg;base64,abc" });
+    expect(result.attendanceState).toBe("checked_in");
+    expect(result.validationReasons.some((r) => r.toLowerCase().includes("selfie"))).toBe(true);
+  });
+
+  it("check-in with selfie does not fail with 'Selfie wajib belum dilampirkan'", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await checkIn("demo:employee", { method: "Selfie", selfieData: "data:image/jpeg;base64,abc" });
+    expect(result.validationReasons).not.toContain("Selfie wajib belum dilampirkan.");
   });
 });

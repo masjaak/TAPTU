@@ -30,6 +30,7 @@ import {
   getDemoEmployeeList,
   getDemoExceptionQueue,
   getDemoEmployeeSummary,
+  getDemoManagerOverview,
   getDemoRequests,
   getDemoAuditLogs,
   getDemoReportRows,
@@ -42,6 +43,7 @@ import {
   createDemoShift,
   createDemoWorkLocation,
   reassignDemoEmployeeDepartment,
+  recordDemoCheckIn,
   updateDemoDepartment,
   updateDemoShift,
   updateDemoWorkLocation,
@@ -52,6 +54,9 @@ import {
 import { supabase } from "./supabase";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+// VITE_BROWSER_LOCAL_DEMO=true: demo works offline but cross-device sync is disabled.
+// Set to false (default) for shared API-backed demo across devices.
+// Default is false — only enable explicitly when running fully offline.
 const useBrowserLocalDemo = import.meta.env.VITE_BROWSER_LOCAL_DEMO === "true";
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
@@ -133,10 +138,16 @@ export async function checkIn(
 ) {
   const hasSelfieProof = Boolean(payload.selfieUrl || payload.selfieData);
   if (isDemoToken(token)) {
+    // Determine the employee id from the demo token (employee role → usr-employee-01)
+    const demoEmployeeId = "usr-employee-01";
+    // Write check-in into the shared demo store so manager/HR overview reflects it
+    recordDemoCheckIn(demoEmployeeId, payload.method);
+    const selfieNote = hasSelfieProof ? "Selfie tersimpan sebagai bukti hadir." : undefined;
     const response: AttendanceActionResponse = {
       attendanceState: "checked_in",
-      validationStatus: "needs_review",
-      validationReasons: hasSelfieProof ? ["Penyimpanan selfie belum tersedia."] : ["Selfie wajib belum dilampirkan."],
+      // Check-in succeeds regardless of selfie — selfie is optional evidence
+      validationStatus: hasSelfieProof ? "needs_review" : "verified",
+      validationReasons: selfieNote ? [selfieNote] : [],
       record: { day: "Hari ini", status: "Tepat waktu", time: new Date().toTimeString().slice(0, 5), method: payload.method }
     };
     return Promise.resolve(response);
@@ -288,16 +299,7 @@ export async function fetchAdminOverview(token: string) {
 
 export async function fetchManagerOverview(token: string) {
   if (isDemoToken(token)) {
-    return Promise.resolve({
-      totalEmployees: 0,
-      checkedInToday: 0,
-      onTimeToday: 0,
-      lateToday: 0,
-      pendingRequests: 0,
-      absentToday: 0,
-      exceptionCount: 0,
-      recentActivity: []
-    });
+    return Promise.resolve(getDemoManagerOverview());
   }
   return requestJson<AdminOverview>("/admin/overview", {}, token);
 }
@@ -384,12 +386,16 @@ export async function reassignEmployeeDepartment(
 }
 
 export async function fetchManagerEmployeeList(token: string): Promise<EmployeeListItem[]> {
-  if (isDemoToken(token)) return Promise.resolve([]);
+  if (isDemoToken(token)) {
+    // Return only team members whose managerId matches the demo manager
+    const managerId = "usr-manager-01";
+    return Promise.resolve(getDemoEmployeeList().filter((e) => e.managerId === managerId));
+  }
   return requestJson<EmployeeListItem[]>("/admin/employees", {}, token);
 }
 
 export async function fetchManagerRequests(token: string): Promise<LeaveRequestItem[]> {
-  if (isDemoToken(token)) return Promise.resolve([]);
+  if (isDemoToken(token)) return Promise.resolve(getDemoRequests(token));
   return requestJson<LeaveRequestItem[]>("/admin/requests", {}, token);
 }
 

@@ -715,18 +715,34 @@ describe("AppPage", () => {
       }
     });
 
+    // Mock getUserMedia to return a fake stream
+    const stopFn = vi.fn();
+    const mockStream = { getTracks: () => [{ stop: stopFn }], srcObject: null };
+    const getUserMediaSpy = vi.fn().mockResolvedValue(mockStream);
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    // Mock canvas.toDataURL to return a JPEG base64 data URL
+    const toDataURLSpy = vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/jpeg;base64,/9j/fake");
+    // Mock getContext so drawImage doesn't throw
+    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn()
+    } as unknown as CanvasRenderingContext2D);
+
     renderRoute("/app/attendance");
 
     fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /ambil foto wajah/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
     expect(apiMocks.checkIn).not.toHaveBeenCalled();
 
-    const selfieInput = screen.getByLabelText(/ambil selfie check-in/i);
-    fireEvent.change(selfieInput, {
-      target: {
-        files: [new File(["selfie"], "selfie.jpg", { type: "image/jpeg" })]
-      }
-    });
+    // Wait for getUserMedia to be called and camera to become active
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
+
+    // Now click capture
+    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
 
     expect(await screen.findByRole("button", { name: /gunakan foto ini/i })).toBeTruthy();
     expect(apiMocks.checkIn).not.toHaveBeenCalled();
@@ -741,9 +757,7 @@ describe("AppPage", () => {
       expect.objectContaining({
         method: "Selfie",
         selfieUrl: undefined,
-        selfieData: expect.stringMatching(/^data:image\/jpeg;base64,/),
-        selfieFileName: "selfie.jpg",
-        selfieContentType: "image/jpeg",
+        selfieData: "data:image/jpeg;base64,/9j/fake",
         requiredSelfie: true
       })
     );
@@ -751,6 +765,8 @@ describe("AppPage", () => {
     await waitFor(() => expect(apiMocks.fetchEmployeeSummary).toHaveBeenCalledTimes(2));
     expect((await screen.findAllByText(/Masuk 08[.:]03/i)).length).toBeGreaterThan(0);
 
+    toDataURLSpy.mockRestore();
+    getContextSpy.mockRestore();
     createObjectUrl.mockRestore();
   });
 
@@ -3728,5 +3744,212 @@ describe("HR Divisi & Penempatan", () => {
       // No additional fetch — already loaded with the correct filter
       expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe("BUG 3 — Camera uses getUserMedia instead of file input", () => {
+  beforeEach(() => {
+    cleanup();
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 0,
+      onTimeDays: 0,
+      lateDays: 0,
+      pendingRequests: 0,
+      currentAttendanceState: "idle",
+      assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
+      todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00.000Z", updatedAt: "2026-05-02T08:00:00.000Z" }
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchNotifications.mockResolvedValue([]);
+
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+      })
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("getUserMedia is called when opening face camera", async () => {
+    const mockStream = { getTracks: () => [{ stop: vi.fn() }] };
+    const getUserMediaSpy = vi.fn().mockResolvedValue(mockStream);
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
+
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalledWith({ video: { facingMode: "user" } }));
+  });
+
+  it("camera permission denied shows error message", async () => {
+    const getUserMediaSpy = vi.fn().mockRejectedValue(new DOMException("Permission denied", "NotAllowedError"));
+    // jsdom doesn't expose mediaDevices by default — use Object.defineProperty on the prototype
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
+
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
+    // Error shows either in cameraError paragraph (role=alert) or feedback toast
+    expect(
+      (await screen.findAllByText(/izin kamera ditolak/i)).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("there is no file input of type file for camera capture", async () => {
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /scan qr/i });
+    // No visible file input for camera — getUserMedia approach is used instead
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    expect(fileInputs.length).toBe(0);
+  });
+});
+
+describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment camera", () => {
+  beforeEach(() => {
+    cleanup();
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [],
+      schedule: [],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      totalDays: 0,
+      onTimeDays: 0,
+      lateDays: 0,
+      pendingRequests: 0,
+      currentAttendanceState: "idle",
+      assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
+      todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00.000Z", updatedAt: "2026-05-02T08:00:00.000Z" }
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchNotifications.mockResolvedValue([]);
+
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+      })
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("QR mode calls getUserMedia with facingMode environment when camera is opened", async () => {
+    const mockStream = { getTracks: () => [{ stop: vi.fn() }] };
+    const getUserMediaSpy = vi.fn().mockResolvedValue(mockStream);
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+
+    // QR mode is selected by default
+    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalledWith({ video: { facingMode: "environment" } }));
+  });
+
+  it("QR mode does NOT call getUserMedia with facingMode user (face mode constraint)", async () => {
+    const mockStream = { getTracks: () => [{ stop: vi.fn() }] };
+    const getUserMediaSpy = vi.fn().mockResolvedValue(mockStream);
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
+    expect(getUserMediaSpy).not.toHaveBeenCalledWith({ video: { facingMode: "user" } });
+  });
+
+  it("QR camera permission denied shows QR-specific error", async () => {
+    const getUserMediaSpy = vi.fn().mockRejectedValue(new DOMException("Permission denied", "NotAllowedError"));
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
+    expect(
+      (await screen.findAllByText(/izin kamera ditolak/i)).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("QR camera stream stops when switching away from attendance tab", async () => {
+    const mockStop = vi.fn();
+    const mockStream = { getTracks: () => [{ stop: mockStop }] };
+    const getUserMediaSpy = vi.fn().mockResolvedValue(mockStream);
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: getUserMediaSpy },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+
+    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+    await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
+
+    // Switch away from attendance — multiple Beranda nav buttons (desktop + mobile), click first
+    const berandaNavs = await screen.findAllByRole("button", { name: /beranda/i });
+    fireEvent.click(berandaNavs[0]);
+
+    await waitFor(() => expect(mockStop).toHaveBeenCalled());
+  });
+
+  it("QR mode does not use a file input for camera", async () => {
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /buka kamera qr/i });
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    expect(fileInputs.length).toBe(0);
   });
 });
