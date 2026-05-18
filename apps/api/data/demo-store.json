@@ -10,15 +10,15 @@
       "locationId": "loc-hq",
       "locationName": "Kantor Pusat",
       "state": "checked_in",
-      "status": "Tepat waktu",
+      "status": "Terlambat",
       "validationStatus": "needs_review",
       "validationReasons": [
         "Lokasi belum terekam."
       ],
       "selfieUrl": "",
       "createdAt": "2026-05-02T07:30:00.000Z",
-      "updatedAt": "2026-05-18T08:03:50.394Z",
-      "checkInAt": "2026-05-18T08:03:50.394Z",
+      "updatedAt": "2026-05-18T11:02:09.294Z",
+      "checkInAt": "2026-05-18T11:02:09.294Z",
       "checkInMethod": "Manual"
     },
     "usr-employee-02": {
@@ -71,10 +71,10 @@
     {
       "id": "att-usr-employee-01-2026-05-02",
       "day": "Hari ini",
-      "status": "Tepat waktu",
-      "time": "08:03",
+      "status": "Terlambat",
+      "time": "11:02",
       "method": "Manual",
-      "checkInTime": "2026-05-18T08:03:50.394Z",
+      "checkInTime": "2026-05-18T11:02:09.294Z",
       "duration": "Belum selesai",
       "locationName": "Kantor Pusat"
     },
@@ -122,7 +122,7 @@
     "token": "HDR-31A-7XZ",
     "locationId": "loc-hq",
     "locationName": "Kantor Pusat",
-    "expiresAt": "2026-05-18T08:04:20.388Z",
+    "expiresAt": "2026-05-18T11:02:39.281Z",
     "status": "active",
     "scansToday": 124,
     "recentScans": [
@@ -146,13 +146,22 @@
   },
   "exceptions": [
     {
-      "id": "exc-att-usr-employee-01-2026-05-02-1779091430394",
+      "id": "exc-att-usr-employee-01-2026-05-02-1779102129294",
+      "attendanceRecordId": "att-usr-employee-01-2026-05-02",
+      "employeeId": "usr-employee-01",
+      "exceptionType": "Late check-in",
+      "reason": "Check-in melebihi toleransi 10 menit dari awal shift.",
+      "status": "Need Review",
+      "createdAt": "2026-05-18T11:02:09.294Z"
+    },
+    {
+      "id": "exc-att-usr-employee-01-2026-05-02-1779102129294",
       "attendanceRecordId": "att-usr-employee-01-2026-05-02",
       "employeeId": "usr-employee-01",
       "exceptionType": "Outside radius",
       "reason": "Lokasi belum terekam.",
       "status": "Need Review",
-      "createdAt": "2026-05-18T08:03:50.394Z"
+      "createdAt": "2026-05-18T11:02:09.294Z"
     },
     {
       "id": "exc-001",
@@ -193,9 +202,22 @@
       "title": "Validasi kehadiran perlu ditinjau",
       "message": "Catatan kehadiran Fikri Maulana perlu ditinjau.",
       "entityType": "attendance_exception",
-      "entityId": "exc-att-usr-employee-01-2026-05-02-1779091430394",
-      "id": "ntf-1779091430394-2cmcw",
-      "createdAt": "2026-05-18T08:03:50.394Z",
+      "entityId": "exc-att-usr-employee-01-2026-05-02-1779102129294",
+      "id": "ntf-1779102129294-ratmx",
+      "createdAt": "2026-05-18T11:02:09.294Z",
+      "readAt": null
+    },
+    {
+      "organizationId": "org-demo",
+      "recipientId": "usr-manager-01",
+      "recipientRole": "manager",
+      "type": "attendance_exception_created",
+      "title": "Validasi kehadiran perlu ditinjau",
+      "message": "Catatan kehadiran Fikri Maulana perlu ditinjau.",
+      "entityType": "attendance_exception",
+      "entityId": "exc-att-usr-employee-01-2026-05-02-1779102129294",
+      "id": "ntf-1779102129294-o53d6",
+      "createdAt": "2026-05-18T11:02:09.294Z",
       "readAt": null
     }
   ],
