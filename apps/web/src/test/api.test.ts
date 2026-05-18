@@ -380,7 +380,7 @@ describe("BUG 4 — Demo check-in succeeds without selfie upload configured", ()
     vi.stubGlobal("fetch", vi.fn());
     const result = await checkIn("demo:employee", { method: "Selfie", selfieData: "data:image/jpeg;base64,abc" });
     expect(result.attendanceState).toBe("checked_in");
-    expect(result.validationReasons.some((r) => r.toLowerCase().includes("selfie"))).toBe(true);
+    expect((result.validationReasons ?? []).some((r) => r.toLowerCase().includes("selfie"))).toBe(true);
   });
 
   it("check-in with selfie does not fail with 'Selfie wajib belum dilampirkan'", async () => {

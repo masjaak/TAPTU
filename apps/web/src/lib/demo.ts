@@ -356,7 +356,7 @@ let demoShifts: ShiftRecord[] = INITIAL_DEMO_SHIFTS.map((shift) => ({ ...shift }
 
 // Derive live report rows from demoEmployees so that check-ins are reflected immediately.
 function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceReportRow {
-  let status: string;
+  let status: AttendanceReportRow["status"];
   let checkInTime: string | undefined;
 
   if (e.todayStatus === "leave") {
@@ -383,8 +383,8 @@ function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceRepo
     departmentId: e.departmentId ?? null,
     departmentName: e.departmentName ?? null,
     date: today,
-    shiftName: e.shiftName,
-    workLocationName: e.locationName,
+    shiftName: e.shiftName ?? "—",
+    workLocationName: e.locationName ?? "—",
     checkInTime,
     checkOutTime: e.checkOutTime ? `${today}T${e.checkOutTime}:00.000Z` : undefined,
     status,
