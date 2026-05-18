@@ -325,6 +325,8 @@ export interface EmployeeListItem {
   employeeCode?: string | null;
   todayStatus: "present" | "late" | "absent" | "leave";
   checkInTime?: string;
+  checkOutTime?: string;
+  checkInMethod?: string;
   validationStatus?: AttendanceValidationStatus;
   shiftName?: string;
   locationName?: string;
@@ -388,6 +390,7 @@ export interface AttendanceReportRow {
   deviceValidated: boolean;
   approvalStatus?: string;
   adminNote?: string;
+  checkInMethod?: string;
 }
 
 export interface AttendanceReportFilters {

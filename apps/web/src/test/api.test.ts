@@ -7,7 +7,9 @@ vi.mock("../lib/supabase", () => ({ supabase: null, isSupabaseEnabled: () => fal
 import {
   approveRequest,
   checkIn,
+  checkOut,
   createDepartment,
+  fetchAttendanceHistory,
   fetchEmployeeSummary,
   fetchDepartments,
   fetchEmployeeList,
@@ -385,5 +387,100 @@ describe("BUG 4 — Demo check-in succeeds without selfie upload configured", ()
     vi.stubGlobal("fetch", vi.fn());
     const result = await checkIn("demo:employee", { method: "Selfie", selfieData: "data:image/jpeg;base64,abc" });
     expect(result.validationReasons).not.toContain("Selfie wajib belum dilampirkan.");
+  });
+});
+
+describe("PHASE 10.5 — Employee Riwayat persistence after demo check-in", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetchAttendanceHistory returns a Hari ini record after demo check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const today = history.filter((r) => r.day === "Hari ini");
+    expect(today.length).toBe(1);
+    expect(today[0].checkInTime).toBeTruthy();
+    expect(today[0].method).toBe("QR");
+  });
+
+  it("check-out updates the same Hari ini record without duplicating it", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Manual" });
+    await checkOut("demo:employee", { method: "Manual" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const today = history.filter((r) => r.day === "Hari ini");
+    expect(today.length).toBe(1);
+    expect(today[0].checkOutTime).toBeTruthy();
+  });
+
+  it("second check-in replaces old Hari ini record rather than duplicating it", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "GPS" });
+    await checkIn("demo:employee", { method: "QR" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const today = history.filter((r) => r.day === "Hari ini");
+    expect(today.length).toBe(1);
+    expect(today[0].method).toBe("QR");
+  });
+});
+
+describe("PHASE 10.5 — Manager sees richer attendance detail after demo check-in", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("manager employee list shows checkInMethod after demo check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkInMethod).toBe("QR");
+  });
+
+  it("manager employee list shows checkOutTime after demo check-out", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Manual" });
+    await checkOut("demo:employee", { method: "Manual" });
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkOutTime).toBeTruthy();
+  });
+
+  it("manager does not see employees outside their team", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const employees = await fetchManagerEmployeeList("demo:manager");
+    const leo = employees.find((e) => e.fullName === "Leo Pratama");
+    expect(leo).toBeUndefined();
+  });
+});
+
+describe("PHASE 10.5 — HR report shows method detail after demo check-in", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("HR report row for Fikri includes checkInMethod after check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInMethod).toBe("QR");
+  });
+
+  it("HR report row for Fikri includes checkOutTime after check-out", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Manual" });
+    await checkOut("demo:employee", { method: "Manual" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkOutTime).toBeTruthy();
+  });
+
+  it("HR report reads from live demo store, not static rows", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInTime).toBeTruthy();
+    expect(fikri?.checkInMethod).toBe("Selfie");
   });
 });

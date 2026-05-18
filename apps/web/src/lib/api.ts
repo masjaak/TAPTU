@@ -44,6 +44,7 @@ import {
   createDemoWorkLocation,
   reassignDemoEmployeeDepartment,
   recordDemoCheckIn,
+  recordDemoCheckOut,
   updateDemoDepartment,
   updateDemoShift,
   updateDemoWorkLocation,
@@ -186,6 +187,8 @@ export async function checkOut(
   }
 ) {
   if (isDemoToken(token)) {
+    const demoEmployeeId = "usr-employee-01";
+    recordDemoCheckOut(demoEmployeeId);
     const response: AttendanceActionResponse = {
       attendanceState: "checked_out",
       validationStatus: "verified",

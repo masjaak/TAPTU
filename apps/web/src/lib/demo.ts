@@ -227,6 +227,7 @@ export function getDemoDashboard(token: string): DashboardPayload {
 export function getDemoAttendanceHistory(token: string): AttendanceTimelineItem[] {
   const role = getDemoRoleFromToken(token);
   if (!role) return [];
+  if (role === "employee") return [...demoEmployeeAttendanceHistory];
   return ATTENDANCE[role] ?? [];
 }
 
@@ -326,16 +327,19 @@ const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
 ];
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
-  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", checkInMethod: "GPS", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
   { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
-  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "07:58", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:00", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "07:58", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:00", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
 ];
 
 let demoDepartments: DepartmentItem[] = INITIAL_DEMO_DEPARTMENTS.map((department) => ({ ...department }));
 let demoEmployees: EmployeeListItem[] = INITIAL_DEMO_EMPLOYEES.map((employee) => ({ ...employee }));
+
+// Mutable history for the demo employee account — starts empty, populated by recordDemoCheckIn/Out.
+let demoEmployeeAttendanceHistory: AttendanceTimelineItem[] = [];
 
 const INITIAL_DEMO_WORK_LOCATIONS: WorkLocationItem[] = [
   { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1, Jakarta Pusat", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" },
@@ -382,7 +386,7 @@ function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceRepo
     shiftName: e.shiftName,
     workLocationName: e.locationName,
     checkInTime,
-    checkOutTime: undefined,
+    checkOutTime: e.checkOutTime ? `${today}T${e.checkOutTime}:00.000Z` : undefined,
     status,
     validationStatus: (e.validationStatus ?? "verified") as AttendanceReportRow["validationStatus"],
     validationReasons: [],
@@ -390,7 +394,8 @@ function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceRepo
     hasException,
     selfieProof: false,
     deviceValidated: false,
-    approvalStatus: e.todayStatus === "leave" ? "Disetujui" : undefined
+    approvalStatus: e.todayStatus === "leave" ? "Disetujui" : undefined,
+    checkInMethod: e.checkInMethod
   };
 }
 
@@ -515,21 +520,62 @@ export function getDemoReportRows(): AttendanceReportRow[] {
 
 /**
  * Records an employee check-in in the demo in-memory store so that
- * getDemoManagerOverview() reflects live check-ins without requiring a real backend.
+ * getDemoManagerOverview(), HR report rows, and employee Riwayat all reflect
+ * the live check-in without requiring a real backend.
  */
 export function recordDemoCheckIn(employeeId: string, method: string): void {
-  const time = new Date().toTimeString().slice(0, 5);
+  const now = new Date();
+  const time = now.toTimeString().slice(0, 5);
+  const isoTime = now.toISOString();
+  const [h, m] = time.split(":").map(Number);
+  const isLate = h * 60 + m > 8 * 60 + 10;
+  const status: "Tepat waktu" | "Terlambat" = isLate ? "Terlambat" : "Tepat waktu";
+  const safeMethod = (["QR", "GPS", "Selfie", "Manual"].includes(method) ? method : "Manual") as AttendanceTimelineItem["method"];
+
   demoEmployees = demoEmployees.map((e) => {
     if (e.id !== employeeId) return e;
-    // Determine if late — shift pagi starts 08:00 with 10 min grace
-    const [h, m] = time.split(":").map(Number);
-    const minutesSinceMidnight = h * 60 + m;
-    const isLate = minutesSinceMidnight > 8 * 60 + 10;
     return {
       ...e,
       todayStatus: isLate ? "late" : "present",
       checkInTime: time,
+      checkInMethod: method,
+      checkOutTime: undefined,
       validationStatus: "verified"
     } as typeof e;
+  });
+
+  // Replace any existing "Hari ini" record so history stays a single entry per day
+  const newRecord: AttendanceTimelineItem = {
+    id: `att-live-${employeeId}`,
+    day: "Hari ini",
+    status,
+    time,
+    method: safeMethod,
+    checkInTime: isoTime,
+    locationName: "Kantor Pusat"
+  };
+  demoEmployeeAttendanceHistory = [
+    newRecord,
+    ...demoEmployeeAttendanceHistory.filter((r) => r.day !== "Hari ini")
+  ];
+}
+
+/**
+ * Records a check-out in the demo store — updates the existing "Hari ini" record.
+ * Never creates a duplicate entry.
+ */
+export function recordDemoCheckOut(employeeId: string): void {
+  const now = new Date();
+  const time = now.toTimeString().slice(0, 5);
+  const isoTime = now.toISOString();
+
+  demoEmployees = demoEmployees.map((e) => {
+    if (e.id !== employeeId) return e;
+    return { ...e, checkOutTime: time } as typeof e;
+  });
+
+  demoEmployeeAttendanceHistory = demoEmployeeAttendanceHistory.map((r) => {
+    if (r.day !== "Hari ini") return r;
+    return { ...r, checkOutTime: isoTime };
   });
 }

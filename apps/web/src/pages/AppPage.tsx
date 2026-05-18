@@ -2619,11 +2619,18 @@ export function AppPage() {
               employee: (
                 <div>
                   <p className="font-semibold text-[#111827]">{row.employeeName}</p>
-                  <p className="mt-1 text-xs font-semibold text-[#667085]">{row.workLocationName}</p>
+                  <p className="mt-1 text-xs text-[#667085]">{row.departmentName ?? row.workLocationName}</p>
                 </div>
               ),
               date: row.date,
-              checkin: row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--",
+              checkin: (
+                <div>
+                  <p className="tabular-nums font-semibold text-[#111827]">{row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--"}</p>
+                  {row.checkInMethod && row.checkInTime ? (
+                    <p className="mt-0.5 text-xs text-[#8099c8]">{row.checkInMethod}</p>
+                  ) : null}
+                </div>
+              ),
               status: <StatusBadge tone={row.status === "Terlambat" ? "warning" : row.status === "Belum check-in" ? "neutral" : row.status === "Izin" ? "info" : "success"}>{row.status}</StatusBadge>,
               validation: (
                 <StatusBadge tone={row.validationStatus === "verified" ? "success" : row.validationStatus === "needs_review" ? "warning" : row.validationStatus === "blocked" || row.validationStatus === "rejected" ? "danger" : "neutral"}>
@@ -2703,7 +2710,19 @@ export function AppPage() {
                   </div>
                 ),
                 shift: emp.shiftName ?? "-",
-                checkin: <span className="tabular-nums">{emp.checkInTime ?? "--:--"}</span>,
+                checkin: (
+                  <div>
+                    <p className="tabular-nums font-semibold text-[#111827]">{emp.checkInTime ?? "--:--"}</p>
+                    {emp.checkOutTime && (
+                      <p className="text-xs text-[#667085]">Keluar {emp.checkOutTime}</p>
+                    )}
+                    {(emp.checkInMethod || emp.locationName) && emp.checkInTime ? (
+                      <p className="mt-0.5 text-xs text-[#8099c8]">
+                        {[emp.checkInMethod ?? "Metode tidak tersedia", emp.locationName].filter(Boolean).join(" · ")}
+                      </p>
+                    ) : null}
+                  </div>
+                ),
                 status: (
                   <StatusBadge tone={attendanceStatusTone(emp.todayStatus)}>
                     {attendanceStatusLabel(emp.todayStatus)}
@@ -4348,7 +4367,14 @@ export function AppPage() {
                 ),
                 date: row.date,
                 shift: row.shiftName,
-                checkin: row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--",
+                checkin: (
+                  <div>
+                    <p className="tabular-nums font-semibold text-[#111827]">{row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--"}</p>
+                    {row.checkInMethod && row.checkInTime ? (
+                      <p className="mt-0.5 text-xs text-[#8099c8]">{row.checkInMethod}</p>
+                    ) : null}
+                  </div>
+                ),
                 checkout: row.checkOutTime ? row.checkOutTime.slice(11, 16) : "--:--",
                 status: (
                   <StatusBadge tone={row.status === "Belum check-in" ? "neutral" : row.status === "Terlambat" ? "warning" : row.status === "Izin" ? "info" : "success"}>
