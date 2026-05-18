@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -3383,6 +3384,98 @@ describe("HR Divisi & Penempatan", () => {
       await screen.findByText("Pengajuan cuti baru");
       expect(screen.getByTestId("nav-badge-notifications")).toBeTruthy();
       expect(screen.getByTestId("nav-badge-notifications").textContent).toBe("1");
+    });
+  });
+
+  describe("fetch performance — redundant request guards", () => {
+    it("getDashboard is called exactly once even after subsequent state updates from data loading", async () => {
+      setupAdminSession();
+
+      renderRoute("/app");
+
+      // Wait for the overview to load (triggered by a state update after dashboard loads)
+      await waitFor(() => expect(apiMocks.fetchAdminOverview).toHaveBeenCalled());
+      // Verify dashboard was not re-triggered by the state update
+      expect(apiMocks.getDashboard).toHaveBeenCalledTimes(1);
+    });
+
+    it("fetchAuditLogs is called at most once per mount even when the reports tab loads zero audit rows", async () => {
+      setupAdminSession();
+      apiMocks.fetchAuditLogs.mockResolvedValue([]);
+
+      renderRoute("/app/reports");
+
+      await waitFor(() => expect(apiMocks.fetchAuditLogs).toHaveBeenCalled());
+      // Wait for other async data to settle (reportRows, employeeList, departments)
+      await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalled());
+
+      expect(apiMocks.fetchAuditLogs).toHaveBeenCalledTimes(1);
+    });
+
+    it("home view attendance preview is capped at 3 items when dashboard returns more", async () => {
+      localStorage.setItem(
+        "taptu-session",
+        JSON.stringify({
+          token: "demo:employee",
+          user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+        })
+      );
+      apiMocks.getDashboard.mockResolvedValue({
+        greeting: "Halo",
+        stats: [],
+        schedule: [],
+        attendance: [
+          { id: "a1", day: "Senin", status: "Tepat waktu", time: "08:01", method: "QR" },
+          { id: "a2", day: "Selasa", status: "Tepat waktu", time: "08:02", method: "QR" },
+          { id: "a3", day: "Rabu", status: "Tepat waktu", time: "08:03", method: "QR" },
+          { id: "a4", day: "Kamis", status: "Tepat waktu", time: "08:04", method: "QR" },
+          { id: "a5", day: "Jumat", status: "Tepat waktu", time: "08:05", method: "QR" }
+        ],
+        attendanceState: "idle",
+        requests: []
+      });
+      apiMocks.fetchEmployeeSummary.mockResolvedValue({
+        totalDays: 5, onTimeDays: 5, lateDays: 0, pendingRequests: 0,
+        currentAttendanceState: "idle",
+        assignedShift: { id: "s1", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor" },
+        todayRecord: { id: "r1", employeeId: "usr-employee-01", shiftId: "s1", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "", updatedAt: "" }
+      });
+
+      renderRoute("/app");
+
+      await screen.findByText("Senin");
+      expect(screen.getByText("Senin")).toBeTruthy();
+      expect(screen.getByText("Selasa")).toBeTruthy();
+      expect(screen.getByText("Rabu")).toBeTruthy();
+      expect(screen.queryByText("Kamis")).toBeNull();
+      expect(screen.queryByText("Jumat")).toBeNull();
+    });
+
+    it("team employee search filters results by name without triggering a new API fetch", async () => {
+      setupAdminSession();
+
+      renderRoute("/app/team");
+
+      // Both employees visible before filtering
+      await screen.findAllByText("Fikri Maulana");
+      expect(screen.getAllByText("Anisa Rahma").length).toBeGreaterThan(0);
+
+      const callCountBeforeSearch = apiMocks.fetchEmployeeList.mock.calls.length;
+
+      const searchInput = screen.getByRole("textbox", { name: /cari karyawan/i });
+      fireEvent.change(searchInput, { target: { value: "Anisa" } });
+
+      // Fikri disappears from the table row (first occurrence is in the table body)
+      await waitFor(() => {
+        const fikris = screen.queryAllByText("Fikri Maulana");
+        // After filtering, Fikri should not appear in the employee row list
+        // (the table body p.font-semibold should be gone)
+        const tableRows = fikris.filter((el) => el.closest("td") !== null || el.className.includes("font-semibold"));
+        expect(tableRows.length).toBe(0);
+      });
+
+      // No additional API call was made — filtering is pure client-side
+      expect(apiMocks.fetchEmployeeList.mock.calls.length).toBe(callCountBeforeSearch);
     });
   });
 });

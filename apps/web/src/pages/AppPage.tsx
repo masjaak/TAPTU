@@ -441,6 +441,7 @@ export function AppPage() {
   const [workLocationsError, setWorkLocationsError] = useState<string | null>(null);
   const [shiftsLoaded, setShiftsLoaded] = useState(false);
   const [shiftsError, setShiftsError] = useState<string | null>(null);
+  const [auditLogsLoaded, setAuditLogsLoaded] = useState(false);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [departmentsLoaded, setDepartmentsLoaded] = useState(false);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
@@ -529,7 +530,7 @@ export function AppPage() {
         setPageError(error instanceof Error ? error.message : "Workspace gagal dimuat.");
         location.assign("/login");
       });
-  }, [session]);
+  }, [session?.token]);
 
   useEffect(() => {
     if (!session) {
@@ -537,7 +538,6 @@ export function AppPage() {
     }
 
     if ((tab === "history" || (tab === "attendance" && isEmployee)) && !attendanceHistoryLoaded) {
-      setAttendanceHistoryLoaded(false);
       setAttendanceHistoryError(null);
       fetchAttendanceHistoryByFilter(session.token, historyFilter)
         .then((items) => {
@@ -704,10 +704,15 @@ export function AppPage() {
         });
     }
 
-    if (tab === "reports" && (isAdmin || isManager) && auditLogs.length === 0) {
+    if (tab === "reports" && (isAdmin || isManager) && !auditLogsLoaded) {
       fetchAuditLogs(session.token)
-        .then((items) => setAuditLogs(items))
-        .catch(() => undefined);
+        .then((items) => {
+          setAuditLogs(items);
+          setAuditLogsLoaded(true);
+        })
+        .catch(() => {
+          setAuditLogsLoaded(true);
+        });
     }
 
     if (tab === "reports" && (isAdmin || isManager) && !reportLoaded) {
@@ -723,7 +728,7 @@ export function AppPage() {
           setReportError(error instanceof Error ? error.message : "Laporan gagal dimuat.");
         });
     }
-  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogs.length, departmentsLoaded, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, notificationsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
+  }, [adminAttendanceLoaded, adminOverview, adminOverviewLoaded, attendanceHistoryLoaded, auditLogsLoaded, departmentsLoaded, employeeListLoaded, employeeSummary, employeeSummaryLoaded, exceptionQueueLoaded, historyFilter, isAdmin, isEmployee, isManager, isScanner, managerRequestsLoaded, notificationsLoaded, reportLoaded, scannerLoaded, session, shiftsLoaded, tab, workLocationsLoaded]);
 
   useEffect(() => {
     if (tab !== "scanner" || !scannerMeta) {
@@ -852,6 +857,22 @@ export function AppPage() {
       window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [openDepartmentActionId]);
+
+  const filteredEmployees = useMemo(() => {
+    const normalizedSearch = employeeSearch.trim().toLowerCase();
+    return employeeList.filter((emp) => {
+      if (!isManager && employeeDepartmentFilter && emp.departmentId !== employeeDepartmentFilter) return false;
+      if (!isManager && employeeStatusFilter && emp.todayStatus !== employeeStatusFilter) return false;
+      if (!normalizedSearch) return true;
+      return [
+        emp.fullName,
+        emp.email,
+        emp.employeeCode ?? "",
+        isManager ? emp.departmentName ?? "" : "",
+        isManager ? emp.managerName ?? "" : ""
+      ].some((value) => value.toLowerCase().includes(normalizedSearch));
+    });
+  }, [employeeList, employeeSearch, employeeDepartmentFilter, employeeStatusFilter, isManager]);
 
   const divisiList = useMemo(() => {
     const map = new Map<string, { name: string; employees: EmployeeListItem[] }>();
@@ -3496,26 +3517,6 @@ export function AppPage() {
   }
 
   function renderTeamWorkspace() {
-    const normalizedEmployeeSearch = employeeSearch.trim().toLowerCase();
-    const filteredEmployees = employeeList.filter((emp) => {
-      if (!isManager && employeeDepartmentFilter && emp.departmentId !== employeeDepartmentFilter) {
-        return false;
-      }
-
-      if (!isManager && employeeStatusFilter && emp.todayStatus !== employeeStatusFilter) {
-        return false;
-      }
-
-      if (!normalizedEmployeeSearch) return true;
-
-      return [
-        emp.fullName,
-        emp.email,
-        emp.employeeCode ?? "",
-        isManager ? emp.departmentName ?? "" : "",
-        isManager ? emp.managerName ?? "" : ""
-      ].some((value) => value.toLowerCase().includes(normalizedEmployeeSearch));
-    });
 
     const managerColumns = [
       { key: "name", header: "Karyawan" },
