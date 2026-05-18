@@ -9,6 +9,7 @@ import {
   checkIn,
   checkOut,
   createDepartment,
+  fetchAdminOverview,
   fetchAttendanceHistory,
   fetchEmployeeSummary,
   fetchDepartments,
@@ -613,5 +614,74 @@ describe("PHASE 10.8 — HR/Manager demo attendance source sync", () => {
     const history = await fetchAttendanceHistory("demo:employee");
     const todayEntries = history.filter((r) => r.day === "Hari ini");
     expect(todayEntries).toHaveLength(0);
+  });
+});
+
+describe("PHASE 10.10 — Admin home overview live recent activity", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("admin overview does not call fetch for demo:admin token", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await fetchAdminOverview("demo:admin");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("admin overview recentActivity does not contain stale Fikri 08:03 QR before check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    const fikriActivity = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    // Fikri starts absent — should not appear in recent activity
+    expect(fikriActivity).toBeUndefined();
+  });
+
+  it("admin overview recentActivity shows Fikri after Selfie check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const overview = await fetchAdminOverview("demo:admin");
+    const fikriActivity = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikriActivity).toBeDefined();
+    expect(fikriActivity?.time).not.toBe("08:03");
+  });
+
+  it("admin overview recentActivity Fikri detail contains Selfie after Selfie check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const overview = await fetchAdminOverview("demo:admin");
+    const fikriActivity = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikriActivity?.detail).toContain("Selfie");
+  });
+
+  it("admin overview recentActivity Fikri event is Check-in after check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const overview = await fetchAdminOverview("demo:admin");
+    const fikriActivity = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikriActivity?.event).toBe("Check-in");
+  });
+
+  it("admin overview recentActivity Fikri shows Check-out event after check-out", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    await checkOut("demo:employee", { method: "Selfie" });
+    const overview = await fetchAdminOverview("demo:admin");
+    const fikriActivity = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikriActivity).toBeDefined();
+    expect(fikriActivity?.event).toBe("Check-out");
+  });
+
+  it("admin overview recentActivity is org-wide, not manager-scoped", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    // Anisa (dep-ops, manager-01) and Budi (dep-ops, manager-01) start with seeded attendance
+    const overview = await fetchAdminOverview("demo:admin");
+    // Both Anisa and Budi are in initial seeded state (late/present)
+    const anisa = overview.recentActivity.find((a) => a.employeeName === "Anisa Rahma");
+    const budi = overview.recentActivity.find((a) => a.employeeName === "Budi Santoso");
+    expect(anisa).toBeDefined();
+    expect(budi).toBeDefined();
   });
 });

@@ -174,12 +174,6 @@ const REQUESTS: Record<UserRole, LeaveRequestItem[]> = {
   ]
 };
 
-const ADMIN_ACTIVITY: AttendanceActivityItem[] = [
-  { id: "act-01", employeeName: "Anisa Rahma", event: "Butuh review", time: "08:24", status: "Terlambat", detail: "Akurasi GPS rendah · butuh verifikasi HR" },
-  { id: "act-02", employeeName: "Fikri Maulana", event: "Check-in", time: "08:03", status: "Tepat waktu", detail: "QR utama · Kantor Pusat" },
-  { id: "act-03", employeeName: "Leo Pratama", event: "Check-out", time: "17:09", status: "Selesai", detail: "Shift sore ditutup dari perangkat iPhone" }
-];
-
 const DEMO_ROLES = new Set<UserRole>(["superadmin", "admin", "manager", "employee", "scanner"]);
 
 export function getDemoRoleFromToken(token: string): UserRole | null {
@@ -237,7 +231,25 @@ export function getDemoRequests(token: string): LeaveRequestItem[] {
   return REQUESTS[role] ?? [];
 }
 
+// Derive admin recent activity from live demoEmployees so check-ins are reflected
+// immediately without requiring a data-layer reset.
 export function getDemoAdminOverview(): AdminOverview {
+  const checkedIn = demoEmployees.filter(
+    (e) => e.todayStatus === "present" || e.todayStatus === "late"
+  );
+
+  const recentActivity: AttendanceActivityItem[] = checkedIn.map((e) => {
+    const hasCheckedOut = Boolean(e.checkOutTime);
+    return {
+      id: `act-admin-${e.id}`,
+      employeeName: e.fullName,
+      event: hasCheckedOut ? "Check-out" : "Check-in",
+      time: hasCheckedOut ? (e.checkOutTime ?? "--:--") : (e.checkInTime ?? "--:--"),
+      status: hasCheckedOut ? "Selesai" : (e.todayStatus === "late" ? "Terlambat" : "Tepat waktu"),
+      detail: `${e.checkInMethod ?? "Manual"} · ${e.locationName ?? "Kantor"}`
+    };
+  });
+
   return {
     totalEmployees: 248,
     checkedInToday: 187,
@@ -246,7 +258,7 @@ export function getDemoAdminOverview(): AdminOverview {
     pendingRequests: 6,
     absentToday: 61,
     exceptionCount: 5,
-    recentActivity: ADMIN_ACTIVITY
+    recentActivity
   };
 }
 
