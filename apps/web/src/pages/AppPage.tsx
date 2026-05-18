@@ -2120,7 +2120,11 @@ export function AppPage() {
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <StatusBadge tone={attendanceTrust.canClock ? "success" : "warning"}>{attendanceTrust.canClock ? "Lokasi valid" : "Lokasi perlu cek"}</StatusBadge>
-                <StatusBadge tone="info">{checkInMode === "qr" ? "Scanner siap" : "Kamera siap"}</StatusBadge>
+                <StatusBadge tone={qrCameraActive || cameraActive ? "success" : "neutral"}>
+                  {checkInMode === "qr"
+                    ? (qrCameraActive ? "Scanner aktif" : "QR Check-in")
+                    : (cameraActive ? "Kamera aktif" : "Selfie Check-in")}
+                </StatusBadge>
               </div>
             </div>
 
@@ -2139,6 +2143,10 @@ export function AppPage() {
                       type="button"
                       aria-pressed={checkInMode === item.key}
                       onClick={() => {
+                        if (item.key !== checkInMode) {
+                          stopCameraStream();
+                          stopQrCameraStream();
+                        }
                         setCheckInMode(item.key);
                         setCheckInFlowState("idle");
                       }}
@@ -2155,37 +2163,65 @@ export function AppPage() {
                 {checkInMode === "qr" ? (
                   <div className="mt-4">
                     <p className="text-[15px] font-semibold text-[#111827]">Check-in dengan QR</p>
-                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Arahkan kamera ke QR code di kiosk. Deteksi otomatis belum aktif — tekan Scan QR setelah QR terlihat jelas di frame.</p>
-                    <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
-                      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
+                    <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Arahkan kamera ke QR aktif di kiosk.</p>
+
+                    {/* Camera frame */}
+                    <div className="mt-4 overflow-hidden rounded-[24px] border border-[#dfe6f2]">
+                      <div className="relative grid aspect-[4/3] place-items-center">
                         {qrCameraActive ? (
-                          // Live rear-camera stream via getUserMedia (environment)
-                          <video
-                            ref={qrVideoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="absolute inset-0 h-full w-full object-cover"
-                            aria-label="Kamera QR aktif"
-                          />
+                          <div className="absolute inset-0 bg-[#111827]">
+                            <video
+                              ref={qrVideoRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="h-full w-full object-cover"
+                              aria-label="Kamera QR aktif"
+                            />
+                            {/* QR corner guides */}
+                            <div className="pointer-events-none absolute inset-10">
+                              <div className="absolute left-0 top-0 h-8 w-8 rounded-tl-lg border-l-4 border-t-4 border-white/70" />
+                              <div className="absolute right-0 top-0 h-8 w-8 rounded-tr-lg border-r-4 border-t-4 border-white/70" />
+                              <div className="absolute bottom-0 left-0 h-8 w-8 rounded-bl-lg border-b-4 border-l-4 border-white/70" />
+                              <div className="absolute bottom-0 right-0 h-8 w-8 rounded-br-lg border-b-4 border-r-4 border-white/70" />
+                            </div>
+                            <div className="absolute bottom-4 flex flex-wrap justify-center gap-2 px-4">
+                              <StatusBadge tone="success">Kamera aktif</StatusBadge>
+                              <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/70">
+                                Deteksi otomatis belum aktif
+                              </span>
+                            </div>
+                          </div>
                         ) : (
-                          <>
-                            <div className="absolute inset-5 rounded-[20px] border-2 border-dashed border-[#8bb8ff]/60" />
-                            <div className="absolute left-8 top-8 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-[#8bb8ff]" />
-                            <div className="absolute right-8 top-8 h-10 w-10 rounded-tr-2xl border-r-4 border-t-4 border-[#8bb8ff]" />
-                            <div className="absolute bottom-8 left-8 h-10 w-10 rounded-bl-2xl border-b-4 border-l-4 border-[#8bb8ff]" />
-                            <div className="absolute bottom-8 right-8 h-10 w-10 rounded-br-2xl border-b-4 border-r-4 border-[#8bb8ff]" />
-                            <QrCode className="h-16 w-16 text-[#8bb8ff]" />
-                          </>
+                          <div className="flex flex-col items-center gap-3 bg-[#f9fafc] px-6 py-10">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef4ff]">
+                              <QrCode className="h-8 w-8 text-[#1769ff]" />
+                            </div>
+                            <span className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#596172]">
+                              Kamera belum aktif
+                            </span>
+                            <p className="text-center text-[12px] leading-5 text-[#8099c8]">
+                              Kamera belakang akan digunakan untuk membaca QR.
+                            </p>
+                          </div>
                         )}
-                        <span className="absolute bottom-5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">
-                          {qrCameraActive ? "Kamera aktif" : "Kamera belum dibuka"}
-                        </span>
                       </div>
                     </div>
+
+                    {/* Permission error */}
                     {qrCameraError && (
-                      <p role="alert" className="mt-3 text-sm text-red-600">{qrCameraError}</p>
+                      <div className="mt-3 rounded-2xl bg-[#fff7ed] px-4 py-3">
+                        <p role="alert" className="text-sm font-semibold text-[#9a3412]">{qrCameraError}</p>
+                        <button
+                          type="button"
+                          onClick={() => { setQrCameraError(null); handleOpenQrCamera(); }}
+                          className="mt-2 text-sm font-semibold text-[#1769ff] hover:underline"
+                        >
+                          Coba aktifkan lagi
+                        </button>
+                      </div>
                     )}
+
                     {checkInFlowState === "qr_scanned" && pendingCheckIn ? (
                       <div className="mt-4 rounded-[24px] border border-[#d6def0] bg-white p-4">
                         <div className="flex items-start gap-3">
@@ -2211,17 +2247,18 @@ export function AppPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-4 flex flex-col gap-3">
+                      <div className="mt-4">
                         {!qrCameraActive ? (
-                          <SecondaryButton onClick={handleOpenQrCamera}>
+                          <PrimaryButton className="w-full" onClick={handleOpenQrCamera}>
+                            <Camera className="mr-2 h-4 w-4" />
+                            Aktifkan kamera belakang
+                          </PrimaryButton>
+                        ) : (
+                          <PrimaryButton className="w-full" onClick={handleQrScan}>
                             <QrCode className="mr-2 h-4 w-4" />
-                            Buka kamera QR
-                          </SecondaryButton>
-                        ) : null}
-                        <PrimaryButton onClick={handleQrScan}>
-                          <QrCode className="mr-2 h-4 w-4" />
-                          Scan QR
-                        </PrimaryButton>
+                            Scan QR
+                          </PrimaryButton>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2229,42 +2266,70 @@ export function AppPage() {
                   <div className="mt-4">
                     <p className="text-[15px] font-semibold text-[#111827]">Selfie untuk bukti hadir</p>
                     <p className="mt-1.5 text-[13px] leading-5 text-[#596172]">Pastikan wajah terlihat jelas di dalam frame.</p>
-                    <div className="mt-4 rounded-[28px] border border-[#cfd9ec] bg-[#111827] p-4 shadow-[0_18px_44px_rgba(20,24,31,0.16)]">
-                      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_center,#1c2f54_0,#101827_58%,#090d16_100%)]">
+
+                    {/* Camera frame */}
+                    <div className="mt-4 overflow-hidden rounded-[24px] border border-[#dfe6f2]">
+                      <div className="relative grid aspect-[4/3] place-items-center">
                         {cameraActive ? (
-                          // Live front-camera stream via getUserMedia
-                          <video
-                            ref={cameraVideoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="absolute inset-0 h-full w-full object-cover"
-                            aria-label="Kamera selfie aktif"
-                          />
+                          <div className="absolute inset-0 bg-[#111827]">
+                            <video
+                              ref={cameraVideoRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="h-full w-full object-cover"
+                              aria-label="Kamera selfie aktif"
+                            />
+                            {/* Face oval guide */}
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                              <div className="h-[62%] w-[48%] rounded-[50%] border-2 border-white/40" />
+                            </div>
+                            <div className="absolute bottom-4 flex flex-wrap justify-center gap-2 px-4">
+                              <StatusBadge tone="success">Kamera aktif</StatusBadge>
+                              <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/70">Belum diambil</span>
+                            </div>
+                          </div>
                         ) : (pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl) ? (
-                          <img src={pendingCheckIn?.selfie?.previewUrl ?? attendanceCapture.selfieUrl} alt="Preview selfie" className="absolute inset-0 h-full w-full object-cover" />
-                        ) : null}
-                        <div className="absolute h-[70%] w-[54%] rounded-[50%] border-2 border-dashed border-[#8bb8ff]/60 bg-white/5 pointer-events-none" />
-                        {!cameraActive && !(pendingCheckIn?.selfie?.previewUrl || attendanceCapture.selfieUrl) && (
-                          <ScanFace className="relative h-16 w-16 text-[#8bb8ff]" />
+                          <div className="absolute inset-0 bg-[#111827]">
+                            <img
+                              src={pendingCheckIn?.selfie?.previewUrl ?? attendanceCapture.selfieUrl}
+                              alt="Preview selfie"
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute bottom-4 flex justify-center px-4">
+                              <StatusBadge tone="success">Selfie siap</StatusBadge>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-3 bg-[#f9fafc] px-6 py-10">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef4ff]">
+                              <ScanFace className="h-8 w-8 text-[#1769ff]" />
+                            </div>
+                            <span className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#596172]">
+                              Kamera belum aktif
+                            </span>
+                            <p className="text-center text-[12px] leading-5 text-[#8099c8]">
+                              Kamera akan meminta izin akses perangkat.
+                            </p>
+                          </div>
                         )}
-                        <div className="absolute bottom-4 flex flex-wrap justify-center gap-2 px-4">
-                          {cameraActive ? (
-                            <StatusBadge tone="info">Kamera aktif</StatusBadge>
-                          ) : (
-                            <StatusBadge tone="info">Kamera siap</StatusBadge>
-                          )}
-                          {checkInFlowState === "face_captured" ? (
-                            <StatusBadge tone="success">Selfie siap</StatusBadge>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-white/60">Belum diambil</span>
-                          )}
-                        </div>
                       </div>
                     </div>
+
+                    {/* Permission error */}
                     {cameraError && (
-                      <p role="alert" className="mt-3 rounded-2xl bg-[#fff7ed] px-4 py-3 text-sm font-semibold leading-6 text-[#9a3412]">{cameraError}</p>
+                      <div className="mt-3 rounded-2xl bg-[#fff7ed] px-4 py-3">
+                        <p role="alert" className="text-sm font-semibold text-[#9a3412]">{cameraError}</p>
+                        <button
+                          type="button"
+                          onClick={() => { setCameraError(null); handleOpenFaceCamera(); }}
+                          className="mt-2 text-sm font-semibold text-[#1769ff] hover:underline"
+                        >
+                          Coba aktifkan lagi
+                        </button>
+                      </div>
                     )}
+
                     {cameraActive ? (
                       <PrimaryButton className="mt-4 w-full" onClick={handleCaptureSelfie}>
                         <Camera className="mr-2 h-4 w-4" />
@@ -2283,7 +2348,7 @@ export function AppPage() {
                     ) : (
                       <PrimaryButton className="mt-4 w-full" onClick={handleOpenFaceCamera}>
                         <Camera className="mr-2 h-4 w-4" />
-                        Ambil selfie untuk bukti hadir
+                        Aktifkan kamera depan
                       </PrimaryButton>
                     )}
                   </div>

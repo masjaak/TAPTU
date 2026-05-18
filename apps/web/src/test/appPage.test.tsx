@@ -735,13 +735,13 @@ describe("AppPage", () => {
     renderRoute("/app/attendance");
 
     fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera depan/i }));
     expect(apiMocks.checkIn).not.toHaveBeenCalled();
 
     // Wait for getUserMedia to be called and camera to become active
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
 
-    // Now click capture
+    // Now click capture (button label changes to "Ambil selfie" once camera is active)
     fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
 
     expect(await screen.findByRole("button", { name: /gunakan foto ini/i })).toBeTruthy();
@@ -818,9 +818,20 @@ describe("AppPage", () => {
       }
     });
 
+    // Activate QR camera first (new design requires camera activation before Scan QR)
+    const mockQrStream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockQrStream) },
+      configurable: true,
+      writable: true
+    });
+
     renderRoute("/app/attendance");
 
-    fireEvent.click(await screen.findByRole("button", { name: /scan qr/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /scan qr/i })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /scan qr/i }));
     expect(await screen.findByText(/qr berhasil terbaca/i)).toBeTruthy();
     expect(apiMocks.checkIn).not.toHaveBeenCalled();
 
@@ -893,9 +904,18 @@ describe("AppPage", () => {
     });
     apiMocks.checkIn.mockRejectedValue(new Error("Database gagal menyimpan check-in."));
 
+    const mockQrStream2 = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockQrStream2) },
+      configurable: true,
+      writable: true
+    });
+
     renderRoute("/app/attendance");
 
-    fireEvent.click(await screen.findByRole("button", { name: /scan qr/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /scan qr/i })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /scan qr/i }));
     fireEvent.click(screen.getByRole("button", { name: /konfirmasi check-in/i }));
     fireEvent.click(await screen.findByRole("button", { name: /submit check-in/i }));
 
@@ -1106,12 +1126,21 @@ describe("AppPage", () => {
       }
     });
 
+    const mockQrStream3 = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockQrStream3) },
+      configurable: true,
+      writable: true
+    });
+
     renderRoute("/app/attendance");
 
     const verifyButton = await screen.findByRole("button", { name: /verifikasi ulang perangkat/i });
     fireEvent.click(verifyButton);
     await screen.findByText(/perangkat ini tidak mendukung verifikasi lokasi/i);
 
+    // Activate QR camera first before Scan QR is available
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
     const scanButton = await screen.findByRole("button", { name: /scan qr/i });
     expect(scanButton).not.toHaveProperty("disabled", true);
 
@@ -3798,7 +3827,7 @@ describe("BUG 3 — Camera uses getUserMedia instead of file input", () => {
     renderRoute("/app/attendance");
 
     fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera depan/i }));
 
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalledWith({ video: { facingMode: "user" } }));
   });
@@ -3815,7 +3844,7 @@ describe("BUG 3 — Camera uses getUserMedia instead of file input", () => {
     renderRoute("/app/attendance");
 
     fireEvent.click(await screen.findByRole("button", { name: /face verification/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /ambil selfie untuk bukti hadir/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera depan/i }));
 
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
     // Error shows either in cameraError paragraph (role=alert) or feedback toast
@@ -3826,7 +3855,7 @@ describe("BUG 3 — Camera uses getUserMedia instead of file input", () => {
 
   it("there is no file input of type file for camera capture", async () => {
     renderRoute("/app/attendance");
-    await screen.findByRole("button", { name: /scan qr/i });
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
     // No visible file input for camera — getUserMedia approach is used instead
     const fileInputs = document.querySelectorAll('input[type="file"]');
     expect(fileInputs.length).toBe(0);
@@ -3884,7 +3913,7 @@ describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment ca
     renderRoute("/app/attendance");
 
     // QR mode is selected by default
-    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
 
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalledWith({ video: { facingMode: "environment" } }));
   });
@@ -3900,7 +3929,7 @@ describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment ca
 
     renderRoute("/app/attendance");
 
-    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
 
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
     expect(getUserMediaSpy).not.toHaveBeenCalledWith({ video: { facingMode: "user" } });
@@ -3916,7 +3945,7 @@ describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment ca
 
     renderRoute("/app/attendance");
 
-    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
 
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
     expect(
@@ -3936,7 +3965,7 @@ describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment ca
 
     renderRoute("/app/attendance");
 
-    fireEvent.click(await screen.findByRole("button", { name: /buka kamera qr/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
     await waitFor(() => expect(getUserMediaSpy).toHaveBeenCalled());
 
     // Switch away from attendance — multiple Beranda nav buttons (desktop + mobile), click first
@@ -3948,8 +3977,177 @@ describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment ca
 
   it("QR mode does not use a file input for camera", async () => {
     renderRoute("/app/attendance");
-    await screen.findByRole("button", { name: /buka kamera qr/i });
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
     const fileInputs = document.querySelectorAll('input[type="file"]');
     expect(fileInputs.length).toBe(0);
+  });
+});
+
+// ─── Phase 10.6 — Camera idle state polish ───────────────────────────────────
+// Shared setup for camera idle state tests
+function setupEmployeeSessionForCamera() {
+  cleanup();
+  Object.values(apiMocks).forEach((mock) => mock.mockReset());
+  apiMocks.getDashboard.mockResolvedValue({
+    greeting: "Halo, Fikri Maulana",
+    stats: [],
+    schedule: [],
+    attendance: [],
+    attendanceState: "idle",
+    requests: []
+  });
+  apiMocks.fetchEmployeeSummary.mockResolvedValue({
+    totalDays: 0,
+    onTimeDays: 0,
+    lateDays: 0,
+    pendingRequests: 0,
+    currentAttendanceState: "idle",
+    assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
+    todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00.000Z", updatedAt: "2026-05-02T08:00:00.000Z" }
+  });
+  apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+  apiMocks.fetchNotifications.mockResolvedValue([]);
+  localStorage.setItem(
+    "taptu-session",
+    JSON.stringify({
+      token: "demo:employee",
+      user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+    })
+  );
+}
+
+describe("PHASE 10.6 — Camera idle state copy and placeholder", () => {
+  beforeEach(setupEmployeeSessionForCamera);
+  afterEach(() => { cleanup(); localStorage.clear(); });
+
+  it("QR idle state shows Kamera belum aktif chip", async () => {
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    expect(screen.getByText(/kamera belum aktif/i)).toBeTruthy();
+  });
+
+  it("QR idle state shows Aktifkan kamera belakang as the primary CTA", async () => {
+    renderRoute("/app/attendance");
+    const btn = await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    expect(btn).toBeTruthy();
+  });
+
+  it("Face idle state shows Kamera belum aktif chip", async () => {
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    await screen.findByRole("button", { name: /aktifkan kamera depan/i });
+    expect(screen.getByText(/kamera belum aktif/i)).toBeTruthy();
+  });
+
+  it("Face idle state shows Aktifkan kamera depan as the primary CTA", async () => {
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    const btn = await screen.findByRole("button", { name: /aktifkan kamera depan/i });
+    expect(btn).toBeTruthy();
+  });
+
+  it("Face idle state does not claim biometric or Face ID", async () => {
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    await screen.findByRole("button", { name: /aktifkan kamera depan/i });
+    const pageText = document.body.textContent ?? "";
+    expect(pageText).not.toMatch(/biometrik/i);
+    expect(pageText).not.toMatch(/face id/i);
+    expect(pageText).not.toMatch(/liveness/i);
+  });
+
+  it("Face active state shows Kamera aktif chip after getUserMedia", async () => {
+    const mockStream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      configurable: true,
+      writable: true
+    });
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera depan/i }));
+    await waitFor(() => expect(screen.getAllByText(/kamera aktif/i).length).toBeGreaterThan(0));
+  });
+
+  it("QR active state shows Scan QR button and Kamera aktif chip after getUserMedia", async () => {
+    const mockStream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      configurable: true,
+      writable: true
+    });
+    renderRoute("/app/attendance");
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
+    await waitFor(() => expect(screen.getAllByText(/kamera aktif/i).length).toBeGreaterThan(0));
+    expect(screen.getByRole("button", { name: /scan qr/i })).toBeTruthy();
+  });
+
+  it("Face permission denied shows Coba aktifkan lagi retry button", async () => {
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("Permission denied", "NotAllowedError")) },
+      configurable: true,
+      writable: true
+    });
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera depan/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /coba aktifkan lagi/i })).toBeTruthy());
+  });
+
+  it("QR permission denied shows Coba aktifkan lagi retry button", async () => {
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("Permission denied", "NotAllowedError")) },
+      configurable: true,
+      writable: true
+    });
+    renderRoute("/app/attendance");
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /coba aktifkan lagi/i })).toBeTruthy());
+  });
+});
+
+describe("PHASE 10.6 — Camera stream lifecycle on mode switch", () => {
+  beforeEach(setupEmployeeSessionForCamera);
+  afterEach(() => { cleanup(); localStorage.clear(); });
+
+  it("switching from QR to Face stops QR stream tracks", async () => {
+    const mockStop = vi.fn();
+    const mockStream = { getTracks: () => [{ stop: mockStop }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera belakang/i }));
+    await waitFor(() => expect(screen.getAllByText(/kamera aktif/i).length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    await waitFor(() => expect(mockStop).toHaveBeenCalled());
+  });
+
+  it("switching from Face to QR stops Face stream tracks", async () => {
+    const mockStop = vi.fn();
+    const mockStream = { getTracks: () => [{ stop: mockStop }] };
+    Object.defineProperty(global.navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      configurable: true,
+      writable: true
+    });
+
+    renderRoute("/app/attendance");
+    await screen.findByRole("button", { name: /aktifkan kamera belakang/i });
+    fireEvent.click(screen.getByRole("button", { name: /face verification/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /aktifkan kamera depan/i }));
+    await waitFor(() => expect(screen.getAllByText(/kamera aktif/i).length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole("button", { name: /qr check-in/i }));
+    await waitFor(() => expect(mockStop).toHaveBeenCalled());
   });
 });
