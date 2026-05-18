@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -280,7 +281,7 @@ describe("post-login design system", () => {
       "apps/web/src/components/StatusPill.tsx",
       "apps/web/tailwind.config.js"
     ];
-    const source = files.map((file) => readFileSync(resolve(process.cwd(), "..", "..", file), "utf8")).join("\n");
+    const source = files.map((file) => readFileSync(resolve(process.cwd(), file), "utf8")).join("\n");
 
     const oldTokenPattern = new RegExp(
       [

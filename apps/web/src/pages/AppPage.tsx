@@ -2362,6 +2362,7 @@ export function AppPage() {
                 type="button"
                 aria-pressed={historyFilter === filter}
                 onClick={() => {
+                  if (filter === historyFilter) return;
                   setAttendanceHistoryLoaded(false);
                   setHistoryFilter(filter);
                 }}

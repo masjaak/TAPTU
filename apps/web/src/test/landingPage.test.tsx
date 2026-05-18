@@ -1,6 +1,26 @@
+// @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+
+// framer-motion's whileInView uses IntersectionObserver which jsdom does not provide.
+// Mock it so the landing page renders without throwing from the ErrorBoundary.
+beforeAll(() => {
+  class MockIntersectionObserver {
+    root = null;
+    rootMargin = "";
+    thresholds: number[] = [];
+    disconnect() {}
+    observe() {}
+    takeRecords(): IntersectionObserverEntry[] { return []; }
+    unobserve() {}
+  }
+  Object.defineProperty(globalThis, "IntersectionObserver", {
+    writable: true,
+    configurable: true,
+    value: MockIntersectionObserver
+  });
+});
 
 import { router as appRouter } from "../pages/router";
 

@@ -4,7 +4,7 @@
 
 Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
 
-The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: MVP documentation is updated through Phase 8 final stabilization. Phase 8 completed manager-scoped data wiring, Manager Dashboard UX polish, HR Dashboard hardening, HR Struktur/Divisi & Penempatan, two-step approval QA, attendance persistence QA, and role access guard QA. Known limitations remain around production-seeded manual QA, approval timeline UI, shift assignment, selfie storage finalization, payslip data, some Supabase persistence gaps, and very narrow mobile QA with production-like data.
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: documentation is updated through **Phase 9 scale-up hardening**. Phase 9 delivered query safety defaults, DB index deployment to live Supabase, report API pagination, frontend fetch discipline fixes, and full test suite hardening (345 tests passing, 0 failures). No new product features were added in Phase 9. Known limitations remain around production-seeded manual QA, approval timeline UI, shift assignment, selfie storage finalization, payslip data, some Supabase persistence gaps, report pagination frontend controls, and very narrow mobile QA with production-like data.
 
 ## B. Fixed product decisions
 
@@ -41,7 +41,8 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Phase 8.1: manager-scoped data APIs — `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
 - Phase 8.3: Manager Dashboard UX polish — nav expanded to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, rebuilt Beranda with team status panels, manager-specific Tim Saya and Presensi Tim, dedicated team approval queue in Pengajuan, manager permission summary in Profil. 141 tests passing.
 - Phase 8.4-8.6: HR Struktur/Divisi & Penempatan added and connected to department/employee assignment APIs; HR Tim filter controls replaced with custom `FilterSelect` controls. 169 tests passing at Phase 8.6.
-- Phase 8 final stabilization: targeted QA for approval two-step flow, employee attendance check-in/check-out persistence, HR/Manager attendance visibility, and role access guards. Latest targeted runs: `supabaseQueries.test.ts` 21 passing, `appPage.test.tsx` 103 passing, `appShellState.test.ts` 12 passing.
+- Phase 8 final stabilization: targeted QA for approval two-step flow, employee attendance check-in/check-out persistence, HR/Manager attendance visibility, and role access guards.
+- Phase 9 scale-up hardening: query safety defaults (`.limit()`, 30-day history filter, org-scoped exception count), report API pagination (`?limit`/`?offset` + `X-Has-More` headers, 500-row cap), frontend fetch discipline (`auditLogsLoaded` flag, `session?.token` dep, history filter same-filter guard, `filteredEmployees` useMemo), 6 DB indexes deployed to live Supabase, test suite hardened from 169 to **345 tests passing** (17 pre-existing infra failures fixed, 18 new regression tests added). No product features added.
 
 ## D. Routes/pages
 
@@ -232,6 +233,7 @@ Concise manual checklist:
 - Very narrow mobile layouts should still be manually checked with production-length employee names, notes, and dense report rows.
 - Some phase 4/5 operational endpoints still rely on local/demo-store style paths rather than fully normalized Supabase relational persistence.
 - Profile workspace is lightweight and not a full account/settings system.
+- Report pagination headers exist in the API (`X-Has-More`, `X-Pagination-Limit`, `X-Pagination-Offset`); frontend report view does not yet expose paging controls to the user.
 
 ## M. Future roadmap
 
@@ -247,15 +249,16 @@ Concise manual checklist:
 
 ## N. Recommended next step after MVP
 
-Recommended next step: the next phase should focus on operational hardening, not roadmap feature expansion.
+Recommended next step: Phase 9 scale-up hardening is complete. Phase 10 should continue operational hardening before any roadmap feature expansion.
 
-Priority order:
+Priority order for Phase 10:
 
-1. Run manual QA with seeded manager/team data.
-2. Add approval step timeline panel and reporting hardening.
-3. Finish Supabase-backed persistence gaps for older operational data flows.
-4. Implement shift assignment workflow end to end.
-5. Finalize selfie storage/upload and retention behavior.
-6. Replace the lightweight Slip Gaji placeholder only after a real payslip source exists.
+1. Run manual QA with seeded manager/team data against live Supabase (indexes are in place; verify query performance).
+2. Add approval step timeline panel to request cards (backend `approval_steps` table exists; UI is missing).
+3. Wire report pagination controls in the frontend (`?limit`/`?offset` API is ready; frontend shows all rows currently).
+4. Finish Supabase-backed persistence gaps for older operational data flows.
+5. Implement shift assignment workflow end to end.
+6. Finalize selfie storage/upload and retention behavior.
+7. Replace the lightweight Slip Gaji placeholder only after a real payslip source exists.
 
 This sequence closes the largest trust and handoff gaps while preserving the current MVP product shape.

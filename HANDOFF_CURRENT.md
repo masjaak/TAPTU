@@ -4,17 +4,16 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 
 ## Current status
 
-- Documentation is current through Phase 8 final stabilization.
+- Documentation is current through **Phase 9 scale-up hardening** (complete).
 - Phase 6 completed employee-facing simplification and polish.
 - Phase 7 added organization structure, multi-step approval state machine (API), and initial manager dashboard UI.
-- Phase 7.4 implemented request approval state machine: employee creation, optional manager step, HR final step, rejection finalization, backward-compatible status labels.
-- Phase 7.5 shipped initial manager dashboard: role-scoped nav, Beranda with team stats, Tim Saya, Presensi Tim, Pengajuan with two-step banner, Profil. 132 tests passing.
-- Phase 8.1 wired manager-scoped data: `fetchManagerOverview`, `fetchManagerEmployeeList`, `fetchManagerExceptionQueue`, `fetchManagerRequests`. No org-wide fallback. `workflowStatus`/`statusLabel` preserved.
-- Phase 8.3 completed Manager Dashboard UX polish: nav updated to Beranda/Tim Saya/Presensi Tim/Pengajuan/Pengecualian/Profil, new Pengecualian page, manager-specific request queue, rebuilt home with team status panels, refined team and attendance views, manager permission summary in Profil. 141 tests passing.
-- Phase 8.4 added HR Divisi & Penempatan UI shell: division table in HR Tim workspace, data derived from employee list, actions disabled with TODO notice. 162 tests passing.
-- Phase 8.5 connected all Divisi & Penempatan actions to backend API: Tambah divisi (createDepartment), Edit/Atur manager (updateDepartment), Ubah divisi in employee table (reassignEmployeeDepartment). Data source switched to `fetchDepartments` with loading/error states. 166 tests passing.
-- Phase 8.6 replaced native `<select>` filter controls in HR Tim with custom `FilterSelect` component (Taptu style, portal dropdown, scroll-safe, no native browser popup). New `FilterSelect` exported from `components/app.tsx`. Divisi and Status filters in HR Tim filter strip now use combobox role. **169 tests passing.**
-- Phase 8 final stabilization completed targeted QA for Manager Dashboard scoping, HR Dashboard hardening, HR Struktur/Divisi & Penempatan, approval two-step flow, attendance check-in/check-out persistence, and role access guards. Latest targeted runs: `npm run test --workspace @taptu/api -- supabaseQueries.test.ts` (**21 tests passing**), `npm run test --workspace @taptu/web -- appPage.test.tsx` (**103 tests passing**), `npm run test --workspace @taptu/web -- appShellState.test.ts` (**12 tests passing**).
+- Phase 8 completed manager-scoped data wiring, Manager Dashboard UX polish, HR Struktur/Divisi & Penempatan, two-step approval QA, and attendance persistence QA. **169 tests at Phase 8.6.**
+- Phase 9 delivered scale-up hardening with no new product features:
+  - **Query safety defaults**: `.limit(50/100)` on notifications, history, exceptions; 30-day date filter on history; org-scoped exception count in admin overview.
+  - **Report pagination**: `?limit`/`?offset` params, `X-Has-More`/`X-Pagination-Limit`/`X-Pagination-Offset` headers, 500-row server-side cap.
+  - **Frontend fetch discipline**: `auditLogsLoaded` boolean flag (replaced length check), `session?.token` added to dashboard effect deps, history filter same-filter guard (`if (filter === historyFilter) return`), `filteredEmployees` useMemo.
+  - **DB indexes deployed to live Supabase** (`ajlfwivpllbcmadscmkb`): 6 indexes across `profiles`, `attendance_records`, `approval_requests`, and `attendance_exceptions`.
+  - **Test suite hardening**: resolved 17 pre-existing test infrastructure failures (missing jsdom annotations, wrong path resolution), added 18 new tests (history filter refetch × 3, role flow regression QA × 5, landing page × 10 previously broken). **345 tests passing across 25 test files, 0 failures.**
 
 ## Fixed decisions
 
@@ -44,6 +43,7 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 - Very narrow mobile screens still need manual QA with production-length names, notes, and dense report data.
 - Superadmin boundary is conceptual; no dedicated Superadmin-only settings UI built.
 - HR Struktur/Divisi & Penempatan is connected for create/edit/manager assignment/employee reassignment, but deeper HRIS profile management remains out of scope.
+- Report pagination headers exist in API; frontend report view does not yet expose paging controls to the user.
 
 ## Roadmap only
 
@@ -61,13 +61,18 @@ Read this file first in future sessions. It is the low-token entrypoint; open `H
 
 - `Documents/TAPTU/HANDOFF_CURRENT.md`
 - `Documents/TAPTU/HANDOFF_TAPTU.md`
+- `Documents/TAPTU/CHANGELOG_PHASE_9.md`
 - `Documents/TAPTU/CHANGELOG_PHASE_8.md`
 - `Documents/TAPTU/CHANGELOG_PHASE_7.md`
 - `Documents/TAPTU/CHANGELOG_PHASE_6.md`
 
 ## Recommended next step
 
-1. Next safe phase: Phase 9 operational hardening.
-2. Start with manual QA using seeded manager/team data, then add approval step timeline panel and reporting hardening.
-3. Keep scope focused on stabilization: Supabase persistence gaps, shift assignment, selfie storage, dense mobile QA.
-4. Do not build payroll, notifications, chat/comments, analytics, or reimbursement yet.
+Phase 9 scale-up hardening is complete. Next safe tasks for Phase 10:
+
+1. **Manual QA with seeded data** — run the app against real manager/team data in production Supabase; verify org-scoped queries and index effectiveness.
+2. **Approval timeline panel** — add a step-history UI to request cards so users can see when manager approved vs. when HR finalized, using `approval_steps` table data.
+3. **Report pagination frontend** — wire `?limit`/`?offset` API params to the report view; the backend is ready, the UI just needs page controls.
+4. **Shift assignment workflow** — complete the end-to-end shift assignment flow in post-login UI/API (`shift_assignments` table exists, UI is incomplete).
+5. **Selfie storage finalization** — finalize `selfie_url` upload/storage path; currently nullable and preview-only.
+6. Do not build payroll, notifications, chat/comments, analytics, or reimbursement yet.

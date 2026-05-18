@@ -3478,4 +3478,255 @@ describe("HR Divisi & Penempatan", () => {
       expect(apiMocks.fetchEmployeeList.mock.calls.length).toBe(callCountBeforeSearch);
     });
   });
+
+  describe("role flow regression QA", () => {
+    afterEach(() => {
+      cleanup();
+      localStorage.clear();
+      vi.clearAllMocks();
+    });
+
+    // ── 1. Session guard ────────────────────────────────────────────
+    it("redirects to /login and shows no workspace content when there is no session", async () => {
+      // No localStorage session set — readSession() returns null
+      renderRoute("/app");
+
+      // getDashboard must never be called without a valid token
+      await new Promise((r) => setTimeout(r, 100));
+      expect(apiMocks.getDashboard).not.toHaveBeenCalled();
+      // Workspace content is absent
+      expect(screen.queryByText(/halo,/i)).toBeNull();
+      expect(screen.queryByText(/hadir hari ini/i)).toBeNull();
+    });
+
+    // ── 2. Superadmin role is treated as admin ─────────────────────
+    it("superadmin role loads the admin dashboard overview, not the employee home", async () => {
+      localStorage.setItem(
+        "taptu-session",
+        JSON.stringify({
+          token: "demo:superadmin",
+          user: {
+            id: "usr-superadmin-01",
+            fullName: "Super Admin",
+            email: "superadmin@taptu.app",
+            organizationName: "TAPTU HQ",
+            role: "superadmin"
+          }
+        })
+      );
+      apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Super Admin", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+      apiMocks.fetchAdminOverview.mockResolvedValue({
+        totalEmployees: 5, checkedInToday: 3, onTimeToday: 2, lateToday: 1,
+        pendingRequests: 0, absentToday: 2, exceptionCount: 0, recentActivity: []
+      });
+
+      renderRoute("/app");
+
+      await waitFor(() => expect(apiMocks.fetchAdminOverview).toHaveBeenCalledWith("demo:superadmin"));
+      expect(apiMocks.fetchEmployeeSummary).not.toHaveBeenCalled();
+    });
+
+    // ── 3. Employee URL guard: /app/team redirects to home ─────────
+    it("employee navigating directly to /app/team sees home workspace, not admin employee data", async () => {
+      localStorage.setItem(
+        "taptu-session",
+        JSON.stringify({
+          token: "employee-api-token",
+          user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+        })
+      );
+      apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo, Fikri Maulana", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+      apiMocks.fetchEmployeeSummary.mockResolvedValue({
+        totalDays: 5, onTimeDays: 5, lateDays: 0, pendingRequests: 0,
+        currentAttendanceState: "idle",
+        assignedShift: { id: "s1", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor" },
+        todayRecord: { id: "r1", employeeId: "usr-employee-01", shiftId: "s1", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "", updatedAt: "" }
+      });
+
+      // Employee navigates directly to the team section URL
+      renderRoute("/app/team");
+
+      // Employee home shown, not the admin team page
+      await screen.findByText("Halo, Fikri Maulana");
+      // No admin employee list data fetched — cross-role data isolation
+      expect(apiMocks.fetchEmployeeList).not.toHaveBeenCalled();
+      expect(apiMocks.fetchManagerEmployeeList).not.toHaveBeenCalled();
+    });
+
+    // ── 4. Employee request submission ─────────────────────────────
+    it("employee submitting an izin request calls createRequest and shows Menunggu status", async () => {
+      localStorage.setItem(
+        "taptu-session",
+        JSON.stringify({
+          token: "employee-api-token",
+          user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+        })
+      );
+      apiMocks.getDashboard.mockResolvedValue({ greeting: "Halo", stats: [], schedule: [], attendance: [], attendanceState: "idle", requests: [] });
+      apiMocks.fetchEmployeeSummary.mockResolvedValue({
+        totalDays: 5, onTimeDays: 5, lateDays: 0, pendingRequests: 0,
+        currentAttendanceState: "idle",
+        assignedShift: { id: "s1", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor" },
+        todayRecord: { id: "r1", employeeId: "usr-employee-01", shiftId: "s1", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "", updatedAt: "" }
+      });
+      apiMocks.createRequest.mockResolvedValue({
+        request: { id: "req-new", category: "Izin", title: "Izin keperluan keluarga", status: "Menunggu", detail: "Urusan mendadak mendesak.", workflowStatus: "pending_manager" }
+      });
+
+      renderRoute("/app/requests");
+
+      // Fill all required form fields
+      fireEvent.change(await screen.findByLabelText(/^judul$/i), { target: { value: "Izin keperluan keluarga" } });
+      fireEvent.change(screen.getByLabelText(/tanggal mulai/i), { target: { value: "2026-05-20" } });
+      fireEvent.change(screen.getByLabelText(/tanggal selesai/i), { target: { value: "2026-05-20" } });
+      fireEvent.change(screen.getByLabelText(/detail/i), { target: { value: "Urusan mendadak mendesak." } });
+
+      fireEvent.click(screen.getByRole("button", { name: /kirim pengajuan/i }));
+
+      await waitFor(() => expect(apiMocks.createRequest).toHaveBeenCalledTimes(1));
+      expect(apiMocks.createRequest).toHaveBeenCalledWith("employee-api-token", expect.objectContaining({
+        category: "Izin",
+        title: "Izin keperluan keluarga"
+      }));
+      // New request appears — workflowStatus "pending_manager" renders as "Menunggu Manager"
+      expect(await screen.findByText("Izin keperluan keluarga")).toBeTruthy();
+      expect(screen.getByText("Menunggu Manager")).toBeTruthy();
+    });
+
+    // ── 5. HR final approval: approved_by_manager → Disetujui ─────
+    it("HR approving an approved_by_manager request calls approveRequest and shows Disetujui", async () => {
+      setupAdminSession();
+      // Admin requests are seeded from getDashboard.requests, not fetchRequests
+      apiMocks.getDashboard.mockResolvedValue({
+        greeting: "Halo, Nadia Putri",
+        stats: [],
+        schedule: [],
+        attendance: [],
+        attendanceState: "idle",
+        requests: [
+          { id: "req-final", title: "Cuti sudah OK manager", status: "Menunggu", detail: "Sudah disetujui manager.", workflowStatus: "approved_by_manager" }
+        ]
+      });
+      apiMocks.approveRequest.mockResolvedValue({
+        request: { id: "req-final", title: "Cuti sudah OK manager", status: "Disetujui", detail: "Sudah disetujui manager.", workflowStatus: "approved" }
+      });
+
+      renderRoute("/app/requests");
+
+      await screen.findByText("Cuti sudah OK manager");
+      const requestCard = screen.getByText("Cuti sudah OK manager").closest("article");
+      fireEvent.click(within(requestCard!).getByRole("button", { name: /setujui/i }));
+
+      await waitFor(() => expect(apiMocks.approveRequest).toHaveBeenCalledWith("demo:admin", "req-final", "Disetujui", undefined));
+      expect(await screen.findByText(/pengajuan disetujui/i)).toBeTruthy();
+    });
+  });
+
+  describe("history filter refetch", () => {
+    const employeeSession = {
+      token: "employee-api-token",
+      user: {
+        id: "usr-employee-01",
+        fullName: "Fikri Maulana",
+        email: "employee@taptu.app",
+        organizationName: "TAPTU HQ",
+        role: "employee"
+      }
+    };
+
+    const minimalSummary = {
+      totalDays: 5,
+      onTimeDays: 5,
+      lateDays: 0,
+      pendingRequests: 0,
+      currentAttendanceState: "idle" as const,
+      assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
+      todayRecord: {
+        id: "r1",
+        employeeId: "usr-employee-01",
+        shiftId: "shift-pagi",
+        status: "Belum check-in",
+        validationStatus: "verified" as const,
+        validationReasons: [],
+        createdAt: "2026-05-18T00:00:00.000Z",
+        updatedAt: "2026-05-18T00:00:00.000Z"
+      }
+    };
+
+    beforeEach(() => {
+      localStorage.setItem("taptu-session", JSON.stringify(employeeSession));
+      apiMocks.getDashboard.mockResolvedValue({
+        greeting: "Halo",
+        stats: [],
+        schedule: [],
+        attendance: [],
+        attendanceState: "idle",
+        requests: []
+      });
+      apiMocks.fetchEmployeeSummary.mockResolvedValue(minimalSummary);
+    });
+
+    it("clicking Hadir filter re-fetches with present and shows new records", async () => {
+      apiMocks.fetchAttendanceHistoryByFilter
+        .mockResolvedValueOnce([
+          { id: "all-1", date: "2026-05-12", status: "Selesai", checkInTime: "2026-05-12T08:00:00.000Z", method: "QR" }
+        ])
+        .mockResolvedValueOnce([
+          { id: "present-1", date: "2026-05-13", status: "Selesai", checkInTime: "2026-05-13T08:05:00.000Z", method: "QR" }
+        ]);
+
+      renderRoute("/app/history");
+
+      // Initial load with "Semua" filter
+      await screen.findByText(/12 Mei 2026/i);
+      expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(1);
+      expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenLastCalledWith("employee-api-token", "all");
+
+      // Click "Hadir" filter button
+      fireEvent.click(screen.getByRole("button", { name: "Hadir" }));
+
+      // Must re-fetch with "present" filter
+      await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
+      expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenLastCalledWith("employee-api-token", "present");
+
+      // New data replaces old data
+      expect(await screen.findByText(/13 Mei 2026/i)).toBeTruthy();
+      expect(screen.queryByText(/12 Mei 2026/i)).toBeNull();
+    });
+
+    it("clicking filter does not produce more than 2 fetches total (no infinite re-fetch)", async () => {
+      apiMocks.fetchAttendanceHistoryByFilter
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([]);
+
+      renderRoute("/app/history");
+
+      await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole("button", { name: "Hadir" }));
+
+      await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
+
+      // Allow any pending updates to settle; count must not grow beyond 2
+      await new Promise((r) => setTimeout(r, 200));
+      expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2);
+    });
+
+    it("clicking same filter twice fetches only once more (not double)", async () => {
+      apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+
+      renderRoute("/app/history");
+
+      await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole("button", { name: "Hadir" }));
+      await waitFor(() => expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2));
+
+      // Clicking the same filter again while already on "Hadir"
+      fireEvent.click(screen.getByRole("button", { name: "Hadir" }));
+      await new Promise((r) => setTimeout(r, 150));
+      // No additional fetch — already loaded with the correct filter
+      expect(apiMocks.fetchAttendanceHistoryByFilter).toHaveBeenCalledTimes(2);
+    });
+  });
 });

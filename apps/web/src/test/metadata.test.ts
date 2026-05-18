@@ -2,7 +2,10 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const indexHtml = readFileSync(resolve(process.cwd(), "index.html"), "utf8");
+// When run from monorepo root, apps/web files live under apps/web/
+const webRoot = resolve(process.cwd(), "apps/web");
+
+const indexHtml = readFileSync(resolve(webRoot, "index.html"), "utf8");
 
 describe("site metadata", () => {
   it("describes the current Taptu product positioning", () => {
@@ -25,6 +28,6 @@ describe("site metadata", () => {
   });
 
   it("ships the referenced OG image asset", () => {
-    expect(existsSync(resolve(process.cwd(), "public/taptu-opengraph.png"))).toBe(true);
+    expect(existsSync(resolve(webRoot, "public/taptu-opengraph.png"))).toBe(true);
   });
 });
