@@ -8,14 +8,15 @@ Taptu is an **Attendance Validation OS** for operational teams — not a full HR
 
 ## Current status
 
-Documentation is current through **Phase 10.15 — Final Demo Consistency QA** (complete).
+Documentation is current through **Phase 10.17 — Live Check-in Time Sync and Dummy Data Cleanup** (complete).
 
 - **Phase 9** delivered scale-up hardening: query safety defaults, DB indexes on live Supabase (`ajlfwivpllbcmadscmkb`), report pagination API, frontend fetch discipline, test suite hardened to 345 passing tests.
 - **Phase 10.12** fixed demo check-in time source (local ISO, no Z), removed Anisa/Budi from manager demo team, removed Notifikasi from manager nav.
 - **Phase 10.13** extracted `formatAttendanceTime` to a testable utility (`attendanceTime.ts`); handles local ISO (slice), UTC+Z (Date parse), plain HH:mm passthrough, and missing (--:--).
 - **Phase 10.14** scoped Manager Pengajuan to Fikri-only requests with proper `workflowStatus`/`statusLabel` fields; manager approve → `pending_hr` (not final).
 - **Phase 10.15** made `demoFikriRequests` mutable with `approveDemoRequest()` mutator so approval state persists across re-fetches; `resetDemoAttendanceState()` also resets request state for test isolation.
-- **Test suite: 354/354 passing, 0 failures.**
+- **Phase 10.17** fixed `getDemoEmployeeSummary()` to read live from `demoEmployees` (was static); removed stale dummy check-in data from Anisa/Budi `INITIAL_DEMO_EMPLOYEES`; cleared hardcoded items from `ATTENDANCE.admin/manager/superadmin`; replaced raw `.slice(11,16)` in AppPage.tsx render code with `formatAttendanceTime()`. After Fikri checks in, Employee summary, Riwayat, Manager Presensi Tim, HR Presensi, and HR Laporan all show the same local check-in time.
+- **Test suite: 367/367 passing, 0 failures.**
 
 ## Role architecture
 
@@ -34,6 +35,8 @@ Documentation is current through **Phase 10.15 — Final Demo Consistency QA** (
 - Manager demo team is Fikri-only. Anisa Rahma and Budi Santoso have `managerId: undefined` (excluded from manager team scope).
 - HR/Admin overview is org-wide (all employees with `role === "employee"`).
 - Fikri's attendance check-in/check-out stored as local ISO (no Z suffix) — `formatAttendanceTime` slices `[11,16]` for display.
+- `getDemoEmployeeSummary()` reads live from `demoEmployees`; after check-in, all views (Employee, Manager, HR) show the same time.
+- Anisa and Budi start as `absent` with no check-in fields — HR Presensi and Laporan show honest "Belum check-in" until they check in.
 
 ## Approval flow (state machine)
 

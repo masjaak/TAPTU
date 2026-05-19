@@ -40,11 +40,13 @@ Manager approve meneruskan ke HR — bukan keputusan final. HR yang finalisasi.
 
 ## Status terkini
 
-- Dokumentasi current s.d. **Phase 10.15 — Final Demo Consistency QA**.
-- **354/354 tests passing.**
+- Dokumentasi current s.d. **Phase 10.17 — Live Check-in Time Sync and Dummy Data Cleanup**.
+- **367/367 tests passing.**
 - Demo approval state persists across re-fetches (mutable `demoFikriRequests`).
 - Check-in time disimpan sebagai local ISO (no Z suffix) — tidak ada UTC offset regression.
 - `formatAttendanceTime` utility handles local ISO, UTC+Z, plain HH:mm, dan missing value.
+- `getDemoEmployeeSummary()` membaca live dari `demoEmployees` — Employee, Manager, dan HR views menampilkan waktu check-in yang sama setelah Fikri check-in.
+- Stale dummy attendance data di Anisa, Budi, dan `ATTENDANCE.admin/manager/superadmin` telah dihapus.
 
 ## Known limitations
 

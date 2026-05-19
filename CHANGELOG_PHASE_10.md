@@ -4,6 +4,41 @@ Phase 10 is a multi-sub-phase demo consistency and stability series. No new prod
 
 ---
 
+## Phase 10.17 — Live Check-in Time Sync and Dummy Data Cleanup (2026-05-19)
+
+**Goal:** Fix four compounding bugs that caused Employee check-in time to display incorrectly and HR/Manager views to show stale dummy attendance data.
+
+### Root causes fixed
+
+1. **`getDemoEmployeeSummary()` was static** — always returned `TODAY_RECORD` with `currentAttendanceState: "idle"` and no `checkInTime`, regardless of what `recordDemoCheckIn` had stored. After `refreshEmployeeAttendanceSummary()` ran, the employee's own Presensi tab reverted to idle.
+2. **Stale check-in fields in `INITIAL_DEMO_EMPLOYEES`** — Anisa had `todayStatus: "late", checkInTime: "08:24", checkInMethod: "GPS", validationStatus: "needs_review"` and Budi had `todayStatus: "present", checkInTime: "07:58"`. These appeared as fake attendance in HR Presensi, HR Laporan, and admin overview.
+3. **Stale hardcoded items in `ATTENDANCE.admin/manager/superadmin`** — arrays contained items like `{time: "08:03", method: "QR"}` that loaded into the `attendance` React state on every dashboard fetch.
+4. **Raw `.slice(11, 16)` in AppPage.tsx render code** — safe for local ISO but returns UTC time (e.g. "15:00") for any UTC ISO string from a real backend.
+
+### Changes
+
+**`apps/web/src/lib/demo.ts`**
+- Rewrote `getDemoEmployeeSummary()` to read live from `demoEmployees.find(e => e.id === "usr-employee-01")`. Builds local ISO checkInTime/checkOutTime from `demoEmployees` state, not from static `TODAY_RECORD`.
+- `INITIAL_DEMO_EMPLOYEES`: removed all check-in fields from Anisa (`usr-employee-02`) and Budi (`usr-employee-05`); set `todayStatus: "absent"`.
+- `ATTENDANCE.admin`, `.manager`, `.superadmin` cleared to `[]`.
+
+**`apps/web/src/pages/AppPage.tsx`**
+- HR Presensi (line ~2694): replaced `row.checkInTime.slice(11, 16)` with `formatAttendanceTime(row.checkInTime)`.
+- HR Laporan render and CSV export (lines ~4438, ~4444): same replacement.
+
+**`apps/web/src/test/api.test.ts`**
+- 13 new PHASE 10.17 tests: live `getDemoEmployeeSummary` before/after check-in, Anisa/Budi start as Belum check-in, admin overview starts at 0 checkedInToday/exceptionCount/recentActivity, after Fikri check-in HR report shows local ISO (no UTC offset), admin/superadmin dashboard returns empty attendance array.
+- 5 existing Phase 10.10/10.11 tests updated: `checkedInToday` 2→0, `lateToday` 1→0, `absentToday` 2→4, `exceptionCount` 1→0, `recentActivity` test rewritten to verify org-wide sync after Fikri check-in.
+
+### Result
+
+After Fikri checks in, all views show the same local check-in time: Employee Presensi/Riwayat, Manager Presensi Tim, HR Presensi, HR Laporan. No stale dummy data appears for Anisa, Budi, or in admin/manager/superadmin attendance arrays.
+
+### Test result
+367/367 passing, 0 failures.
+
+---
+
 ## Phase 10.15 — Final Demo Consistency QA (2026-05-19)
 
 **Goal:** Make approval state persist across re-fetches in the demo; final QA checklist across all 5 demo accounts.
