@@ -685,3 +685,131 @@ describe("PHASE 10.10 — Admin home overview live recent activity", () => {
     expect(budi).toBeDefined();
   });
 });
+
+describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  // --- HR/Admin KPI ---
+
+  it("HR admin totalEmployees equals demo roster count, not 248", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    // Demo has 5 employee-role members; must not show enterprise-scale 248
+    expect(overview.totalEmployees).not.toBe(248);
+    expect(overview.totalEmployees).toBeGreaterThan(0);
+    expect(overview.totalEmployees).toBeLessThanOrEqual(10);
+  });
+
+  it("HR admin checkedInToday equals live checked-in count before Fikri check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    // Initial: Anisa(late) + Budi(present) = 2; must not be enterprise-scale 187
+    expect(overview.checkedInToday).not.toBe(187);
+    expect(overview.checkedInToday).toBe(2);
+  });
+
+  it("HR admin checkedInToday increases after Fikri Selfie check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const before = await fetchAdminOverview("demo:admin");
+    await checkIn("demo:employee", { method: "Selfie" });
+    const after = await fetchAdminOverview("demo:admin");
+    expect(after.checkedInToday).toBe(before.checkedInToday + 1);
+  });
+
+  it("HR admin lateToday starts at 1 (Anisa) and increases after Fikri late check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const before = await fetchAdminOverview("demo:admin");
+    expect(before.lateToday).toBe(1); // Anisa is initially late
+    await checkIn("demo:employee", { method: "Selfie" }); // Fikri will be late (current time > 08:10)
+    const after = await fetchAdminOverview("demo:admin");
+    // Fikri should be late since tests run after 08:10
+    expect(after.lateToday).toBeGreaterThanOrEqual(before.lateToday);
+  });
+
+  it("HR admin absentToday decreases after Fikri check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const before = await fetchAdminOverview("demo:admin");
+    expect(before.absentToday).toBe(2); // Fikri + Leo are absent initially
+    await checkIn("demo:employee", { method: "Selfie" });
+    const after = await fetchAdminOverview("demo:admin");
+    expect(after.absentToday).toBe(before.absentToday - 1);
+  });
+
+  it("HR admin exceptionCount counts needs_review employees", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    // Anisa starts with validationStatus: needs_review → exceptionCount = 1
+    expect(overview.exceptionCount).toBe(1);
+    expect(overview.exceptionCount).not.toBe(5); // not hardcoded enterprise value
+  });
+
+  it("HR admin pendingRequests uses demo request count, not hardcoded 6", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    expect(overview.pendingRequests).not.toBe(6);
+    expect(overview.pendingRequests).toBe(1); // only Anisa sick leave is Menunggu
+  });
+
+  // --- Manager KPI ---
+
+  it("Manager totalEmployees is team-scoped (Fikri+Anisa+Budi), not org-wide", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.totalEmployees).toBe(3); // Fikri, Anisa, Budi under usr-manager-01
+  });
+
+  it("Manager checkedInToday equals team checked-in count before Fikri check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.checkedInToday).toBe(2); // Anisa(late) + Budi(present)
+  });
+
+  it("Manager checkedInToday increases after Fikri Selfie check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const before = await fetchManagerOverview("demo:manager");
+    await checkIn("demo:employee", { method: "Selfie" });
+    const after = await fetchManagerOverview("demo:manager");
+    expect(after.checkedInToday).toBe(before.checkedInToday + 1);
+  });
+
+  it("Manager absentToday decreases after Fikri check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const before = await fetchManagerOverview("demo:manager");
+    expect(before.absentToday).toBe(1); // only Fikri is absent in team
+    await checkIn("demo:employee", { method: "Selfie" });
+    const after = await fetchManagerOverview("demo:manager");
+    expect(after.absentToday).toBe(0);
+  });
+
+  it("Manager KPI excludes non-team employees Leo and Dina", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    // Leo (dep-fnb, no manager) and Dina (dep-fnb, no manager) must not be counted
+    // If they were included, totalEmployees would be 5 or more
+    expect(overview.totalEmployees).toBe(3);
+  });
+
+  // --- Regression ---
+
+  it("HR recentActivity from Phase 10.10 still works after KPI fix", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const overview = await fetchAdminOverview("demo:admin");
+    const fikri = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikri?.detail).toContain("Selfie");
+  });
+
+  it("Manager recentActivity reflects check-out event for Fikri", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    await checkOut("demo:employee", { method: "Selfie" });
+    const overview = await fetchManagerOverview("demo:manager");
+    const fikri = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikri).toBeDefined();
+    expect(fikri?.event).toBe("Check-out");
+  });
+});

@@ -231,65 +231,63 @@ export function getDemoRequests(token: string): LeaveRequestItem[] {
   return REQUESTS[role] ?? [];
 }
 
-// Derive admin recent activity from live demoEmployees so check-ins are reflected
-// immediately without requiring a data-layer reset.
-export function getDemoAdminOverview(): AdminOverview {
-  const checkedIn = demoEmployees.filter(
-    (e) => e.todayStatus === "present" || e.todayStatus === "late"
-  );
+function buildRecentActivity(members: EmployeeListItem[], idPrefix: string): AttendanceActivityItem[] {
+  return members
+    .filter((e) => e.todayStatus === "present" || e.todayStatus === "late")
+    .map((e) => {
+      const hasCheckedOut = Boolean(e.checkOutTime);
+      return {
+        id: `${idPrefix}-${e.id}`,
+        employeeName: e.fullName,
+        event: hasCheckedOut ? "Check-out" : "Check-in",
+        time: hasCheckedOut ? (e.checkOutTime ?? "--:--") : (e.checkInTime ?? "--:--"),
+        status: hasCheckedOut ? "Selesai" : (e.todayStatus === "late" ? "Terlambat" : "Tepat waktu"),
+        detail: `${e.checkInMethod ?? "Manual"} · ${e.locationName ?? "Kantor"}`
+      };
+    });
+}
 
-  const recentActivity: AttendanceActivityItem[] = checkedIn.map((e) => {
-    const hasCheckedOut = Boolean(e.checkOutTime);
-    return {
-      id: `act-admin-${e.id}`,
-      employeeName: e.fullName,
-      event: hasCheckedOut ? "Check-out" : "Check-in",
-      time: hasCheckedOut ? (e.checkOutTime ?? "--:--") : (e.checkInTime ?? "--:--"),
-      status: hasCheckedOut ? "Selesai" : (e.todayStatus === "late" ? "Terlambat" : "Tepat waktu"),
-      detail: `${e.checkInMethod ?? "Manual"} · ${e.locationName ?? "Kantor"}`
-    };
-  });
+// All KPI numbers derived from live demoEmployees (employee-role only) so
+// check-ins and check-outs are reflected immediately — no hardcoded enterprise values.
+export function getDemoAdminOverview(): AdminOverview {
+  const employees = demoEmployees.filter((e) => e.role === "employee");
+  const checkedIn = employees.filter((e) => e.todayStatus === "present" || e.todayStatus === "late");
+  const onTime = employees.filter((e) => e.todayStatus === "present");
+  const late = employees.filter((e) => e.todayStatus === "late");
+  const absent = employees.filter((e) => e.todayStatus === "absent");
+  const exceptions = employees.filter((e) => e.validationStatus === "needs_review");
 
   return {
-    totalEmployees: 248,
-    checkedInToday: 187,
-    onTimeToday: 182,
-    lateToday: 5,
-    pendingRequests: 6,
-    absentToday: 61,
-    exceptionCount: 5,
-    recentActivity
+    totalEmployees: employees.length,
+    checkedInToday: checkedIn.length,
+    onTimeToday: onTime.length,
+    lateToday: late.length,
+    pendingRequests: REQUESTS.admin.filter((r) => r.status === "Menunggu").length,
+    absentToday: absent.length,
+    exceptionCount: exceptions.length,
+    recentActivity: buildRecentActivity(employees, "act-admin")
   };
 }
 
-// Manager overview is derived from the demo employee list so that mutations
-// (e.g. check-in via the employee account) are reflected here.
+// Manager overview is team-scoped (managerId = usr-manager-01) so that mutations
+// via the employee account are reflected without extra data-layer work.
 export function getDemoManagerOverview(): AdminOverview {
   const managerId = "usr-manager-01";
-  const teamMembers = demoEmployees.filter((e) => e.managerId === managerId);
-  const checkedIn = teamMembers.filter((e) => e.todayStatus === "present" || e.todayStatus === "late");
-  const onTime = teamMembers.filter((e) => e.todayStatus === "present");
-  const late = teamMembers.filter((e) => e.todayStatus === "late");
-  const absent = teamMembers.filter((e) => e.todayStatus === "absent");
-
-  const recentActivity: AttendanceActivityItem[] = checkedIn.map((e) => ({
-    id: `act-mgr-${e.id}`,
-    employeeName: e.fullName,
-    event: "Check-in",
-    time: e.checkInTime ?? "--:--",
-    status: e.todayStatus === "late" ? "Terlambat" : "Tepat waktu",
-    detail: `${e.shiftName ?? "Shift"} · ${e.locationName ?? "Kantor"}`
-  }));
+  const team = demoEmployees.filter((e) => e.managerId === managerId);
+  const checkedIn = team.filter((e) => e.todayStatus === "present" || e.todayStatus === "late");
+  const onTime = team.filter((e) => e.todayStatus === "present");
+  const late = team.filter((e) => e.todayStatus === "late");
+  const absent = team.filter((e) => e.todayStatus === "absent");
 
   return {
-    totalEmployees: teamMembers.length,
+    totalEmployees: team.length,
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
     pendingRequests: REQUESTS.manager.filter((r) => r.status === "Menunggu").length,
     absentToday: absent.length,
     exceptionCount: 0,
-    recentActivity
+    recentActivity: buildRecentActivity(team, "act-mgr")
   };
 }
 
