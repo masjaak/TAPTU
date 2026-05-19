@@ -1,29 +1,46 @@
 # Taptu
 
-**Attendance Validation OS** for operational teams — not a full HRIS or payroll system.
+Taptu is an Attendance Validation OS for operational teams.
 
-Taptu proves a practical end-to-end attendance workflow: check-in validation, exception review, multi-step approvals, and HR-ready reporting — across four roles in one clean interface.
+It helps HR and managers validate attendance data before it becomes a final report, using time, location, device, QR/scanner, selfie proof, approval flow, and audit-ready reporting.
 
-> Payroll is handled only as **Payroll Input Readiness** (CSV export for downstream processing). Full payroll processing is not in scope.
+## What Taptu Solves
 
-## What problem it solves
+Raw attendance data can be hard to trust. Taptu helps teams separate valid attendance records from records that need review.
 
-- Clock-in can be faked — GPS, device, and selfie signals give HR real evidence to validate
-- Exception review is ad-hoc — Taptu provides a structured exception queue per role
-- A manager's approval should not be final — the two-step flow requires HR to finalize
-- HR Presensi, Manager Presensi Tim, and Employee Riwayat must agree — Taptu syncs them from one source
+- Attendance records often need evidence from location, device, time, QR, and selfie proof.
+- Exceptions should be reviewed through a structured queue, not scattered chats.
+- Manager approval should support HR review, not replace it.
+- Employee Riwayat, Manager Presensi Tim, and HR Presensi should agree from one source.
 
-## Core features
+## Core Features
 
-- **Multi-signal check-in** — GPS geofence, QR scan, Selfie, and Manual, with per-signal trust scoring
-- **Exception queue** — flagged records for geofence violations, device mismatches, and late arrivals
-- **Two-step approval flow** — Manager approve → HR finalize; manager action is not final
-- **Role-aware dashboards** — Employee, Manager, HR/Admin, Superadmin, and Scanner each see only their scope
-- **HR reporting** — attendance table with per-employee status, validation detail, and CSV export
-- **Scanner / Kiosk mode** — rotating 30-second QR token for gated entry points
-- **PWA + iOS** — installable on mobile; Capacitor wrapper available
+- Employee check-in and check-out
+- Location, time, device, QR/scanner, and selfie validation
+- Manager approval
+- HR final approval
+- Exception queue
+- HR attendance report
+- Audit trail
+- Scanner / kiosk mode
 
-## Approval flow
+## Product Boundary
+
+Taptu is not a full HRIS or payroll engine.
+
+Payroll is treated as **Payroll Input Readiness**: clean attendance summaries that can be exported or integrated with payroll systems. Full payroll processing, tax, BPJS, benefits, recruitment, performance appraisal, and training are not in scope.
+
+## Role Flow
+
+**Employee → Manager → HR/Admin**
+
+- Employee submits attendance and requests.
+- Manager reviews team attendance and requests.
+- HR/Admin finalizes review and reporting.
+- Scanner supports QR/kiosk attendance validation.
+- Superadmin handles organization-level boundaries.
+
+### Approval States
 
 ```
 pending_manager → (manager approve) → pending_hr → (HR approve) → approved
@@ -31,37 +48,41 @@ pending_manager → (reject)          → rejected
 pending_hr      → (HR reject)       → rejected
 ```
 
-Manager approval forwards to HR — it is not the final decision.
+Manager approval forwards to HR. It is not the final decision.
 
-## Demo accounts
+## Demo Accounts
 
-All accounts use password `Taptu123!`
+| Role | Email | Password |
+|---|---|---|
+| Employee | employee@taptu.app | Taptu123! |
+| Manager | manager@taptu.app | Taptu123! |
+| HR/Admin | admin@taptu.app | Taptu123! |
+| Superadmin | superadmin@taptu.app | Taptu123! |
+| Scanner | scanner@taptu.app | Taptu123! |
 
-| Role | Email |
-|---|---|
-| Employee | employee@taptu.app |
-| Manager | manager@taptu.app |
-| HR/Admin | admin@taptu.app |
-| Superadmin | superadmin@taptu.app |
-| Scanner | scanner@taptu.app |
+These credentials are for demo/reviewer access only.
 
-**Demo universe:** Fikri Maulana (employee) → Raka Saputra (manager) → Nadia Putri (HR/Admin).
-Manager sees Fikri only. HR/Admin sees the full organisation.
+## Demo Universe
+
+- **Fikri Maulana** is the demo employee.
+- **Raka Saputra** is the demo manager (sees Fikri only).
+- **Nadia Putri** is the demo HR/Admin (sees organization-wide data).
+- Demo data is intentionally clean and connected — not filled with unrelated fake employee rows.
 
 > Demo state is in-memory on Vercel serverless. Data resets on cold start. For stable cross-device demo, configure Supabase storage (see Environment).
 
-## Tech stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + Vite + Tailwind CSS + PWA |
-| Mobile | Capacitor (iOS) |
+| Mobile | Capacitor iOS wrapper |
 | API | Node.js + Express |
-| Storage | Local JSON (demo) or Supabase (production) |
-| Shared types | `@taptu/shared` TypeScript package |
-| Tests | Vitest — 387 passing |
+| Storage | Local demo JSON or Supabase |
+| Shared types | TypeScript shared package |
+| Testing | Vitest |
 
-## Local setup
+## Local Setup
 
 ```bash
 npm install
@@ -97,7 +118,7 @@ npx vitest run
 npm run build
 ```
 
-## Known limitations
+## Known Limitations
 
 - Vercel serverless in-memory demo resets on cold start — not reliable for cross-device use
 - QR auto-detection not implemented; current flow uses manual confirmation
