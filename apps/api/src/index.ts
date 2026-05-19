@@ -151,22 +151,6 @@ const users: Array<AuthUser & { password: string }> = [
     managerId: "usr-manager-01"
   },
   {
-    id: "usr-employee-02",
-    fullName: "Anisa Rahma",
-    email: "anisa@taptu.app",
-    password: "Taptu123!",
-    organizationName: "Taptu Demo Company",
-    role: "employee"
-  },
-  {
-    id: "usr-employee-03",
-    fullName: "Leo Pratama",
-    email: "leo@taptu.app",
-    password: "Taptu123!",
-    organizationName: "Taptu Demo Company",
-    role: "employee"
-  },
-  {
     id: "usr-scanner-01",
     fullName: "Front Gate Scanner",
     email: "scanner@taptu.app",
@@ -269,13 +253,10 @@ const attendanceFeed: Record<UserRole, AttendanceTimelineItem[]> = {
 
 const requestFeed: Record<UserRole, LeaveRequestItem[]> = {
   superadmin: [
-    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final." },
-    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." }
+    { id: "req-01", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." }
   ],
   admin: [
-    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Butuh approval hari ini sebelum 12.00." },
-    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." },
-    { id: "req-03", title: "Tukar shift · Leo Pratama", status: "Menunggu", detail: "Menunggu manager operasional." }
+    { id: "req-01", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." }
   ],
   manager: [
     { id: "req-01", title: "Izin tim lapangan", status: "Menunggu", detail: "Butuh keputusan supervisor sebelum jam 12.00." }
@@ -429,6 +410,11 @@ async function authenticateSupabase(authHeader?: string): Promise<AuthUser | nul
 }
 
 async function requireUserAsync(req: express.Request, res: express.Response): Promise<AuthUser | null> {
+  // Local JWT first — covers demo accounts signed by this server in all storage modes.
+  const local = authenticate(req.header("authorization"));
+  if (local) return local;
+
+  // Fall back to Supabase JWT for real user accounts (non-demo).
   if (useSupabase && sb) {
     const user = await authenticateSupabase(req.header("authorization"));
     if (!user) {
@@ -438,14 +424,8 @@ async function requireUserAsync(req: express.Request, res: express.Response): Pr
     return user;
   }
 
-  const user = authenticate(req.header("authorization"));
-
-  if (!user) {
-    res.status(401).json({ message: "Unauthorized" });
-    return null;
-  }
-
-  return user;
+  res.status(401).json({ message: "Unauthorized" });
+  return null;
 }
 
 // Sync version kept for backward compat. Delegates to local-only auth.
@@ -719,6 +699,17 @@ export function resetLocalAttendanceStoreForTests() {
   }
 }
 
+// In Supabase mode, reload the store on each request so updates from other serverless
+// instances (e.g. a different Vercel lambda) are visible without a cold start.
+if (useSupabase) {
+  app.use((_req, _res, next) => {
+    storage.load().then((fresh) => {
+      store = fresh;
+      next();
+    }).catch(() => next());
+  });
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -737,6 +728,12 @@ app.post("/api/auth/login", async (req, res) => {
     });
   }
 
+  // Demo accounts always take priority — they must work in all storage modes.
+  const found = findLocalDemoUserByCredentials(parsed.data.email, parsed.data.password);
+  if (found) {
+    return res.json({ token: signUser(found), user: found } satisfies LoginResponse);
+  }
+
   if (useSupabase && sb) {
     try {
       const result = await supabaseSignIn(sb, parsed.data.email, parsed.data.password);
@@ -747,20 +744,9 @@ app.post("/api/auth/login", async (req, res) => {
     }
   }
 
-  const found = findLocalDemoUserByCredentials(parsed.data.email, parsed.data.password);
-
-  if (!found) {
-    return res.status(401).json({
-      message: "Akun tidak ditemukan atau password salah."
-    });
-  }
-
-  const response: LoginResponse = {
-    token: signUser(found),
-    user: found
-  };
-
-  return res.json(response);
+  return res.status(401).json({
+    message: "Akun tidak ditemukan atau password salah."
+  });
 });
 
 app.post("/api/auth/register", async (req, res) => {

@@ -29,4 +29,12 @@ describe("demo auth mapping", () => {
   it("rejects invalid demo credentials", () => {
     expect(findLocalDemoUserByCredentials("employee@taptu.app", "wrong")).toBeNull();
   });
+
+  it("PHASE 11.2 — Anisa Rahma is not a demo account (RED until users array cleaned)", () => {
+    expect(findLocalDemoUserByCredentials("anisa@taptu.app", "Taptu123!")).toBeNull();
+  });
+
+  it("PHASE 11.2 — Leo Pratama is not a demo account (RED until users array cleaned)", () => {
+    expect(findLocalDemoUserByCredentials("leo@taptu.app", "Taptu123!")).toBeNull();
+  });
 });

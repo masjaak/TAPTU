@@ -118,6 +118,23 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-side only. Never expose it in the web app.
 
+### Vercel Deployment
+
+The API is deployed as a Vercel serverless function (`api/index.ts`). All `/api/*` requests are routed to it via `vercel.json`.
+
+**Vercel environment variables — server-side only (never set as VITE_ prefixed vars):**
+
+```
+TAPTU_STORAGE_MODE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+JWT_SECRET=<random-secret>
+```
+
+**Do NOT set `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` on Vercel.** When these are absent, the frontend routes login through the Express API, which returns a signed JWT. All subsequent API calls use that JWT — the demo `isDemoToken()` short-circuit is skipped, and requests go through the real API with Supabase-backed persistence.
+
+Apply the SQL migrations from `supabase/migrations/` before deploying.
+
 Apply the SQL migrations from `supabase/migrations/` using the Supabase SQL editor or Supabase CLI.
 
 ## Testing
