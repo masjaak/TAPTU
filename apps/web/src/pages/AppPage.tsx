@@ -2691,7 +2691,7 @@ export function AppPage() {
               date: row.date,
               checkin: (
                 <div>
-                  <p className="tabular-nums font-semibold text-[#111827]">{row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--"}</p>
+                  <p className="tabular-nums font-semibold text-[#111827]">{formatAttendanceTime(row.checkInTime)}</p>
                   {row.checkInMethod && row.checkInTime ? (
                     <p className="mt-0.5 text-xs text-[#8099c8]">{row.checkInMethod}</p>
                   ) : null}
@@ -4435,13 +4435,13 @@ export function AppPage() {
                 shift: row.shiftName,
                 checkin: (
                   <div>
-                    <p className="tabular-nums font-semibold text-[#111827]">{row.checkInTime ? row.checkInTime.slice(11, 16) : "--:--"}</p>
+                    <p className="tabular-nums font-semibold text-[#111827]">{formatAttendanceTime(row.checkInTime)}</p>
                     {row.checkInMethod && row.checkInTime ? (
                       <p className="mt-0.5 text-xs text-[#8099c8]">{row.checkInMethod}</p>
                     ) : null}
                   </div>
                 ),
-                checkout: row.checkOutTime ? row.checkOutTime.slice(11, 16) : "--:--",
+                checkout: formatAttendanceTime(row.checkOutTime),
                 status: (
                   <StatusBadge tone={row.status === "Belum check-in" ? "neutral" : row.status === "Terlambat" ? "warning" : row.status === "Izin" ? "info" : "success"}>
                     {row.status}

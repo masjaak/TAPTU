@@ -133,21 +133,9 @@ const STATS: Record<UserRole, DashboardStat[]> = {
 };
 
 const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
-  superadmin: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08:24", method: "GPS" },
-    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07:58", method: "Selfie" }
-  ],
-  admin: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08:24", method: "GPS" },
-    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07:58", method: "Selfie" }
-  ],
-  manager: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08:03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08:24", method: "GPS" },
-    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07:58", method: "Selfie" }
-  ],
+  superadmin: [],
+  admin: [],
+  manager: [],
   employee: [],
   scanner: [
     { id: "a-01", day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },
@@ -360,14 +348,33 @@ export function getDemoManagerOverview(): AdminOverview {
 }
 
 export function getDemoEmployeeSummary(): EmployeeSummary {
+  const fikri = demoEmployees.find((e) => e.id === "usr-employee-01");
+  const today = new Date().toISOString().slice(0, 10);
+
+  let currentAttendanceState: "idle" | "checked_in" | "checked_out" = "idle";
+  let checkInTime: string | undefined;
+  let checkOutTime: string | undefined;
+  let status: AttendanceRecord["status"] = "Belum check-in";
+
+  if (fikri?.checkOutTime) {
+    currentAttendanceState = "checked_out";
+    checkInTime = fikri.checkInTime ? `${today}T${fikri.checkInTime}:00` : undefined;
+    checkOutTime = `${today}T${fikri.checkOutTime}:00`;
+    status = "Selesai";
+  } else if (fikri?.checkInTime) {
+    currentAttendanceState = "checked_in";
+    checkInTime = `${today}T${fikri.checkInTime}:00`;
+    status = fikri.todayStatus === "late" ? "Terlambat" : "Tepat waktu";
+  }
+
   return {
     totalDays: 0,
     onTimeDays: 0,
     lateDays: 0,
     pendingRequests: 0,
-    currentAttendanceState: "idle",
+    currentAttendanceState,
     assignedShift: SHIFT,
-    todayRecord: TODAY_RECORD
+    todayRecord: { ...TODAY_RECORD, checkInTime, checkOutTime, status }
   };
 }
 
@@ -406,10 +413,10 @@ const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
   { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "late", checkInTime: "08:24", checkInMethod: "GPS", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
   { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
-  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "present", checkInTime: "07:58", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:00", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
 ];
 

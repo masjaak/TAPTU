@@ -677,13 +677,18 @@ describe("PHASE 10.10 — Admin home overview live recent activity", () => {
 
   it("admin overview recentActivity is org-wide, not manager-scoped", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    // Anisa (dep-ops, manager-01) and Budi (dep-ops, manager-01) start with seeded attendance
-    const overview = await fetchAdminOverview("demo:admin");
-    // Both Anisa and Budi are in initial seeded state (late/present)
-    const anisa = overview.recentActivity.find((a) => a.employeeName === "Anisa Rahma");
-    const budi = overview.recentActivity.find((a) => a.employeeName === "Budi Santoso");
-    expect(anisa).toBeDefined();
-    expect(budi).toBeDefined();
+    // After Fikri checks in, admin sees Fikri in activity (org-wide)
+    // while manager only sees team members
+    await checkIn("demo:employee", { method: "Selfie" });
+    const adminOverview = await fetchAdminOverview("demo:admin");
+    const managerOverview = await fetchManagerOverview("demo:manager");
+    // Both admin and manager should see Fikri's activity
+    const fikriInAdmin = adminOverview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    const fikriInManager = managerOverview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikriInAdmin).toBeDefined();
+    expect(fikriInManager).toBeDefined();
+    // Admin total employees is larger than manager's (org-wide vs team)
+    expect(adminOverview.totalEmployees).toBeGreaterThan(managerOverview.totalEmployees);
   });
 });
 
@@ -708,9 +713,9 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
   it("HR admin checkedInToday equals live checked-in count before Fikri check-in", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchAdminOverview("demo:admin");
-    // Initial: Anisa(late) + Budi(present) = 2; must not be enterprise-scale 187
+    // Clean initial state: no stale seeded attendance, must not be enterprise-scale 187
     expect(overview.checkedInToday).not.toBe(187);
-    expect(overview.checkedInToday).toBe(2);
+    expect(overview.checkedInToday).toBe(0);
   });
 
   it("HR admin checkedInToday increases after Fikri Selfie check-in", async () => {
@@ -721,10 +726,10 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(after.checkedInToday).toBe(before.checkedInToday + 1);
   });
 
-  it("HR admin lateToday starts at 1 (Anisa) and increases after Fikri late check-in", async () => {
+  it("HR admin lateToday starts at 0 and increases after Fikri late check-in", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchAdminOverview("demo:admin");
-    expect(before.lateToday).toBe(1); // Anisa is initially late
+    expect(before.lateToday).toBe(0); // clean initial state, no stale late employees
     await checkIn("demo:employee", { method: "Selfie" }); // Fikri will be late (current time > 08:10)
     const after = await fetchAdminOverview("demo:admin");
     // Fikri should be late since tests run after 08:10
@@ -734,17 +739,18 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
   it("HR admin absentToday decreases after Fikri check-in", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchAdminOverview("demo:admin");
-    expect(before.absentToday).toBe(2); // Fikri + Leo are absent initially
+    // Clean initial state: Fikri + Anisa + Leo + Budi are absent (Dina is on leave)
+    expect(before.absentToday).toBe(4);
     await checkIn("demo:employee", { method: "Selfie" });
     const after = await fetchAdminOverview("demo:admin");
     expect(after.absentToday).toBe(before.absentToday - 1);
   });
 
-  it("HR admin exceptionCount counts needs_review employees", async () => {
+  it("HR admin exceptionCount starts at 0 (no stale needs_review employees)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchAdminOverview("demo:admin");
-    // Anisa starts with validationStatus: needs_review → exceptionCount = 1
-    expect(overview.exceptionCount).toBe(1);
+    // Clean initial state: Anisa's needs_review was stale dummy data, now removed
+    expect(overview.exceptionCount).toBe(0);
     expect(overview.exceptionCount).not.toBe(5); // not hardcoded enterprise value
   });
 
@@ -1121,5 +1127,139 @@ describe("PHASE 10.15 — Final demo consistency QA", () => {
     const overview = await fetchManagerOverview("demo:manager");
     expect(overview.totalEmployees).toBe(1);
     expect(overview.checkedInToday).toBe(0); // reset clears check-in
+  });
+});
+
+describe("PHASE 10.17 — Live check-in time sync + dummy data cleanup", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  // ── getDemoEmployeeSummary() must reflect live check-in state ────────────
+
+  it("fetchEmployeeSummary before check-in returns idle state with no checkInTime", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const summary = await fetchEmployeeSummary("demo:employee");
+    expect(summary.currentAttendanceState).toBe("idle");
+    expect(summary.todayRecord.checkInTime).toBeUndefined();
+    expect(summary.todayRecord.checkOutTime).toBeUndefined();
+  });
+
+  it("fetchEmployeeSummary after checkIn returns checked_in state with local ISO checkInTime", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const summary = await fetchEmployeeSummary("demo:employee");
+    // RED: getDemoEmployeeSummary is static — still returns idle
+    expect(summary.currentAttendanceState).toBe("checked_in");
+    expect(summary.todayRecord.checkInTime).toBeDefined();
+    // Local ISO: contains "T" with no Z suffix
+    expect(summary.todayRecord.checkInTime).toMatch(/T\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it("fetchEmployeeSummary after checkIn: formatAttendanceTime on checkInTime matches stored HH:mm", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const summary = await fetchEmployeeSummary("demo:employee");
+    const checkInTime = summary.todayRecord.checkInTime;
+    // RED: currently undefined (static summary), so this assertion will fail
+    expect(checkInTime).toBeDefined();
+    // The stored HH:mm part (slice 11-16) must equal the ISO's HH:mm (no UTC offset applied)
+    const storedHHmm = checkInTime!.slice(11, 16);
+    // formatAttendanceTime should return the same — verifies no UTC shift applied
+    const { formatAttendanceTime } = await import("../lib/attendanceTime");
+    expect(formatAttendanceTime(checkInTime)).toBe(storedHHmm);
+  });
+
+  it("fetchEmployeeSummary after checkOut returns checked_out state with checkOutTime", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Manual" });
+    await checkOut("demo:employee", { method: "Manual" });
+    const summary = await fetchEmployeeSummary("demo:employee");
+    // RED: static summary always returns idle
+    expect(summary.currentAttendanceState).toBe("checked_out");
+    expect(summary.todayRecord.checkInTime).toBeDefined();
+    expect(summary.todayRecord.checkOutTime).toBeDefined();
+  });
+
+  it("fetchEmployeeSummary todayRecord.status is Tepat waktu or Terlambat after check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const summary = await fetchEmployeeSummary("demo:employee");
+    // RED: static status is "Belum check-in"
+    expect(["Tepat waktu", "Terlambat"]).toContain(summary.todayRecord.status);
+  });
+
+  // ── Stale dummy attendance must be removed from Anisa and Budi ───────────
+
+  it("HR report rows: Anisa starts as Belum check-in with no checkInTime (no stale dummy)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const rows = await fetchReportRows("demo:admin");
+    const anisa = rows.find((r) => r.employeeName === "Anisa Rahma");
+    expect(anisa).toBeDefined();
+    // RED: currently Anisa has checkInTime "08:24" and status "Terlambat"
+    expect(anisa?.status).toBe("Belum check-in");
+    expect(anisa?.checkInTime).toBeUndefined();
+  });
+
+  it("HR report rows: Budi starts as Belum check-in with no checkInTime (no stale dummy)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const rows = await fetchReportRows("demo:admin");
+    const budi = rows.find((r) => r.employeeName === "Budi Santoso");
+    expect(budi).toBeDefined();
+    // RED: currently Budi has checkInTime "07:58" and status "Tepat waktu"
+    expect(budi?.status).toBe("Belum check-in");
+    expect(budi?.checkInTime).toBeUndefined();
+  });
+
+  it("HR admin overview: checkedInToday is 0 before any check-in (no stale seeded attendance)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    // RED: currently 2 due to Anisa(late) + Budi(present) seeded values
+    expect(overview.checkedInToday).toBe(0);
+  });
+
+  it("HR admin overview: exceptionCount is 0 before any check-in (Anisa needs_review removed)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    // RED: currently 1 because Anisa has validationStatus: needs_review
+    expect(overview.exceptionCount).toBe(0);
+  });
+
+  it("HR admin overview recentActivity is empty before any check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    // RED: currently includes Anisa and Budi from seeded state
+    expect(overview.recentActivity).toHaveLength(0);
+  });
+
+  it("after Fikri check-in: HR report shows Fikri with local ISO checkInTime (no UTC offset)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "Selfie" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeName === "Fikri Maulana");
+    expect(fikri).toBeDefined();
+    expect(fikri?.checkInTime).toBeDefined();
+    // Must be local ISO (no Z suffix)
+    expect(fikri?.checkInTime).not.toMatch(/Z$/);
+    // HH:mm part extracted via slice == what formatAttendanceTime gives (no UTC shift)
+    const { formatAttendanceTime } = await import("../lib/attendanceTime");
+    const sliced = fikri!.checkInTime!.slice(11, 16);
+    expect(formatAttendanceTime(fikri!.checkInTime)).toBe(sliced);
+  });
+
+  it("getDashboard for demo:admin returns empty attendance array (no stale dummy items)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const dashboard = await getDashboard("demo:admin");
+    // RED: currently returns ATTENDANCE.admin = [08:03, 08:24, 07:58] stale items
+    expect(dashboard.attendance).toHaveLength(0);
+  });
+
+  it("getDashboard for demo:superadmin returns empty attendance array (no stale dummy items)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const dashboard = await getDashboard("demo:superadmin");
+    // RED: currently returns ATTENDANCE.superadmin = [08:03, 08:24, 07:58] stale items
+    expect(dashboard.attendance).toHaveLength(0);
   });
 });
