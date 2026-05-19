@@ -677,18 +677,18 @@ describe("PHASE 10.10 — Admin home overview live recent activity", () => {
 
   it("admin overview recentActivity is org-wide, not manager-scoped", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    // After Fikri checks in, admin sees Fikri in activity (org-wide)
-    // while manager only sees team members
+    // After Fikri checks in, both admin (org-wide) and manager (team) see Fikri's activity
     await checkIn("demo:employee", { method: "Selfie" });
     const adminOverview = await fetchAdminOverview("demo:admin");
     const managerOverview = await fetchManagerOverview("demo:manager");
-    // Both admin and manager should see Fikri's activity
+    // Both admin and manager should see Fikri's activity (clean demo: Fikri is the only employee)
     const fikriInAdmin = adminOverview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
     const fikriInManager = managerOverview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
     expect(fikriInAdmin).toBeDefined();
     expect(fikriInManager).toBeDefined();
-    // Admin total employees is larger than manager's (org-wide vs team)
-    expect(adminOverview.totalEmployees).toBeGreaterThan(managerOverview.totalEmployees);
+    // Clean demo: org = {Fikri}; team = {Fikri}; both have totalEmployees === 1
+    expect(adminOverview.totalEmployees).toBe(1);
+    expect(managerOverview.totalEmployees).toBe(1);
   });
 });
 
@@ -704,7 +704,7 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
   it("HR admin totalEmployees equals demo roster count, not 248", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchAdminOverview("demo:admin");
-    // Demo has 5 employee-role members; must not show enterprise-scale 248
+    // Demo has 1 employee-role member (Fikri only after 10.18 cleanup); must not show enterprise-scale 248
     expect(overview.totalEmployees).not.toBe(248);
     expect(overview.totalEmployees).toBeGreaterThan(0);
     expect(overview.totalEmployees).toBeLessThanOrEqual(10);
@@ -739,8 +739,8 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
   it("HR admin absentToday decreases after Fikri check-in", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchAdminOverview("demo:admin");
-    // Clean initial state: Fikri + Anisa + Leo + Budi are absent (Dina is on leave)
-    expect(before.absentToday).toBe(4);
+    // Clean demo universe (10.18): only Fikri as employee, starts absent
+    expect(before.absentToday).toBe(1);
     await checkIn("demo:employee", { method: "Selfie" });
     const after = await fetchAdminOverview("demo:admin");
     expect(after.absentToday).toBe(before.absentToday - 1);
@@ -968,15 +968,15 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
     }
   });
 
-  it("fetchRequests for admin returns org-wide requests including Fikri and Anisa", async () => {
+  it("fetchRequests for demo:admin returns Fikri requests (clean demo — no Anisa)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const result = await fetchRequests("demo:admin", true);
     const names = result.map((r) => r.requester ?? r.title);
-    // Admin sees both Fikri and Anisa requests
+    // Admin sees only connected demo requests (Fikri); Anisa removed from demo universe
     const hasFikri = names.some((n) => n.includes("Fikri"));
     const hasAnisa = names.some((n) => n.includes("Anisa"));
     expect(hasFikri).toBe(true);
-    expect(hasAnisa).toBe(true);
+    expect(hasAnisa).toBe(false);
   });
 
   it("approveRequest by manager sets workflowStatus to pending_hr and statusLabel to Menunggu HR", async () => {
@@ -1193,24 +1193,18 @@ describe("PHASE 10.17 — Live check-in time sync + dummy data cleanup", () => {
 
   // ── Stale dummy attendance must be removed from Anisa and Budi ───────────
 
-  it("HR report rows: Anisa starts as Belum check-in with no checkInTime (no stale dummy)", async () => {
+  it("HR report rows: Anisa Rahma does not appear (removed from demo universe in 10.18)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const rows = await fetchReportRows("demo:admin");
     const anisa = rows.find((r) => r.employeeName === "Anisa Rahma");
-    expect(anisa).toBeDefined();
-    // RED: currently Anisa has checkInTime "08:24" and status "Terlambat"
-    expect(anisa?.status).toBe("Belum check-in");
-    expect(anisa?.checkInTime).toBeUndefined();
+    expect(anisa).toBeUndefined();
   });
 
-  it("HR report rows: Budi starts as Belum check-in with no checkInTime (no stale dummy)", async () => {
+  it("HR report rows: Budi Santoso does not appear (removed from demo universe in 10.18)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const rows = await fetchReportRows("demo:admin");
     const budi = rows.find((r) => r.employeeName === "Budi Santoso");
-    expect(budi).toBeDefined();
-    // RED: currently Budi has checkInTime "07:58" and status "Tepat waktu"
-    expect(budi?.status).toBe("Belum check-in");
-    expect(budi?.checkInTime).toBeUndefined();
+    expect(budi).toBeUndefined();
   });
 
   it("HR admin overview: checkedInToday is 0 before any check-in (no stale seeded attendance)", async () => {
@@ -1261,5 +1255,176 @@ describe("PHASE 10.17 — Live check-in time sync + dummy data cleanup", () => {
     const dashboard = await getDashboard("demo:superadmin");
     // RED: currently returns ATTENDANCE.superadmin = [08:03, 08:24, 07:58] stale items
     expect(dashboard.attendance).toHaveLength(0);
+  });
+});
+
+describe("PHASE 10.18 — Clean demo universe: roster, departments, exceptions, requests, scanner, notifications", () => {
+  beforeEach(() => {
+    resetDemoAttendanceState();
+  });
+
+  // --- Roster ---
+  it("demo employee list does not include Anisa, Leo, Dina, or Budi", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const list = await fetchEmployeeList("demo:admin");
+    const names = list.map((e) => e.fullName);
+    expect(names).not.toContain("Anisa Rahma");
+    expect(names).not.toContain("Leo Pratama");
+    expect(names).not.toContain("Dina Fitriani");
+    expect(names).not.toContain("Budi Santoso");
+  });
+
+  it("HR report rows do not include Anisa, Leo, Dina, or Budi", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const rows = await fetchReportRows("demo:admin");
+    const names = rows.map((r) => r.employeeName);
+    expect(names).not.toContain("Anisa Rahma");
+    expect(names).not.toContain("Leo Pratama");
+    expect(names).not.toContain("Dina Fitriani");
+    expect(names).not.toContain("Budi Santoso");
+  });
+
+  it("HR report rows contain only Fikri Maulana", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const rows = await fetchReportRows("demo:admin");
+    expect(rows.length).toBe(1);
+    expect(rows[0].employeeName).toBe("Fikri Maulana");
+  });
+
+  it("getDemoAdminOverview totalEmployees is 1 (only Fikri as employee role)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    expect(overview.totalEmployees).toBe(1);
+  });
+
+  // --- Departments ---
+  it("fetchDepartments for demo:admin returns only Operasional (no F&B Service)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const depts = await fetchDepartments("demo:admin");
+    const names = depts.map((d) => d.name);
+    expect(names).not.toContain("F&B Service");
+    expect(names).toContain("Operasional");
+  });
+
+  it("Operasional department memberCount is 1 (Fikri only)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const depts = await fetchDepartments("demo:admin");
+    const ops = depts.find((d) => d.name === "Operasional");
+    expect(ops?.memberCount).toBe(1);
+  });
+
+  // --- Exceptions ---
+  it("fetchManagerExceptionQueue returns empty array (no Anisa exception)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const queue = await fetchManagerExceptionQueue("demo:manager");
+    expect(queue).toHaveLength(0);
+  });
+
+  // --- Requests ---
+  it("fetchRequests for demo:admin returns only Fikri requests (no Anisa)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchRequests("demo:admin", true);
+    const names = result.map((r) => r.requester ?? r.title);
+    expect(names.some((n) => n.includes("Anisa"))).toBe(false);
+    expect(names.some((n) => n.includes("Fikri"))).toBe(true);
+  });
+
+  it("fetchRequests for demo:superadmin returns only Fikri requests (no Anisa)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchRequests("demo:superadmin", true);
+    const names = result.map((r) => r.requester ?? r.title);
+    expect(names.some((n) => n.includes("Anisa"))).toBe(false);
+  });
+
+  it("getDemoAdminOverview pendingRequests is live from demoFikriRequests (1 initially)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchAdminOverview("demo:admin");
+    expect(overview.pendingRequests).toBe(1);
+  });
+
+  it("getDemoAdminOverview pendingRequests becomes 0 after HR approves Fikri request", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await approveRequest("demo:manager", "req-fikri-01", "Disetujui");
+    await approveRequest("demo:admin", "req-fikri-01", "Disetujui");
+    const overview = await fetchAdminOverview("demo:admin");
+    expect(overview.pendingRequests).toBe(0);
+  });
+
+  // --- Scanner ---
+  it("getDemoScannerState recentScans does not include Leo Pratama", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { fetchScannerState } = await import("../lib/api");
+    const state = await fetchScannerState("demo:scanner");
+    const names = (state.recentScans ?? []).map((s: { employeeName?: string }) => s.employeeName ?? "");
+    expect(names).not.toContain("Leo Pratama");
+  });
+
+  // --- Notifications ---
+  it("fetchNotifications for demo:employee returns empty before any event", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const notifs = await fetchNotifications("demo:employee");
+    expect(notifs).toHaveLength(0);
+  });
+
+  it("fetchNotifications for demo:admin returns empty before any event", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const notifs = await fetchNotifications("demo:admin");
+    expect(notifs).toHaveLength(0);
+  });
+
+  it("after Fikri check-in: demo:employee receives a check-in notification", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const notifs = await fetchNotifications("demo:employee");
+    expect(notifs.length).toBeGreaterThan(0);
+    const checkInNotif = notifs.find((n) => n.type === "attendance_checked_in");
+    expect(checkInNotif).toBeDefined();
+    expect(checkInNotif?.title).toBeTruthy();
+  });
+
+  it("after Fikri check-in: demo:admin receives a check-in notification", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const notifs = await fetchNotifications("demo:admin");
+    expect(notifs.length).toBeGreaterThan(0);
+    const checkInNotif = notifs.find((n) => n.type === "attendance_checked_in");
+    expect(checkInNotif).toBeDefined();
+  });
+
+  it("after Fikri check-in: demo:manager receives a check-in notification", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const notifs = await fetchNotifications("demo:manager");
+    expect(notifs.length).toBeGreaterThan(0);
+    const checkInNotif = notifs.find((n) => n.type === "attendance_checked_in");
+    expect(checkInNotif).toBeDefined();
+  });
+
+  it("after Fikri check-out: demo:employee receives a check-out notification", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    await checkOut("demo:employee", { method: "QR" });
+    const notifs = await fetchNotifications("demo:employee");
+    const checkOutNotif = notifs.find((n) => n.type === "attendance_checked_out");
+    expect(checkOutNotif).toBeDefined();
+  });
+
+  it("after HR approves Fikri request: demo:employee receives approved notification", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await approveRequest("demo:manager", "req-fikri-01", "Disetujui");
+    await approveRequest("demo:admin", "req-fikri-01", "Disetujui");
+    const notifs = await fetchNotifications("demo:employee");
+    const approvedNotif = notifs.find((n) => n.type === "request_approved");
+    expect(approvedNotif).toBeDefined();
+  });
+
+  it("resetDemoAttendanceState clears all demo notifications", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const before = await fetchNotifications("demo:employee");
+    expect(before.length).toBeGreaterThan(0);
+    resetDemoAttendanceState();
+    const after = await fetchNotifications("demo:employee");
+    expect(after).toHaveLength(0);
   });
 });

@@ -33,6 +33,7 @@ import {
   getDemoManagerOverview,
   getDemoRequests,
   getDemoManagerRequests,
+  getDemoNotifications,
   approveDemoRequest,
   getDemoAuditLogs,
   getDemoReportRows,
@@ -271,7 +272,7 @@ export async function fetchRequestDetail(token: string, id: string) {
 }
 
 export async function fetchNotifications(token: string) {
-  if (isDemoToken(token)) return Promise.resolve([]);
+  if (isDemoToken(token)) return Promise.resolve(getDemoNotifications(token));
   return requestJson<import("@taptu/shared").NotificationItem[]>("/notifications", {}, token);
 }
 

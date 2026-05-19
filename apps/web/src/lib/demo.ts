@@ -1,5 +1,6 @@
 import type {
   AdminOverview,
+  ApprovalWorkflowStatus,
   AttendanceActivityItem,
   AttendanceExceptionItem,
   AttendanceRecord,
@@ -14,6 +15,8 @@ import type {
   EmployeeSummary,
   LeaveRequestItem,
   LoginResponse,
+  NotificationItem,
+  NotificationType,
   ScannerTokenPayload,
   ShiftInfo,
   ShiftRecord,
@@ -54,28 +57,9 @@ const TODAY_RECORD: AttendanceRecord = {
   updatedAt: "2026-05-02T08:03:00.000Z"
 };
 
-const EXCEPTIONS: AttendanceExceptionItem[] = [
-  {
-    id: "exc-01",
-    attendanceRecordId: "att-demo-02",
-    employeeId: "usr-employee-02",
-    employeeName: "Anisa Rahma",
-    exceptionType: "Outside radius",
-    reason: "Di luar radius lokasi kerja (603 m).",
-    status: "Need Review",
-    createdAt: "2026-05-02T08:24:00.000Z"
-  },
-  {
-    id: "exc-02",
-    attendanceRecordId: "att-demo-02",
-    employeeId: "usr-employee-02",
-    employeeName: "Anisa Rahma",
-    exceptionType: "Different device",
-    reason: "Perangkat berbeda dari riwayat sebelumnya.",
-    status: "Need Review",
-    createdAt: "2026-05-02T08:24:00.000Z"
-  }
-];
+// No exceptions seeded — clean demo universe shows empty exception queue.
+// Real exceptions are generated from live attendance events only.
+const EXCEPTIONS: AttendanceExceptionItem[] = [];
 
 const AUDIT_LOGS: AuditLogItem[] = [
   {
@@ -83,18 +67,9 @@ const AUDIT_LOGS: AuditLogItem[] = [
     action: "scanner_token_invalid_attempt",
     actorName: "System",
     actorRole: "scanner",
-    targetId: "scan-02",
+    targetId: "scan-01",
     detail: "Scan gagal karena token sudah expired.",
     createdAt: "2026-05-02T08:09:00.000Z"
-  },
-  {
-    id: "audit-02",
-    action: "device_mismatch_exception",
-    actorName: "System",
-    actorRole: "employee",
-    targetId: "att-demo-02",
-    detail: "Perangkat berbeda dari riwayat sebelumnya.",
-    createdAt: "2026-05-02T08:24:00.000Z"
   }
 ];
 
@@ -138,9 +113,7 @@ const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
   manager: [],
   employee: [],
   scanner: [
-    { id: "a-01", day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },
-    { id: "a-02", day: "08.07", status: "Tepat waktu", time: "Ilham Fadli", method: "QR" },
-    { id: "a-03", day: "08.09", status: "Belum check-in", time: "1 scan gagal radius", method: "Manual" }
+    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "Fikri Maulana", method: "QR" }
   ]
 };
 
@@ -175,16 +148,43 @@ const INITIAL_FIKRI_REQUESTS: LeaveRequestItem[] = [
 
 let demoFikriRequests: LeaveRequestItem[] = INITIAL_FIKRI_REQUESTS.map((r) => ({ ...r }));
 
+// Mutable event-based notifications — populated by check-in, check-out, and approval actions.
+let demoNotifications: NotificationItem[] = [];
+
+function pushNotification(
+  recipientId: string,
+  recipientRole: UserRole,
+  type: NotificationType,
+  title: string,
+  message: string
+): void {
+  demoNotifications.push({
+    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    organizationId: "org-demo",
+    recipientId,
+    recipientRole,
+    type,
+    title,
+    message,
+    createdAt: new Date().toISOString(),
+    readAt: null
+  });
+}
+
+export function getDemoNotifications(token: string): NotificationItem[] {
+  const role = getDemoRoleFromToken(token);
+  if (!role) return [];
+  if (role === "employee") return demoNotifications.filter((n) => n.recipientRole === "employee");
+  if (role === "manager") return demoNotifications.filter((n) => n.recipientRole === "manager");
+  if (role === "admin" || role === "superadmin") return demoNotifications.filter((n) => n.recipientRole === "admin");
+  return [];
+}
+
 const REQUESTS: Record<UserRole, LeaveRequestItem[]> = {
-  superadmin: [
-    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final.", requester: "Anisa Rahma" },
-    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja minggu depan.", requester: "Fikri Maulana" }
-  ],
-  admin: [
-    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final.", requester: "Anisa Rahma" },
-    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja minggu depan.", requester: "Fikri Maulana" }
-  ],
-  // Manager requests are derived from FIKRI_REQUESTS via getDemoManagerRequests()
+  // admin/superadmin use getDemoFikriRequests() so requests reflect live mutable state
+  superadmin: [],
+  admin: [],
+  // Manager requests are derived from demoFikriRequests via getDemoManagerRequests()
   manager: [],
   employee: [],
   scanner: [
@@ -246,6 +246,8 @@ export function getDemoAttendanceHistory(token: string): AttendanceTimelineItem[
 export function getDemoRequests(token: string): LeaveRequestItem[] {
   const role = getDemoRoleFromToken(token);
   if (!role) return [];
+  // admin and superadmin see all Fikri requests (the clean demo org has only Fikri as employee)
+  if (role === "admin" || role === "superadmin") return [...demoFikriRequests];
   return REQUESTS[role] ?? [];
 }
 
@@ -284,6 +286,14 @@ export function approveDemoRequest(
 
   const updated: LeaveRequestItem = { ...found, status: resolvedStatus, workflowStatus, statusLabel, adminNote };
   demoFikriRequests = demoFikriRequests.map((r) => (r.id === id ? updated : r));
+
+  // Notify employee on final decision (approved or rejected)
+  if (workflowStatus === "approved") {
+    pushNotification("usr-employee-01", "employee", "request_approved", "Pengajuan disetujui", `${found.title} telah disetujui oleh HR.`);
+  } else if (workflowStatus === "rejected") {
+    pushNotification("usr-employee-01", "employee", "request_rejected", "Pengajuan ditolak", `${found.title} ditolak.`);
+  }
+
   return updated;
 }
 
@@ -313,12 +323,16 @@ export function getDemoAdminOverview(): AdminOverview {
   const absent = employees.filter((e) => e.todayStatus === "absent");
   const exceptions = employees.filter((e) => e.validationStatus === "needs_review");
 
+  const pendingRequests = demoFikriRequests.filter(
+    (r) => r.workflowStatus === "pending_manager" || r.workflowStatus === "pending_hr"
+  ).length;
+
   return {
     totalEmployees: employees.length,
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
-    pendingRequests: REQUESTS.admin.filter((r) => r.status === "Menunggu").length,
+    pendingRequests,
     absentToday: absent.length,
     exceptionCount: exceptions.length,
     recentActivity: buildRecentActivity(employees, "act-admin")
@@ -392,8 +406,7 @@ export function getDemoScannerState() {
     expiresAt: "2026-05-02T08:30:30.000Z",
     status: "active" as const,
     recentScans: [
-      { id: "scan-01", employeeName: "Fikri Maulana", status: "success" as const, time: "08:03", detail: "QR valid di Gerbang Utama" },
-      { id: "scan-02", employeeName: "Leo Pratama", status: "expired" as const, time: "08:09", detail: "Token sudah lewat masa aktif." }
+      { id: "scan-01", employeeName: "Fikri Maulana", status: "success" as const, time: "08:03", detail: "QR valid di Gerbang Utama" }
     ]
   };
 }
@@ -406,18 +419,15 @@ export function getDemoAuditLogs() {
   return AUDIT_LOGS;
 }
 
+// Clean demo universe: only the connected demo actors appear in the roster.
+// Anisa, Leo, Dina, Budi removed — they were confusing dummy data never tied to real demo accounts.
 const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
-  { id: "dep-ops", name: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", isActive: true, memberCount: 3 },
-  { id: "dep-fnb", name: "F&B Service", managerId: null, managerName: null, isActive: true, memberCount: 2 }
+  { id: "dep-ops", name: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", isActive: true, memberCount: 1 }
 ];
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
   { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
-  { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
-  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:00", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "present", checkInTime: "08:00", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
 ];
 
 let demoDepartments: DepartmentItem[] = INITIAL_DEMO_DEPARTMENTS.map((department) => ({ ...department }));
@@ -492,7 +502,7 @@ export function getDemoDepartments(): DepartmentItem[] {
   return demoDepartments.map((department) => ({
     ...department,
     managerName: department.managerId ? demoEmployees.find((employee) => employee.id === department.managerId)?.fullName ?? null : null,
-    memberCount: demoEmployees.filter((employee) => employee.departmentId === department.id).length
+    memberCount: demoEmployees.filter((employee) => employee.departmentId === department.id && employee.role === "employee").length
   }));
 }
 
@@ -630,6 +640,11 @@ export function recordDemoCheckIn(employeeId: string, method: string): void {
     } as typeof e;
   });
 
+  // Push event-based notifications
+  pushNotification("usr-employee-01", "employee", "attendance_checked_in", "Check-in berhasil", `Fikri Maulana check-in pukul ${time} via ${safeMethod}`);
+  pushNotification("usr-manager-01", "manager", "attendance_checked_in", "Anggota tim check-in", `Fikri Maulana check-in pukul ${time}`);
+  pushNotification("usr-admin-01", "admin", "attendance_checked_in", "Presensi baru", `Fikri Maulana check-in pukul ${time}`);
+
   // Replace any existing "Hari ini" record so history stays a single entry per day
   const newRecord: AttendanceTimelineItem = {
     id: `att-live-${employeeId}`,
@@ -661,6 +676,11 @@ export function recordDemoCheckOut(employeeId: string): void {
     return { ...e, checkOutTime: time } as typeof e;
   });
 
+  // Push event-based notifications
+  pushNotification("usr-employee-01", "employee", "attendance_checked_out", "Check-out berhasil", `Fikri Maulana check-out pukul ${time}`);
+  pushNotification("usr-manager-01", "manager", "attendance_checked_out", "Anggota tim check-out", `Fikri Maulana check-out pukul ${time}`);
+  pushNotification("usr-admin-01", "admin", "attendance_checked_out", "Presensi selesai", `Fikri Maulana check-out pukul ${time}`);
+
   demoEmployeeAttendanceHistory = demoEmployeeAttendanceHistory.map((r) => {
     if (r.day !== "Hari ini") return r;
     return { ...r, checkOutTime: localISO };
@@ -675,4 +695,5 @@ export function resetDemoAttendanceState(): void {
   demoEmployees = INITIAL_DEMO_EMPLOYEES.map((e) => ({ ...e }));
   demoEmployeeAttendanceHistory = [];
   demoFikriRequests = INITIAL_FIKRI_REQUESTS.map((r) => ({ ...r }));
+  demoNotifications = [];
 }

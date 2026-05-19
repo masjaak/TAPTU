@@ -127,7 +127,9 @@ export type NotificationType =
   | "request_moved_to_hr"
   | "request_rejected"
   | "request_approved"
-  | "attendance_exception_created";
+  | "attendance_exception_created"
+  | "attendance_checked_in"
+  | "attendance_checked_out";
 
 export interface NotificationItem {
   id: string;
