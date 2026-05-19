@@ -1012,3 +1012,114 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
     expect(fetchSpy).toHaveBeenCalled(); // real API called, not demo path
   });
 });
+
+describe("PHASE 10.15 — Final demo consistency QA", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  // ── Approval flow: mutations persist to subsequent fetches ───────────────
+
+  it("manager approve mutates request — re-fetch reflects pending_hr workflowStatus", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    // Before: request is pending_manager
+    const before = await fetchManagerRequests("demo:manager");
+    const pendingReq = before.find((r) => r.workflowStatus === "pending_manager");
+    expect(pendingReq).toBeDefined();
+
+    // Manager approves
+    await approveRequest("demo:manager", pendingReq!.id!, "Disetujui");
+
+    // After: re-fetch reflects pending_hr (RED: currently static, still pending_manager)
+    const after = await fetchManagerRequests("demo:manager");
+    const updated = after.find((r) => r.id === pendingReq!.id);
+    expect(updated?.workflowStatus).toBe("pending_hr"); // RED
+    expect(updated?.statusLabel).toBe("Menunggu HR"); // RED
+    expect(updated?.status).toBe("Menunggu"); // still awaiting final HR decision
+  });
+
+  it("HR/admin approve mutates request — re-fetch reflects approved workflowStatus", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const reqs = await fetchManagerRequests("demo:manager");
+    const pendingReq = reqs.find((r) => r.workflowStatus === "pending_manager");
+    expect(pendingReq).toBeDefined();
+
+    // Admin approves (finalizes)
+    await approveRequest("demo:admin", pendingReq!.id!, "Disetujui");
+
+    // Re-fetch via manager view still reflects final state
+    const after = await fetchManagerRequests("demo:manager");
+    const updated = after.find((r) => r.id === pendingReq!.id);
+    expect(updated?.workflowStatus).toBe("approved"); // RED
+    expect(updated?.statusLabel).toBe("Disetujui"); // RED
+    expect(updated?.status).toBe("Disetujui"); // RED
+  });
+
+  it("reject by manager mutates request — re-fetch reflects rejected workflowStatus", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const reqs = await fetchManagerRequests("demo:manager");
+    const pendingReq = reqs.find((r) => r.workflowStatus === "pending_manager");
+
+    await approveRequest("demo:manager", pendingReq!.id!, "Ditolak", "Tidak sesuai jadwal.");
+
+    const after = await fetchManagerRequests("demo:manager");
+    const updated = after.find((r) => r.id === pendingReq!.id);
+    expect(updated?.workflowStatus).toBe("rejected"); // RED
+    expect(updated?.status).toBe("Ditolak"); // RED
+    expect(updated?.adminNote).toBe("Tidak sesuai jadwal."); // RED
+  });
+
+  it("resetDemoAttendanceState restores request to initial pending_manager state", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    // Mutate via approval
+    const reqs = await fetchManagerRequests("demo:manager");
+    const pendingReq = reqs.find((r) => r.workflowStatus === "pending_manager");
+    await approveRequest("demo:manager", pendingReq!.id!, "Disetujui");
+
+    // Reset
+    resetDemoAttendanceState();
+
+    // Should be back to pending_manager
+    const restored = await fetchManagerRequests("demo:manager");
+    const restoredReq = restored.find((r) => r.id === pendingReq!.id);
+    expect(restoredReq?.workflowStatus).toBe("pending_manager"); // RED
+  });
+
+  // ── Stale dummy attendance: manager home has no hardcoded dummy rows ──────
+
+  it("getDashboard for demo:manager returns empty attendance (no stale 08:03 QR)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const dashboard = await getDashboard("demo:manager");
+    expect(dashboard.attendance).toHaveLength(0); // already GREEN via api.ts override
+  });
+
+  // ── All 5 demo accounts login and route correctly ─────────────────────────
+
+  it("all 5 demo accounts login and return correct demo token", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const accounts = [
+      { email: "superadmin@taptu.app", expectedToken: "demo:superadmin" },
+      { email: "admin@taptu.app", expectedToken: "demo:admin" },
+      { email: "manager@taptu.app", expectedToken: "demo:manager" },
+      { email: "employee@taptu.app", expectedToken: "demo:employee" },
+      { email: "scanner@taptu.app", expectedToken: "demo:scanner" }
+    ];
+    for (const { email, expectedToken } of accounts) {
+      const result = await login({ email, password: "Taptu123!" });
+      expect(result.token).toBe(expectedToken);
+    }
+  });
+
+  // ── Regression: manager/employee scoping unchanged after reset ────────────
+
+  it("manager team remains Fikri-only after resetDemoAttendanceState", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    resetDemoAttendanceState();
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.totalEmployees).toBe(1);
+    expect(overview.checkedInToday).toBe(0); // reset clears check-in
+  });
+});

@@ -156,8 +156,9 @@ const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
   ]
 };
 
-// Fikri-scoped requests: used by Manager Pengajuan (manager's team = Fikri only)
-const FIKRI_REQUESTS: LeaveRequestItem[] = [
+// Fikri-scoped requests: used by Manager Pengajuan (manager's team = Fikri only).
+// Mutable so that demo approval actions persist within the session.
+const INITIAL_FIKRI_REQUESTS: LeaveRequestItem[] = [
   {
     id: "req-fikri-01",
     employeeId: "usr-employee-01",
@@ -183,6 +184,8 @@ const FIKRI_REQUESTS: LeaveRequestItem[] = [
     createdAt: "2026-05-10T08:00:00"
   }
 ];
+
+let demoFikriRequests: LeaveRequestItem[] = INITIAL_FIKRI_REQUESTS.map((r) => ({ ...r }));
 
 const REQUESTS: Record<UserRole, LeaveRequestItem[]> = {
   superadmin: [
@@ -260,7 +263,40 @@ export function getDemoRequests(token: string): LeaveRequestItem[] {
 
 /** Manager Pengajuan: returns only Fikri's requests (Raka's team = Fikri only). */
 export function getDemoManagerRequests(): LeaveRequestItem[] {
-  return [...FIKRI_REQUESTS];
+  return [...demoFikriRequests];
+}
+
+/**
+ * Mutates a Fikri request in response to a demo approval action.
+ * Returns the updated item, or null if id is not found in demoFikriRequests.
+ */
+export function approveDemoRequest(
+  id: string,
+  role: UserRole,
+  status: "Disetujui" | "Ditolak",
+  adminNote?: string
+): LeaveRequestItem | null {
+  const found = demoFikriRequests.find((r) => r.id === id);
+  if (!found) return null;
+
+  const isRejection = status === "Ditolak";
+  const isManagerRole = role === "manager";
+
+  const workflowStatus: ApprovalWorkflowStatus = isRejection ? "rejected"
+    : isManagerRole ? "pending_hr"
+    : "approved";
+
+  const resolvedStatus: LeaveRequestItem["status"] = isRejection ? "Ditolak"
+    : isManagerRole ? "Menunggu"
+    : "Disetujui";
+
+  const statusLabel = isRejection ? "Ditolak"
+    : isManagerRole ? "Menunggu HR"
+    : "Disetujui";
+
+  const updated: LeaveRequestItem = { ...found, status: resolvedStatus, workflowStatus, statusLabel, adminNote };
+  demoFikriRequests = demoFikriRequests.map((r) => (r.id === id ? updated : r));
+  return updated;
 }
 
 function buildRecentActivity(members: EmployeeListItem[], idPrefix: string): AttendanceActivityItem[] {
@@ -316,7 +352,7 @@ export function getDemoManagerOverview(): AdminOverview {
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
-    pendingRequests: FIKRI_REQUESTS.filter((r) => r.workflowStatus === "pending_manager").length,
+    pendingRequests: demoFikriRequests.filter((r) => r.workflowStatus === "pending_manager").length,
     absentToday: absent.length,
     exceptionCount: 0,
     recentActivity: buildRecentActivity(team, "act-mgr")
@@ -631,4 +667,5 @@ export function recordDemoCheckOut(employeeId: string): void {
 export function resetDemoAttendanceState(): void {
   demoEmployees = INITIAL_DEMO_EMPLOYEES.map((e) => ({ ...e }));
   demoEmployeeAttendanceHistory = [];
+  demoFikriRequests = INITIAL_FIKRI_REQUESTS.map((r) => ({ ...r }));
 }

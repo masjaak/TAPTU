@@ -33,6 +33,7 @@ import {
   getDemoManagerOverview,
   getDemoRequests,
   getDemoManagerRequests,
+  approveDemoRequest,
   getDemoAuditLogs,
   getDemoReportRows,
   getDemoScannerState,
@@ -228,22 +229,20 @@ export async function createRequest(
 
 export async function approveRequest(token: string, id: string, status: "Disetujui" | "Ditolak", adminNote?: string) {
   if (isDemoToken(token)) {
-    const role = getDemoRoleFromToken(token);
+    const role = getDemoRoleFromToken(token)!;
+
+    // Mutate demoFikriRequests if the id belongs to Fikri's requests
+    const mutated = approveDemoRequest(id, role, status, adminNote);
+    if (mutated) {
+      return Promise.resolve<RequestActionResponse>({ request: mutated });
+    }
+
+    // Fallback for requests not in Fikri's list (e.g., static admin requests)
     const isRejection = status === "Ditolak";
     const isManagerRole = role === "manager";
-
-    const workflowStatus = isRejection ? "rejected"
-      : isManagerRole ? "pending_hr"
-      : "approved";
-
-    const statusLabel = isRejection ? "Ditolak"
-      : isManagerRole ? "Menunggu HR"
-      : "Disetujui";
-
-    const resolvedStatus: "Menunggu" | "Disetujui" | "Ditolak" = isRejection ? "Ditolak"
-      : isManagerRole ? "Menunggu"
-      : "Disetujui";
-
+    const workflowStatus = isRejection ? "rejected" : isManagerRole ? "pending_hr" : "approved";
+    const statusLabel = isRejection ? "Ditolak" : isManagerRole ? "Menunggu HR" : "Disetujui";
+    const resolvedStatus: "Menunggu" | "Disetujui" | "Ditolak" = isRejection ? "Ditolak" : isManagerRole ? "Menunggu" : "Disetujui";
     const response: RequestActionResponse = {
       request: { id, title: "Demo request", status: resolvedStatus, detail: "Demo approval.", adminNote, workflowStatus, statusLabel }
     };
