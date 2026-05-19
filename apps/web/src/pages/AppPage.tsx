@@ -10,7 +10,6 @@ import {
   Clock3,
   Download,
   FileClock,
-  FolderKanban,
   LogOut,
   MapPinned,
   QrCode,
