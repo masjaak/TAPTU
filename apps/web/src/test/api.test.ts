@@ -20,6 +20,7 @@ import {
   fetchManagerRequests,
   fetchNotifications,
   fetchReportRows,
+  fetchRequests,
   getDashboard,
   login,
   markNotificationRead,
@@ -920,5 +921,94 @@ describe("PHASE 10.12 — Manager team scoping (Fikri only)", () => {
     const overview = await fetchManagerOverview("demo:manager");
     expect(overview.recentActivity).toHaveLength(0); // Fikri absent → no activity
     expect(overview.checkedInToday).toBe(0);
+  });
+});
+
+describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetchManagerRequests for demo:manager returns only Fikri requests", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerRequests("demo:manager");
+    // Every request must belong to Fikri (usr-employee-01) or have Fikri as requester
+    for (const req of result) {
+      const isFilkri =
+        req.employeeId === "usr-employee-01" ||
+        (req.requester ?? "").includes("Fikri");
+      expect(isFilkri).toBe(true); // RED: current generic entry has no employeeId/requester
+    }
+  });
+
+  it("fetchManagerRequests returns requests with workflowStatus defined", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerRequests("demo:manager");
+    expect(result.length).toBeGreaterThan(0); // at least one pending request for Fikri
+    for (const req of result) {
+      expect(req.workflowStatus).toBeDefined(); // RED: current REQUESTS.manager has no workflowStatus
+    }
+  });
+
+  it("fetchManagerRequests pending requests have workflowStatus pending_manager", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerRequests("demo:manager");
+    const pending = result.filter((r) => r.status === "Menunggu");
+    for (const req of pending) {
+      expect(req.workflowStatus).toBe("pending_manager"); // RED: no workflowStatus currently
+      expect(req.statusLabel).toBe("Menunggu Manager");
+    }
+  });
+
+  it("fetchRequests for admin returns org-wide requests including Fikri and Anisa", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchRequests("demo:admin", true);
+    const names = result.map((r) => r.requester ?? r.title);
+    // Admin sees both Fikri and Anisa requests
+    const hasFikri = names.some((n) => n.includes("Fikri"));
+    const hasAnisa = names.some((n) => n.includes("Anisa"));
+    expect(hasFikri).toBe(true);
+    expect(hasAnisa).toBe(true);
+  });
+
+  it("approveRequest by manager sets workflowStatus to pending_hr and statusLabel to Menunggu HR", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await approveRequest("demo:manager", "req-fikri-01", "Disetujui");
+    expect(result.request.workflowStatus).toBe("pending_hr");
+    expect(result.request.statusLabel).toBe("Menunggu HR");
+    expect(result.request.status).toBe("Menunggu"); // still pending until HR finalizes
+  });
+
+  it("approveRequest by HR sets workflowStatus to approved and statusLabel to Disetujui", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await approveRequest("demo:admin", "req-fikri-01", "Disetujui");
+    expect(result.request.workflowStatus).toBe("approved");
+    expect(result.request.statusLabel).toBe("Disetujui");
+    expect(result.request.status).toBe("Disetujui");
+  });
+
+  it("approveRequest reject by manager sets workflowStatus to rejected and statusLabel to Ditolak", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await approveRequest("demo:manager", "req-fikri-01", "Ditolak");
+    expect(result.request.workflowStatus).toBe("rejected");
+    expect(result.request.statusLabel).toBe("Ditolak");
+  });
+
+  it("manager overview pendingRequests counts only Fikri pending requests", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    const managerReqs = await fetchManagerRequests("demo:manager");
+    const pendingCount = managerReqs.filter((r) => r.workflowStatus === "pending_manager").length;
+    // pendingRequests must equal actual Fikri pending count, not org-wide count
+    expect(overview.pendingRequests).toBe(pendingCount); // RED: currently uses REQUESTS.manager.filter(Menunggu)
+  });
+
+  it("fetchManagerRequests for non-demo token does not call getDemoRequests", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+    vi.stubGlobal("fetch", fetchSpy);
+    await fetchManagerRequests("token:manager");
+    expect(fetchSpy).toHaveBeenCalled(); // real API called, not demo path
   });
 });

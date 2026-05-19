@@ -156,18 +156,45 @@ const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
   ]
 };
 
+// Fikri-scoped requests: used by Manager Pengajuan (manager's team = Fikri only)
+const FIKRI_REQUESTS: LeaveRequestItem[] = [
+  {
+    id: "req-fikri-01",
+    employeeId: "usr-employee-01",
+    requester: "Fikri Maulana",
+    category: "Cuti",
+    title: "Cuti tahunan · Fikri Maulana",
+    status: "Menunggu",
+    detail: "2 hari kerja minggu depan, sudah konfirmasi dengan tim.",
+    workflowStatus: "pending_manager",
+    statusLabel: "Menunggu Manager",
+    createdAt: "2026-05-19T08:00:00"
+  },
+  {
+    id: "req-fikri-02",
+    employeeId: "usr-employee-01",
+    requester: "Fikri Maulana",
+    category: "Izin",
+    title: "Izin dokter · Fikri Maulana",
+    status: "Disetujui",
+    detail: "Kontrol kesehatan rutin, sudah ada surat dokter.",
+    workflowStatus: "approved",
+    statusLabel: "Disetujui",
+    createdAt: "2026-05-10T08:00:00"
+  }
+];
+
 const REQUESTS: Record<UserRole, LeaveRequestItem[]> = {
   superadmin: [
-    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final." },
-    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja minggu depan." }
+    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final.", requester: "Anisa Rahma" },
+    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja minggu depan.", requester: "Fikri Maulana" }
   ],
   admin: [
-    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final." },
-    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja minggu depan." }
+    { id: "req-01", title: "Izin sakit · Anisa Rahma", status: "Menunggu", detail: "Belum ada lampiran dokter final.", requester: "Anisa Rahma" },
+    { id: "req-02", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja minggu depan.", requester: "Fikri Maulana" }
   ],
-  manager: [
-    { id: "req-01", title: "Izin tim lapangan", status: "Menunggu", detail: "Butuh keputusan supervisor sebelum jam 12.00." }
-  ],
+  // Manager requests are derived from FIKRI_REQUESTS via getDemoManagerRequests()
+  manager: [],
   employee: [],
   scanner: [
     { id: "req-01", title: "Token gate timur", status: "Disetujui", detail: "QR aktif dan sinkron sampai 30 detik ke depan." }
@@ -213,7 +240,7 @@ export function getDemoDashboard(token: string): DashboardPayload {
     schedule: SCHEDULE,
     attendance: ATTENDANCE[user.role] ?? ATTENDANCE.employee,
     attendanceState: "idle",
-    requests: REQUESTS[user.role] ?? REQUESTS.employee,
+    requests: user.role === "manager" ? getDemoManagerRequests() : (REQUESTS[user.role] ?? REQUESTS.employee),
     scannerToken: user.role === "scanner" ? "HDR-31A-7XZ" : undefined
   };
 }
@@ -229,6 +256,11 @@ export function getDemoRequests(token: string): LeaveRequestItem[] {
   const role = getDemoRoleFromToken(token);
   if (!role) return [];
   return REQUESTS[role] ?? [];
+}
+
+/** Manager Pengajuan: returns only Fikri's requests (Raka's team = Fikri only). */
+export function getDemoManagerRequests(): LeaveRequestItem[] {
+  return [...FIKRI_REQUESTS];
 }
 
 function buildRecentActivity(members: EmployeeListItem[], idPrefix: string): AttendanceActivityItem[] {
@@ -284,7 +316,7 @@ export function getDemoManagerOverview(): AdminOverview {
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
-    pendingRequests: REQUESTS.manager.filter((r) => r.status === "Menunggu").length,
+    pendingRequests: FIKRI_REQUESTS.filter((r) => r.workflowStatus === "pending_manager").length,
     absentToday: absent.length,
     exceptionCount: 0,
     recentActivity: buildRecentActivity(team, "act-mgr")

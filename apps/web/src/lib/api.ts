@@ -32,6 +32,7 @@ import {
   getDemoEmployeeSummary,
   getDemoManagerOverview,
   getDemoRequests,
+  getDemoManagerRequests,
   getDemoAuditLogs,
   getDemoReportRows,
   getDemoScannerState,
@@ -401,7 +402,7 @@ export async function fetchManagerEmployeeList(token: string): Promise<EmployeeL
 }
 
 export async function fetchManagerRequests(token: string): Promise<LeaveRequestItem[]> {
-  if (isDemoToken(token)) return Promise.resolve(getDemoRequests(token));
+  if (isDemoToken(token)) return Promise.resolve(getDemoManagerRequests());
   return requestJson<LeaveRequestItem[]>("/admin/requests", {}, token);
 }
 
