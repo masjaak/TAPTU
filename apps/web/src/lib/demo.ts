@@ -338,10 +338,10 @@ const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
   { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "late", checkInTime: "08:24", checkInMethod: "GPS", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "late", checkInTime: "08:24", checkInMethod: "GPS", validationStatus: "needs_review", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-employee-03", fullName: "Leo Pratama", email: "leo@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "absent", shiftName: "Shift Sore", locationName: "Kantor Pusat" },
   { id: "usr-employee-04", fullName: "Dina Fitriani", email: "dina@taptu.app", role: "employee", departmentId: "dep-fnb", departmentName: "F&B Service", todayStatus: "leave", shiftName: "Shift Pagi", locationName: "Kantor Cabang Selatan" },
-  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operations", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "07:58", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-05", fullName: "Budi Santoso", email: "budi@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: undefined, managerName: undefined, todayStatus: "present", checkInTime: "07:58", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operations", todayStatus: "present", checkInTime: "08:00", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
 ];
 
@@ -375,10 +375,10 @@ function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceRepo
     status = "Belum check-in";
   } else if (e.todayStatus === "late") {
     status = "Terlambat";
-    checkInTime = e.checkInTime ? `${today}T${e.checkInTime}:00.000Z` : undefined;
+    checkInTime = e.checkInTime ? `${today}T${e.checkInTime}:00` : undefined;
   } else if (e.todayStatus === "present") {
     status = "Tepat waktu";
-    checkInTime = e.checkInTime ? `${today}T${e.checkInTime}:00.000Z` : undefined;
+    checkInTime = e.checkInTime ? `${today}T${e.checkInTime}:00` : undefined;
   } else {
     status = "Belum check-in";
   }
@@ -396,7 +396,7 @@ function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceRepo
     shiftName: e.shiftName ?? "—",
     workLocationName: e.locationName ?? "—",
     checkInTime,
-    checkOutTime: e.checkOutTime ? `${today}T${e.checkOutTime}:00.000Z` : undefined,
+    checkOutTime: e.checkOutTime ? `${today}T${e.checkOutTime}:00` : undefined,
     status,
     validationStatus: (e.validationStatus ?? "verified") as AttendanceReportRow["validationStatus"],
     validationReasons: [],
@@ -536,7 +536,8 @@ export function getDemoReportRows(): AttendanceReportRow[] {
 export function recordDemoCheckIn(employeeId: string, method: string): void {
   const now = new Date();
   const time = now.toTimeString().slice(0, 5);
-  const isoTime = now.toISOString();
+  const today = now.toISOString().slice(0, 10);
+  const localISO = `${today}T${time}:00`;
   const [h, m] = time.split(":").map(Number);
   const isLate = h * 60 + m > 8 * 60 + 10;
   const status: "Tepat waktu" | "Terlambat" = isLate ? "Terlambat" : "Tepat waktu";
@@ -561,7 +562,7 @@ export function recordDemoCheckIn(employeeId: string, method: string): void {
     status,
     time,
     method: safeMethod,
-    checkInTime: isoTime,
+    checkInTime: localISO,
     locationName: "Kantor Pusat"
   };
   demoEmployeeAttendanceHistory = [
@@ -577,7 +578,8 @@ export function recordDemoCheckIn(employeeId: string, method: string): void {
 export function recordDemoCheckOut(employeeId: string): void {
   const now = new Date();
   const time = now.toTimeString().slice(0, 5);
-  const isoTime = now.toISOString();
+  const today = now.toISOString().slice(0, 10);
+  const localISO = `${today}T${time}:00`;
 
   demoEmployees = demoEmployees.map((e) => {
     if (e.id !== employeeId) return e;
@@ -586,7 +588,7 @@ export function recordDemoCheckOut(employeeId: string): void {
 
   demoEmployeeAttendanceHistory = demoEmployeeAttendanceHistory.map((r) => {
     if (r.day !== "Hari ini") return r;
-    return { ...r, checkOutTime: isoTime };
+    return { ...r, checkOutTime: localISO };
   });
 }
 

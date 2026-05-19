@@ -49,20 +49,26 @@ describe("app shell state", () => {
     expect(getNavigationForRole("admin").map((item) => item.label)).toContain("Struktur");
   });
 
-  it("defines manager navigation without scanner or system settings", () => {
+  it("defines manager navigation without scanner, settings, or notifications", () => {
     expect(getNavigationForRole("manager").map((item) => item.key)).toEqual([
       "home",
       "team",
       "attendance",
       "requests",
-      "notifications",
       "exceptions",
       "profile"
-    ]);
+    ]); // RED: currently includes "notifications"
     expect(getNavigationForRole("manager").map((item) => item.key)).not.toContain("structure");
+    expect(getNavigationForRole("manager").map((item) => item.key)).not.toContain("notifications"); // RED
     expect(getNavigationForRole("employee").map((item) => item.key)).not.toContain("structure");
     expect(toAppSection("structure", "manager")).toBe("home");
     expect(toAppSection("structure", "employee")).toBe("home");
+  });
+
+  it("PHASE 10.12 — manager nav does not include Notifikasi (not functional)", () => {
+    const managerNav = getNavigationForRole("manager").map((item) => item.key);
+    expect(managerNav).not.toContain("notifications"); // RED: currently included
+    expect(managerNav).toEqual(["home", "team", "attendance", "requests", "exceptions", "profile"]);
   });
 
   it("applies manager-specific labels for team and attendance sections", () => {
@@ -104,7 +110,6 @@ describe("app shell state", () => {
       "team",
       "attendance",
       "requests",
-      "notifications",
       "exceptions",
       "profile"
     ]);

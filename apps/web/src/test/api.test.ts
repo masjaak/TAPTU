@@ -756,16 +756,16 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
 
   // --- Manager KPI ---
 
-  it("Manager totalEmployees is team-scoped (Fikri+Anisa+Budi), not org-wide", async () => {
+  it("Manager totalEmployees is Fikri-only (1), not Anisa+Budi+Fikri", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
-    expect(overview.totalEmployees).toBe(3); // Fikri, Anisa, Budi under usr-manager-01
+    expect(overview.totalEmployees).toBe(1); // only Fikri is in Raka's team
   });
 
-  it("Manager checkedInToday equals team checked-in count before Fikri check-in", async () => {
+  it("Manager checkedInToday equals 0 before Fikri check-in (no seeded team attendance)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
-    expect(overview.checkedInToday).toBe(2); // Anisa(late) + Budi(present)
+    expect(overview.checkedInToday).toBe(0); // Fikri is absent initially; Anisa/Budi not in team
   });
 
   it("Manager checkedInToday increases after Fikri Selfie check-in", async () => {
@@ -785,12 +785,11 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(after.absentToday).toBe(0);
   });
 
-  it("Manager KPI excludes non-team employees Leo and Dina", async () => {
+  it("Manager KPI excludes non-team employees Leo, Dina, Anisa, and Budi", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
-    // Leo (dep-fnb, no manager) and Dina (dep-fnb, no manager) must not be counted
-    // If they were included, totalEmployees would be 5 or more
-    expect(overview.totalEmployees).toBe(3);
+    // Anisa/Budi no longer in Raka's team; Leo/Dina in dep-fnb with no manager match
+    expect(overview.totalEmployees).toBe(1); // only Fikri
   });
 
   // --- Regression ---
@@ -811,5 +810,115 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     const fikri = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
     expect(fikri).toBeDefined();
     expect(fikri?.event).toBe("Check-out");
+  });
+});
+
+describe("PHASE 10.12 — Demo check-in local time source", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("history item checkInTime is local ISO (no Z suffix) after recordDemoCheckIn", async () => {
+    vi.setSystemTime(new Date("2026-05-19T05:20:00.000Z"));
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const todayItem = history.find((r) => r.day === "Hari ini");
+    expect(todayItem?.checkInTime).toBeDefined();
+    expect(todayItem?.checkInTime).not.toMatch(/\.000Z$|Z$/); // RED: currently ends in Z
+  });
+
+  it("history item checkOutTime is local ISO (no Z suffix) after recordDemoCheckOut", async () => {
+    vi.setSystemTime(new Date("2026-05-19T05:20:00.000Z"));
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    vi.setSystemTime(new Date("2026-05-19T09:30:00.000Z"));
+    await checkOut("demo:employee", { method: "QR" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const todayItem = history.find((r) => r.day === "Hari ini");
+    expect(todayItem?.checkOutTime).toBeDefined();
+    expect(todayItem?.checkOutTime).not.toMatch(/\.000Z$|Z$/); // RED: currently ends in Z
+  });
+
+  it("report row checkInTime is local ISO (no Z suffix) for checked-in employee", async () => {
+    vi.setSystemTime(new Date("2026-05-19T05:20:00.000Z"));
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const rows = await fetchReportRows("demo:admin", {});
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikri?.checkInTime).toBeDefined();
+    expect(fikri?.checkInTime).not.toMatch(/\.000Z$|Z$/); // RED: currently ends in Z
+  });
+
+  it("history time field (HH:mm) matches demoEmployees checkInTime after check-in", async () => {
+    vi.setSystemTime(new Date("2026-05-19T05:20:00.000Z"));
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const employees = await fetchEmployeeList("demo:admin");
+    const fikri = employees.find((e) => e.id === "usr-employee-01");
+    const history = await fetchAttendanceHistory("demo:employee");
+    const todayItem = history.find((r) => r.day === "Hari ini");
+    // time field in history must match HH:mm stored in demoEmployees
+    expect(todayItem?.time).toBe(fikri?.checkInTime);
+  });
+});
+
+describe("PHASE 10.12 — Manager team scoping (Fikri only)", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    resetDemoAttendanceState();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("manager employee list contains only Fikri, not Anisa or Budi", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const result = await fetchManagerEmployeeList("demo:manager");
+    const names = result.map((e) => e.fullName);
+    expect(names).toContain("Fikri Maulana");
+    expect(names).not.toContain("Anisa Rahma"); // RED: currently Anisa is in Raka's team
+    expect(names).not.toContain("Budi Santoso"); // RED: currently Budi is in Raka's team
+    expect(result).toHaveLength(1);
+  });
+
+  it("manager overview totalEmployees is 1 (Fikri only) before any check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.totalEmployees).toBe(1); // RED: currently 3
+  });
+
+  it("manager overview checkedInToday is 0 before Fikri check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.checkedInToday).toBe(0); // RED: currently 2 (Anisa+Budi)
+  });
+
+  it("manager overview recentActivity excludes Anisa and Budi even in initial seeded state", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    const names = overview.recentActivity.map((a) => a.employeeName);
+    expect(names).not.toContain("Anisa Rahma"); // RED: currently included
+    expect(names).not.toContain("Budi Santoso"); // RED: currently included
+  });
+
+  it("manager overview recentActivity shows Fikri after check-in", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await checkIn("demo:employee", { method: "QR" });
+    const overview = await fetchManagerOverview("demo:manager");
+    const fikri = overview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
+    expect(fikri).toBeDefined();
+    expect(fikri?.employeeName).toBe("Fikri Maulana");
+  });
+
+  it("manager overview is empty activity and 0 checked-in before Fikri does anything", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.recentActivity).toHaveLength(0); // Fikri absent → no activity
+    expect(overview.checkedInToday).toBe(0);
   });
 });
