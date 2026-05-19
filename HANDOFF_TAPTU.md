@@ -2,9 +2,9 @@
 
 ## A. Project summary
 
-Taptu is an Attendance Validation OS for operational teams. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface.
+Taptu is an **Attendance Validation OS** for operational teams — not a full HRIS or payroll system. The product position is a modern attendance workspace that goes beyond simple clock-in/out by adding validation signals, scanner support, exception review, approvals, and HR-ready reporting inside a clean SaaS-style interface. Payroll is addressed only as **Payroll Input Readiness** (CSV export for downstream processing); full payroll processing is not in scope.
 
-The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: documentation is updated through **Phase 9 scale-up hardening**. Phase 9 delivered query safety defaults, DB index deployment to live Supabase, report API pagination, frontend fetch discipline fixes, and full test suite hardening (345 tests passing, 0 failures). No new product features were added in Phase 9. Known limitations remain around production-seeded manual QA, approval timeline UI, shift assignment, selfie storage finalization, payslip data, some Supabase persistence gaps, report pagination frontend controls, and very narrow mobile QA with production-like data.
+The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR, Manager, Employee, and Scanner/Kiosk roles without overbuilding advanced fraud, payroll, or full HRIS systems. Current status: documentation is updated through **Phase 10.15 — Final Demo Consistency QA**. Phase 10 delivered demo time normalization, manager team/nav cleanup, manager request scoping, and persistent demo approval state. Phase 9 delivered query safety defaults, DB index deployment to live Supabase, report API pagination, frontend fetch discipline fixes, and test suite hardening. **354 tests passing, 0 failures.** Known limitations remain around cross-device demo persistence, QR auto-detection, selfie storage, Supabase Auth completion, device registry, approval timeline UI, shift assignment, report pagination frontend controls, and very narrow mobile QA.
 
 ## B. Fixed product decisions
 
@@ -43,6 +43,10 @@ The MVP goal is to prove a practical end-to-end attendance workflow for Admin/HR
 - Phase 8.4-8.6: HR Struktur/Divisi & Penempatan added and connected to department/employee assignment APIs; HR Tim filter controls replaced with custom `FilterSelect` controls. 169 tests passing at Phase 8.6.
 - Phase 8 final stabilization: targeted QA for approval two-step flow, employee attendance check-in/check-out persistence, HR/Manager attendance visibility, and role access guards.
 - Phase 9 scale-up hardening: query safety defaults (`.limit()`, 30-day history filter, org-scoped exception count), report API pagination (`?limit`/`?offset` + `X-Has-More` headers, 500-row cap), frontend fetch discipline (`auditLogsLoaded` flag, `session?.token` dep, history filter same-filter guard, `filteredEmployees` useMemo), 6 DB indexes deployed to live Supabase, test suite hardened from 169 to **345 tests passing** (17 pre-existing infra failures fixed, 18 new regression tests added). No product features added.
+- Phase 10.12: demo check-in time fixed to local ISO (no Z); Anisa/Budi removed from manager demo team (`managerId: undefined`); Notifikasi removed from manager nav.
+- Phase 10.13: extracted `formatAttendanceTime` to `attendanceTime.ts`; state machine handles local ISO (slice), UTC+Z (Date parse), plain HH:mm (passthrough), missing (--:--); 16 unit tests.
+- Phase 10.14: Manager Pengajuan scoped to Fikri-only requests; `getDemoManagerRequests()` added; `workflowStatus`/`statusLabel` present on all demo requests; manager approve → `pending_hr`.
+- Phase 10.15: `demoFikriRequests` made mutable; `approveDemoRequest()` mutator persists approval state across re-fetches; `resetDemoAttendanceState()` resets request state. **354/354 tests passing.**
 
 ## D. Routes/pages
 
@@ -67,16 +71,23 @@ Main post-login pages currently surfaced through the app shell:
 
 ## E. Roles and access
 
-- Admin/HR:
-  full MVP operations surface including dashboard, team, structure, attendance, requests, locations, reports, and profile.
-- Manager:
-  limited operational approver. Nav: Beranda, Tim Saya, Presensi Tim, Pengajuan, Pengecualian, Profil. Laporan, Lokasi, Scanner, Struktur, and Settings are not accessible.
-- Employee:
-  Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, and Profil.
-- Scanner/Kiosk:
-  scanner workspace and profile only.
-- Superadmin:
-  current elevated navigation includes Settings, but Scanner remains excluded and the dedicated Settings workspace is not complete.
+Demo accounts (all use password `Taptu123!`):
+
+| Role | Email |
+|---|---|
+| Employee | employee@taptu.app |
+| Manager | manager@taptu.app |
+| HR/Admin | admin@taptu.app |
+| Superadmin | superadmin@taptu.app |
+| Scanner | scanner@taptu.app |
+
+Role nav:
+
+- **Employee**: Beranda, Presensi, Riwayat, Pengajuan, Jadwal, Slip Gaji, Profil.
+- **Manager**: Beranda, Tim Saya, Presensi Tim, Pengajuan, Pengecualian, Profil. Laporan, Lokasi, Scanner, Struktur, Settings, Notifikasi are not accessible.
+- **HR/Admin**: Beranda, Tim, Struktur, Presensi, Pengajuan, Lokasi, Laporan, Profil.
+- **Superadmin**: same as HR/Admin + Settings (dedicated Settings workspace not fully built).
+- **Scanner/Kiosk**: Scanner and Profil only; direct URLs to non-scanner workspaces fall back to scanner mode.
 
 Manager scoping behavior:
 
@@ -219,21 +230,22 @@ Concise manual checklist:
 
 ## L. Known limitations
 
-- Selfie storage/upload is not finalized; current flow is preview/input oriented and `selfie_url` remains nullable.
-- Advanced anti-spoofing is out of MVP scope.
-- Real device fingerprinting is out of MVP scope.
-- Face recognition is out of MVP scope.
-- Full payroll processing is out of MVP scope.
-- Manager endpoints are scoped by `manager_id`; production-seeded QA is still recommended for real manager/team data.
-- Approval UI timeline/step-history panel is not built; only the current status label is shown per request card.
+- **Vercel serverless in-memory demo is not reliable for cross-device persistence.** Each serverless invocation may get a fresh in-memory state. True cross-device demo requires Supabase-backed demo persistence.
+- QR auto-detection is not implemented; QR currently uses honest manual confirmation flow.
+- Selfie upload storage is not wired; `selfie_url` remains nullable.
+- Supabase Auth password reset / production account creation is not completed.
+- Device registry is not completed.
+- Approval UI timeline/step-history panel is not built; only the current `workflowStatus` label is shown per request card.
 - Shift assignment workflow is not completed in post-login UI/API.
 - Employee Jadwal is lightweight and depends on limited schedule data.
-- Employee Slip Gaji is lightweight/read-only and has no real payslip source yet.
-- Reimbursement/klaim, secure documents, advanced notifications, full HRIS profile management, face recognition, advanced anti-spoofing, and real device fingerprinting are not built.
-- Very narrow mobile layouts should still be manually checked with production-length employee names, notes, and dense report rows.
-- Some phase 4/5 operational endpoints still rely on local/demo-store style paths rather than fully normalized Supabase relational persistence.
+- Employee Slip Gaji is lightweight/read-only; no real payslip source yet.
+- Manager endpoints scoped by `manager_id`; production-seeded QA is recommended for real manager/team data.
+- Report pagination headers exist in the API (`X-Has-More`, `X-Pagination-Limit`, `X-Pagination-Offset`); frontend paging controls are not exposed.
+- Very narrow mobile layouts need manual QA with production-length names and dense report rows.
+- Some Phase 4/5 operational routes still use local/demo-store paths rather than fully normalized Supabase relational persistence.
 - Profile workspace is lightweight and not a full account/settings system.
-- Report pagination headers exist in the API (`X-Has-More`, `X-Pagination-Limit`, `X-Pagination-Offset`); frontend report view does not yet expose paging controls to the user.
+- Advanced anti-spoofing, face recognition, and real device fingerprinting are out of MVP scope.
+- Full payroll processing is out of MVP scope; Payroll Input Readiness (CSV export) is the only in-scope payroll work.
 
 ## M. Future roadmap
 
@@ -247,18 +259,18 @@ Concise manual checklist:
 - Advanced anti-spoofing.
 - Real device fingerprinting.
 
-## N. Recommended next step after MVP
+## N. Recommended next steps
 
-Recommended next step: Phase 9 scale-up hardening is complete. Phase 10 should continue operational hardening before any roadmap feature expansion.
+Phase 10.15 demo consistency QA is complete (354/354 tests passing). Next safe tasks:
 
-Priority order for Phase 10:
+1. **Supabase-backed demo persistence** — remove serverless in-memory fragility; demo state survives across devices and deployments. This is the largest demo reliability gap.
+2. **Real QR auto-detection** — replace manual confirmation with camera-based QR code scanning.
+3. **Selfie upload storage** — finalize `selfie_url` upload and retention path; currently nullable/preview-only.
+4. **Supabase Auth / password reset** — complete production account creation and credential management.
+5. **Device registry** — complete device identity binding for scanner and employee accounts.
+6. **Approval timeline panel** — step-history UI on request cards using `approval_steps` table data (backend exists; UI missing).
+7. **Report pagination frontend** — wire `?limit`/`?offset` to frontend report view (backend API is ready).
+8. **Shift assignment workflow** — complete end-to-end shift assignment in post-login UI/API.
+9. **Payroll Input Readiness** — CSV export for downstream processing only; full payroll processing remains out of scope.
 
-1. Run manual QA with seeded manager/team data against live Supabase (indexes are in place; verify query performance).
-2. Add approval step timeline panel to request cards (backend `approval_steps` table exists; UI is missing).
-3. Wire report pagination controls in the frontend (`?limit`/`?offset` API is ready; frontend shows all rows currently).
-4. Finish Supabase-backed persistence gaps for older operational data flows.
-5. Implement shift assignment workflow end to end.
-6. Finalize selfie storage/upload and retention behavior.
-7. Replace the lightweight Slip Gaji placeholder only after a real payslip source exists.
-
-This sequence closes the largest trust and handoff gaps while preserving the current MVP product shape.
+Do not build: full payroll processing, reimbursement/klaim, advanced notifications, full HRIS profile management, face recognition, advanced anti-spoofing, real device fingerprinting.
