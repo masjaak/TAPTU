@@ -8,3 +8,8 @@ dist
 coverage
 apps/web/.capacitor
 apps/api/data/demo-store.json
+
+# Block root-level binary planning artifacts from being accidentally re-committed
+/*.pdf
+/*.docx
+/*.png
