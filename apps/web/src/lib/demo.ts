@@ -225,9 +225,39 @@ export function tryDemoLogin(email: string, password: string): LoginResponse | n
 export function getDemoDashboard(token: string): DashboardPayload {
   const user = demoUserByToken(token) ?? DEMO_USERS.find((candidate) => candidate.role === "employee")!;
 
+  // Derive live stats for manager/admin so KPI cards always reflect real demo state.
+  // Employee and scanner stats are role-appropriate static content and not linked to
+  // check-in events, so they keep their descriptive fallback values from STATS.
+  let liveStats: DashboardStat[] | undefined;
+
+  if (user.role === "manager") {
+    const managerId = "usr-manager-01";
+    const team = demoEmployees.filter((e) => e.managerId === managerId);
+    const teamCheckedIn = team.filter((e) => e.todayStatus === "present" || e.todayStatus === "late").length;
+    const teamLate = team.filter((e) => e.todayStatus === "late").length;
+    const openApprovals = demoFikriRequests.filter((r) => r.workflowStatus === "pending_manager").length;
+    liveStats = [
+      { label: "Tim hadir", value: String(teamCheckedIn), detail: `dari ${team.length} anggota tim` },
+      { label: "Terlambat", value: String(teamLate), detail: teamLate > 0 ? "Butuh follow-up supervisor" : "Semua tepat waktu" },
+      { label: "Open approvals", value: String(openApprovals), detail: openApprovals > 0 ? "Izin tim menunggu review" : "Tidak ada pengajuan pending" }
+    ];
+  } else if (user.role === "admin" || user.role === "superadmin") {
+    const employees = demoEmployees.filter((e) => e.role === "employee");
+    const checkedIn = employees.filter((e) => e.todayStatus === "present" || e.todayStatus === "late").length;
+    const pendingApprovals = demoFikriRequests.filter(
+      (r) => r.workflowStatus === "pending_manager" || r.workflowStatus === "pending_hr"
+    ).length;
+    const needsReview = employees.filter((e) => e.validationStatus === "needs_review").length;
+    liveStats = [
+      { label: "Karyawan hadir", value: String(checkedIn), detail: `dari ${employees.length} karyawan aktif` },
+      { label: "Approval pending", value: String(pendingApprovals), detail: pendingApprovals > 0 ? "Butuh keputusan sebelum siang" : "Tidak ada pengajuan pending" },
+      { label: "Butuh review", value: String(needsReview), detail: needsReview > 0 ? "Validasi lokasi atau selfie belum final" : "Semua validasi selesai" }
+    ];
+  }
+
   return {
     greeting: `Halo, ${user.fullName}`,
-    stats: STATS[user.role] ?? STATS.employee,
+    stats: liveStats ?? STATS[user.role] ?? STATS.employee,
     schedule: SCHEDULE,
     attendance: ATTENDANCE[user.role] ?? ATTENDANCE.employee,
     attendanceState: "idle",
@@ -286,6 +316,7 @@ export function approveDemoRequest(
 
   const updated: LeaveRequestItem = { ...found, status: resolvedStatus, workflowStatus, statusLabel, adminNote };
   demoFikriRequests = demoFikriRequests.map((r) => (r.id === id ? updated : r));
+  saveDemoLiveState();
 
   // Notify employee on final decision (approved or rejected)
   if (workflowStatus === "approved") {
@@ -448,6 +479,67 @@ const INITIAL_DEMO_SHIFTS: ShiftRecord[] = [
 
 let demoWorkLocations: WorkLocationItem[] = INITIAL_DEMO_WORK_LOCATIONS.map((location) => ({ ...location }));
 let demoShifts: ShiftRecord[] = INITIAL_DEMO_SHIFTS.map((shift) => ({ ...shift }));
+
+// ─── localStorage sync ───────────────────────────────────────────────────────
+// Shares demo attendance state across browser tabs without a backend.
+// In Node.js (test environment), localStorage is undefined → all calls are no-ops
+// and the module-level variables behave exactly as before.
+//
+// Browser cross-tab flow:
+//   Employee Tab: recordDemoCheckIn → saveDemoLiveState → localStorage updated
+//   Manager Tab:  storage event fires → loadDemoLiveState → module vars updated
+//   Manager Tab:  next getDemoManagerOverview call reads updated module vars → check-in visible
+//
+// Cross-device sync requires TAPTU_STORAGE_MODE=supabase on the API server — see Deployment.
+
+const DEMO_LS_KEY = "taptu:demo_live_state";
+
+interface DemoLiveState {
+  employees: EmployeeListItem[];
+  attendanceHistory: AttendanceTimelineItem[];
+  notifications: NotificationItem[];
+  fikriRequests: LeaveRequestItem[];
+}
+
+function loadDemoLiveState(): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const raw = localStorage.getItem(DEMO_LS_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw) as DemoLiveState;
+    if (Array.isArray(state.employees)) demoEmployees = state.employees;
+    if (Array.isArray(state.attendanceHistory)) demoEmployeeAttendanceHistory = state.attendanceHistory;
+    if (Array.isArray(state.notifications)) demoNotifications = state.notifications;
+    if (Array.isArray(state.fikriRequests)) demoFikriRequests = state.fikriRequests;
+  } catch {
+    // corrupted data — keep module-level defaults
+  }
+}
+
+function saveDemoLiveState(): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const state: DemoLiveState = {
+      employees: demoEmployees,
+      attendanceHistory: demoEmployeeAttendanceHistory,
+      notifications: demoNotifications,
+      fikriRequests: demoFikriRequests
+    };
+    localStorage.setItem(DEMO_LS_KEY, JSON.stringify(state));
+  } catch {
+    // storage quota exceeded or private mode — ignore
+  }
+}
+
+// Hydrate on module init so a fresh tab picks up state written by another tab
+loadDemoLiveState();
+
+// Keep module vars in sync when another browser tab writes to localStorage
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event: StorageEvent) => {
+    if (event.key === DEMO_LS_KEY) loadDemoLiveState();
+  });
+}
 
 // Derive live report rows from demoEmployees so that check-ins are reflected immediately.
 function employeeToReportRow(e: EmployeeListItem, today: string): AttendanceReportRow {
@@ -659,6 +751,7 @@ export function recordDemoCheckIn(employeeId: string, method: string): void {
     newRecord,
     ...demoEmployeeAttendanceHistory.filter((r) => r.day !== "Hari ini")
   ];
+  saveDemoLiveState();
 }
 
 /**
@@ -685,6 +778,7 @@ export function recordDemoCheckOut(employeeId: string): void {
     if (r.day !== "Hari ini") return r;
     return { ...r, checkOutTime: localISO };
   });
+  saveDemoLiveState();
 }
 
 /**
@@ -696,4 +790,7 @@ export function resetDemoAttendanceState(): void {
   demoEmployeeAttendanceHistory = [];
   demoFikriRequests = INITIAL_FIKRI_REQUESTS.map((r) => ({ ...r }));
   demoNotifications = [];
+  if (typeof localStorage !== "undefined") {
+    try { localStorage.removeItem(DEMO_LS_KEY); } catch { /* ignore */ }
+  }
 }

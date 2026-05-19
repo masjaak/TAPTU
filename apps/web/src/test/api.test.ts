@@ -1428,3 +1428,187 @@ describe("PHASE 10.18 — Clean demo universe: roster, departments, exceptions, 
     expect(after).toHaveLength(0);
   });
 });
+
+describe("PHASE 11.1 — live dashboard stats (RED: must fail before fix)", () => {
+  beforeEach(() => {
+    resetDemoAttendanceState();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("getDashboard for demo:manager Tim hadir is 0 before check-in (not hardcoded 26)", async () => {
+    const dashboard = await getDashboard("demo:manager");
+    const stat = dashboard.stats.find((s) => s.label === "Tim hadir");
+    expect(stat?.value).toBe("0");
+  });
+
+  it("getDashboard for demo:manager Tim hadir is 1 after Fikri check-in", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const dashboard = await getDashboard("demo:manager");
+    const stat = dashboard.stats.find((s) => s.label === "Tim hadir");
+    expect(stat?.value).toBe("1");
+  });
+
+  it("getDashboard for demo:admin Karyawan hadir is 0 before check-in (not hardcoded 187)", async () => {
+    const dashboard = await getDashboard("demo:admin");
+    const stat = dashboard.stats.find((s) => s.label === "Karyawan hadir");
+    expect(stat?.value).toBe("0");
+  });
+
+  it("getDashboard for demo:admin Karyawan hadir is 1 after Fikri check-in", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const dashboard = await getDashboard("demo:admin");
+    const stat = dashboard.stats.find((s) => s.label === "Karyawan hadir");
+    expect(stat?.value).toBe("1");
+  });
+
+  it("getDashboard for demo:admin Approval pending reflects live demoFikriRequests (not hardcoded 6)", async () => {
+    const dashboard = await getDashboard("demo:admin");
+    const stat = dashboard.stats.find((s) => s.label === "Approval pending");
+    // 1 pending_manager request seeded in demoFikriRequests
+    expect(stat?.value).toBe("1");
+  });
+});
+
+describe("PHASE 11.1 — cross-role attendance sync integration", () => {
+  beforeEach(() => {
+    resetDemoAttendanceState();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetchManagerEmployeeList shows Fikri as absent before check-in", async () => {
+    const list = await fetchManagerEmployeeList("demo:manager");
+    const fikri = list.find((e) => e.id === "usr-employee-01")!;
+    expect(fikri.todayStatus).toBe("absent");
+    expect(fikri.checkInTime).toBeUndefined();
+  });
+
+  it("after employee check-in: fetchManagerEmployeeList shows Fikri with checkInTime", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const list = await fetchManagerEmployeeList("demo:manager");
+    const fikri = list.find((e) => e.id === "usr-employee-01")!;
+    expect(fikri.todayStatus).not.toBe("absent");
+    expect(fikri.checkInTime).toBeTruthy();
+  });
+
+  it("after employee check-in: fetchManagerOverview checkedInToday is 1", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const overview = await fetchManagerOverview("demo:manager");
+    expect(overview.checkedInToday).toBe(1);
+    expect(overview.absentToday).toBe(0);
+  });
+
+  it("after employee check-in: fetchAdminOverview checkedInToday is 1", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const overview = await fetchAdminOverview("demo:admin");
+    expect(overview.checkedInToday).toBe(1);
+    expect(overview.absentToday).toBe(0);
+  });
+
+  it("after employee check-in: fetchEmployeeList for admin shows Fikri with checkInTime", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const list = await fetchEmployeeList("demo:admin");
+    const fikri = list.find((e) => e.id === "usr-employee-01")!;
+    expect(fikri.checkInTime).toBeTruthy();
+  });
+
+  it("after employee check-in: fetchReportRows for admin shows Fikri with checkInTime", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const rows = await fetchReportRows("demo:admin");
+    const fikri = rows.find((r) => r.employeeId === "usr-employee-01")!;
+    expect(fikri.checkInTime).toBeTruthy();
+    expect(fikri.status).not.toBe("Belum check-in");
+  });
+
+  it("after employee check-in then check-out: all read paths show checkOutTime", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    await checkOut("demo:employee", { method: "QR" });
+
+    const summary = await fetchEmployeeSummary("demo:employee");
+    expect(summary.currentAttendanceState).toBe("checked_out");
+    expect(summary.todayRecord.checkOutTime).toBeTruthy();
+
+    const list = await fetchManagerEmployeeList("demo:manager");
+    const fikri = list.find((e) => e.id === "usr-employee-01")!;
+    expect(fikri.checkOutTime).toBeTruthy();
+
+    const rows = await fetchReportRows("demo:admin");
+    const row = rows.find((r) => r.employeeId === "usr-employee-01")!;
+    expect(row.checkOutTime).toBeTruthy();
+  });
+
+  it("no duplicate row after check-in then check-out", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    await checkOut("demo:employee", { method: "QR" });
+    const history = await fetchAttendanceHistory("demo:employee");
+    const todayRows = history.filter((r) => r.day === "Hari ini");
+    expect(todayRows).toHaveLength(1);
+  });
+
+  it("notifications: check-in creates events for employee, manager, and admin", async () => {
+    await checkIn("demo:employee", { method: "QR" });
+    const empNotifs = await fetchNotifications("demo:employee");
+    const mgrNotifs = await fetchNotifications("demo:manager");
+    const adminNotifs = await fetchNotifications("demo:admin");
+    expect(empNotifs.length).toBeGreaterThan(0);
+    expect(mgrNotifs.length).toBeGreaterThan(0);
+    expect(adminNotifs.length).toBeGreaterThan(0);
+    expect(empNotifs[0].type).toBe("attendance_checked_in");
+    expect(mgrNotifs[0].type).toBe("attendance_checked_in");
+    expect(adminNotifs[0].type).toBe("attendance_checked_in");
+  });
+
+  it("clean roster: fetchManagerEmployeeList contains only Fikri (no Anisa/Leo/Dina/Budi)", async () => {
+    const list = await fetchManagerEmployeeList("demo:manager");
+    const forbidden = ["Anisa Rahma", "Leo Pratama", "Dina Fitriani", "Budi Santoso"];
+    for (const name of forbidden) {
+      expect(list.find((e) => e.fullName === name)).toBeUndefined();
+    }
+    expect(list.find((e) => e.id === "usr-employee-01")).toBeDefined();
+  });
+
+  it("clean roster: fetchReportRows for admin contains only Fikri (no dummy employees)", async () => {
+    const rows = await fetchReportRows("demo:admin");
+    const forbidden = ["Anisa Rahma", "Leo Pratama", "Dina Fitriani", "Budi Santoso"];
+    for (const name of forbidden) {
+      expect(rows.find((r) => r.employeeName === name)).toBeUndefined();
+    }
+    expect(rows).toHaveLength(1);
+    expect(rows[0].employeeName).toBe("Fikri Maulana");
+  });
+});
+
+describe("PHASE 11.1 — localStorage sync (cross-tab state persistence)", () => {
+  beforeEach(() => {
+    resetDemoAttendanceState();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("resetDemoAttendanceState clears localStorage if available", () => {
+    const store: Record<string, string> = { "taptu:demo_live_state": '{"stub":true}' };
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; }
+    });
+    resetDemoAttendanceState();
+    expect(store["taptu:demo_live_state"]).toBeUndefined();
+  });
+
+  it("recordDemoCheckIn writes employee state to localStorage if available", async () => {
+    const store: Record<string, string> = {};
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; }
+    });
+    await checkIn("demo:employee", { method: "QR" });
+    const raw = store["taptu:demo_live_state"];
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw) as { employees: Array<{ id: string; todayStatus: string }> };
+    const fikri = parsed.employees.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.todayStatus).not.toBe("absent");
+  });
+});
