@@ -99,6 +99,7 @@ import {
   updateWorkLocation
 } from "../lib/api";
 import { getNavigationForRole, toAppSection, type AppTabKey } from "../lib/appShellState";
+import { formatAttendanceTime } from "../lib/attendanceTime";
 import {
   calculateDistanceMeters,
   evaluateAttendanceTrust,
@@ -249,22 +250,6 @@ function formatAttendanceDateLabel(value?: string) {
   return date.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
-function formatAttendanceTime(value?: string) {
-  if (!value) {
-    return "--.--";
-  }
-
-  if (value.includes("T") && value.length >= 16) {
-    return value.slice(11, 16);
-  }
-
-  const date = new Date(value);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-  }
-
-  return value;
-}
 
 function formatAttendanceDuration(checkInTime?: string, checkOutTime?: string) {
   if (!checkInTime || !checkOutTime) {

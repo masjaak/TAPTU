@@ -92,13 +92,13 @@ describe("AppPage", () => {
     ]);
     apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
     apiMocks.fetchWorkLocations.mockResolvedValue([
-      { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
+      { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00" }
     ]);
     apiMocks.fetchShifts.mockResolvedValue([
-      { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
+      { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00", updatedAt: "2026-05-01T00:00:00" }
     ]);
     apiMocks.fetchReportRows.mockResolvedValue([
-      { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+      { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
     ]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
@@ -230,12 +230,12 @@ describe("AppPage", () => {
         id: "att-demo-01",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-02T08:03:00.000Z",
+        checkInTime: "2026-05-02T08:03:00",
         status: "Tepat waktu",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -295,8 +295,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T00:00:00.000Z",
-        updatedAt: "2026-05-11T00:00:00.000Z"
+        createdAt: "2026-05-11T00:00:00",
+        updatedAt: "2026-05-11T00:00:00"
       }
     });
 
@@ -324,13 +324,13 @@ describe("AppPage", () => {
         id: "att-demo-01",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-11T08:02:00.000Z",
-        checkOutTime: "2026-05-11T17:05:00.000Z",
+        checkInTime: "2026-05-11T08:02:00",
+        checkOutTime: "2026-05-11T17:05:00",
         status: "Selesai",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T08:02:00.000Z",
-        updatedAt: "2026-05-11T17:05:00.000Z"
+        createdAt: "2026-05-11T08:02:00",
+        updatedAt: "2026-05-11T17:05:00"
       }
     });
 
@@ -406,12 +406,12 @@ describe("AppPage", () => {
         id: "att-demo-01",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-02T08:03:00.000Z",
+        checkInTime: "2026-05-02T08:03:00",
         status: "Tepat waktu",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     }).mockResolvedValueOnce({
       totalDays: 23,
@@ -430,12 +430,12 @@ describe("AppPage", () => {
         id: "hist-after-checkin",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-11T01:03:00.000Z",
+        checkInTime: "2026-05-11T01:03:00",
         status: "Tepat waktu",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T01:03:00.000Z",
-        updatedAt: "2026-05-11T01:03:00.000Z"
+        createdAt: "2026-05-11T01:03:00",
+        updatedAt: "2026-05-11T01:03:00"
       }
     });
 
@@ -492,8 +492,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -532,7 +532,7 @@ describe("AppPage", () => {
         id: "att-record-01",
         date: "2026-05-02",
         status: "Selesai",
-        checkInTime: "2026-05-02T08:03:00.000Z",
+        checkInTime: "2026-05-02T08:03:00",
         method: "Manual"
       }
     ]);
@@ -556,8 +556,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -596,8 +596,8 @@ describe("AppPage", () => {
         id: "att-record-01",
         date: "2026-05-11",
         status: "Tepat waktu",
-        checkInTime: "2026-05-11T08:02:00.000Z",
-        checkOutTime: "2026-05-11T17:05:00.000Z",
+        checkInTime: "2026-05-11T08:02:00",
+        checkOutTime: "2026-05-11T17:05:00",
         method: "QR",
         locationName: "Kantor Pusat"
       }
@@ -622,8 +622,8 @@ describe("AppPage", () => {
         status: "Selesai",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T08:02:00.000Z",
-        updatedAt: "2026-05-11T17:05:00.000Z"
+        createdAt: "2026-05-11T08:02:00",
+        updatedAt: "2026-05-11T17:05:00"
       }
     });
 
@@ -686,8 +686,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     }).mockResolvedValueOnce({
       totalDays: 23,
@@ -706,12 +706,12 @@ describe("AppPage", () => {
         id: "hist-after-checkin",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-11T01:03:00.000Z",
+        checkInTime: "2026-05-11T01:03:00",
         status: "Tepat waktu",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T01:03:00.000Z",
-        updatedAt: "2026-05-11T01:03:00.000Z"
+        createdAt: "2026-05-11T01:03:00",
+        updatedAt: "2026-05-11T01:03:00"
       }
     });
 
@@ -813,8 +813,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -898,8 +898,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
     apiMocks.checkIn.mockRejectedValue(new Error("Database gagal menyimpan check-in."));
@@ -965,12 +965,12 @@ describe("AppPage", () => {
         id: "att-real-01",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-11T01:03:00.000Z",
+        checkInTime: "2026-05-11T01:03:00",
         status: "Tepat waktu",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T01:03:00.000Z",
-        updatedAt: "2026-05-11T01:03:00.000Z"
+        createdAt: "2026-05-11T01:03:00",
+        updatedAt: "2026-05-11T01:03:00"
       }
     }).mockResolvedValueOnce({
       totalDays: 22,
@@ -989,13 +989,13 @@ describe("AppPage", () => {
         id: "att-real-01",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-11T01:03:00.000Z",
-        checkOutTime: "2026-05-11T10:05:00.000Z",
+        checkInTime: "2026-05-11T01:03:00",
+        checkOutTime: "2026-05-11T10:05:00",
         status: "Selesai",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T01:03:00.000Z",
-        updatedAt: "2026-05-11T10:05:00.000Z"
+        createdAt: "2026-05-11T01:03:00",
+        updatedAt: "2026-05-11T10:05:00"
       }
     });
     apiMocks.fetchAttendanceHistoryByFilter
@@ -1054,12 +1054,12 @@ describe("AppPage", () => {
         id: "att-real-01",
         employeeId: "usr-employee-01",
         shiftId: "shift-pagi",
-        checkInTime: "2026-05-11T01:03:00.000Z",
+        checkInTime: "2026-05-11T01:03:00",
         status: "Tepat waktu",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-11T01:03:00.000Z",
-        updatedAt: "2026-05-11T01:03:00.000Z"
+        createdAt: "2026-05-11T01:03:00",
+        updatedAt: "2026-05-11T01:03:00"
       }
     });
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([
@@ -1121,8 +1121,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -1196,8 +1196,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -1258,8 +1258,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -1320,8 +1320,8 @@ describe("AppPage", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -1422,17 +1422,17 @@ function setupAdminSession() {
   ]);
   apiMocks.fetchManagerEmployeeList.mockResolvedValue([]);
   apiMocks.fetchExceptionQueue.mockResolvedValue([
-    { id: "exc-01", attendanceRecordId: "att-demo-02", employeeId: "usr-employee-02", employeeName: "Anisa Rahma", exceptionType: "Di luar radius", reason: "GPS tidak akurat", status: "Need Review", createdAt: "2026-05-14T08:24:00.000Z" }
+    { id: "exc-01", attendanceRecordId: "att-demo-02", employeeId: "usr-employee-02", employeeName: "Anisa Rahma", exceptionType: "Di luar radius", reason: "GPS tidak akurat", status: "Need Review", createdAt: "2026-05-14T08:24:00" }
   ]);
   apiMocks.fetchManagerExceptionQueue.mockResolvedValue([]);
   apiMocks.fetchWorkLocations.mockResolvedValue([
-    { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
+    { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00" }
   ]);
   apiMocks.fetchShifts.mockResolvedValue([
-    { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
+    { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00", updatedAt: "2026-05-01T00:00:00" }
   ]);
   apiMocks.fetchReportRows.mockResolvedValue([
-    { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+    { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
   ]);
   apiMocks.fetchAuditLogs.mockResolvedValue([]);
   apiMocks.refreshScannerToken.mockResolvedValue({ token: "HDR-31A-7XZ", expiresInSeconds: 30, scansToday: 124, locationName: "Gerbang Utama" });
@@ -1620,8 +1620,8 @@ describe("HR/Admin dashboard Indonesian labels", () => {
       requests: []
     });
     apiMocks.fetchReportRows.mockResolvedValue([
-      { id: "org-att-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
-      { id: "org-att-02", employeeName: "Anisa Rahma", employeeId: "usr-employee-02", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:24:00.000Z", status: "Terlambat", validationStatus: "needs_review", validationReasons: ["Di luar radius"], isLate: true, hasException: true, selfieProof: false, deviceValidated: true }
+      { id: "org-att-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:03:00", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true },
+      { id: "org-att-02", employeeName: "Anisa Rahma", employeeId: "usr-employee-02", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:24:00", status: "Terlambat", validationStatus: "needs_review", validationReasons: ["Di luar radius"], isLate: true, hasException: true, selfieProof: false, deviceValidated: true }
     ]);
 
     renderRoute("/app/attendance");
@@ -1676,8 +1676,8 @@ describe("HR/Admin dashboard Indonesian labels", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:03:00.000Z",
-        updatedAt: "2026-05-02T08:03:00.000Z"
+        createdAt: "2026-05-02T08:03:00",
+        updatedAt: "2026-05-02T08:03:00"
       }
     });
 
@@ -1848,7 +1848,7 @@ describe("Phase 4: Reports workspace", () => {
     apiMocks.fetchWorkLocations.mockResolvedValue([]);
     apiMocks.fetchShifts.mockResolvedValue([]);
     apiMocks.fetchReportRows.mockResolvedValue([
-      { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+      { id: "att-demo-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-02", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-02T08:03:00", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
     ]);
     apiMocks.fetchAuditLogs.mockResolvedValue([]);
     apiMocks.fetchExceptionQueue.mockResolvedValue([]);
@@ -1937,7 +1937,7 @@ describe("Phase 4: Reports workspace", () => {
   it("reports workspace audit trail columns use Indonesian headers", async () => {
     setupAdminSession();
     apiMocks.fetchAuditLogs.mockResolvedValue([
-      { id: "audit-01", action: "Setujui", actorName: "Nadia", actorRole: "admin", detail: "Menyetujui izin sakit", createdAt: "2026-05-12T09:00:00.000Z" }
+      { id: "audit-01", action: "Setujui", actorName: "Nadia", actorRole: "admin", detail: "Menyetujui izin sakit", createdAt: "2026-05-12T09:00:00" }
     ]);
     renderRoute("/app/reports");
 
@@ -1996,8 +1996,8 @@ describe("Phase 4: Reports workspace", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-02T08:00:00.000Z",
-        updatedAt: "2026-05-02T08:00:00.000Z"
+        createdAt: "2026-05-02T08:00:00",
+        updatedAt: "2026-05-02T08:00:00"
       },
       profile: {
         departmentName: null,
@@ -2276,7 +2276,7 @@ describe("Manager dashboard", () => {
       { id: "usr-outside-01", fullName: "Outside Org Employee", email: "outside@taptu.app", role: "employee", departmentName: "Finance", todayStatus: "present", checkInTime: "08:01", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
     ]);
     apiMocks.fetchReportRows.mockResolvedValue([
-      { id: "org-att-01", employeeName: "Outside Org Employee", employeeId: "usr-outside-01", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:01:00.000Z", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
+      { id: "org-att-01", employeeName: "Outside Org Employee", employeeId: "usr-outside-01", date: "2026-05-14", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-14T08:01:00", status: "Selesai", validationStatus: "verified", validationReasons: [], isLate: false, hasException: false, selfieProof: true, deviceValidated: true }
     ]);
     apiMocks.fetchManagerEmployeeList.mockResolvedValue([
       { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentName: "Operations", managerName: "Raka Saputra", todayStatus: "present", checkInTime: "08:03", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
@@ -2887,8 +2887,8 @@ describe("HR Divisi & Penempatan", () => {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        createdAt: "2026-05-14T00:00:00.000Z",
-        updatedAt: "2026-05-14T00:00:00.000Z"
+        createdAt: "2026-05-14T00:00:00",
+        updatedAt: "2026-05-14T00:00:00"
       },
       assignedShift: {
         id: "shift-pagi",
@@ -3280,10 +3280,10 @@ describe("HR Divisi & Penempatan", () => {
   it("HR shift location dropdown is a custom combobox, not a native select", async () => {
     setupAdminWithDepartments();
     apiMocks.fetchWorkLocations.mockResolvedValue([
-      { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00.000Z" }
+      { id: "loc-hq", name: "Kantor Pusat", address: "Jl. Sudirman No. 1", latitude: -6.2088, longitude: 106.8456, radiusMeters: 150, status: "active", createdAt: "2026-05-01T00:00:00" }
     ]);
     apiMocks.fetchShifts.mockResolvedValue([
-      { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00.000Z", updatedAt: "2026-05-01T00:00:00.000Z" }
+      { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", gracePeriodMinutes: 10, workLocationId: "loc-hq", workLocationName: "Kantor Pusat", status: "active", createdAt: "2026-05-01T00:00:00", updatedAt: "2026-05-01T00:00:00" }
     ]);
     renderRoute("/app/locations");
 
@@ -3349,7 +3349,7 @@ describe("HR Divisi & Penempatan", () => {
       title: "Pengajuan cuti baru",
       message: "Fikri mengajukan cuti 3 hari",
       readAt: null,
-      createdAt: "2026-05-15T08:00:00.000Z"
+      createdAt: "2026-05-15T08:00:00"
     };
 
     const READ_NOTIF = {
@@ -3359,8 +3359,8 @@ describe("HR Divisi & Penempatan", () => {
       type: "leave_request_approved" as const,
       title: "Cuti disetujui",
       message: "Pengajuan cuti Anda disetujui",
-      readAt: "2026-05-15T09:00:00.000Z",
-      createdAt: "2026-05-14T08:00:00.000Z"
+      readAt: "2026-05-15T09:00:00",
+      createdAt: "2026-05-14T08:00:00"
     };
 
     it("shows polished empty state when there are no notifications", async () => {
@@ -3404,7 +3404,7 @@ describe("HR Divisi & Penempatan", () => {
 
     it("marks notification as read when button is clicked", async () => {
       setupAdminSession();
-      const updatedNotif = { ...UNREAD_NOTIF, readAt: "2026-05-15T10:00:00.000Z" };
+      const updatedNotif = { ...UNREAD_NOTIF, readAt: "2026-05-15T10:00:00" };
       apiMocks.fetchNotifications.mockResolvedValue([UNREAD_NOTIF]);
       apiMocks.markNotificationRead.mockResolvedValue(updatedNotif);
       renderRoute("/app/notifications");
@@ -3693,8 +3693,8 @@ describe("HR Divisi & Penempatan", () => {
         status: "Belum check-in",
         validationStatus: "verified" as const,
         validationReasons: [],
-        createdAt: "2026-05-18T00:00:00.000Z",
-        updatedAt: "2026-05-18T00:00:00.000Z"
+        createdAt: "2026-05-18T00:00:00",
+        updatedAt: "2026-05-18T00:00:00"
       }
     };
 
@@ -3714,10 +3714,10 @@ describe("HR Divisi & Penempatan", () => {
     it("clicking Hadir filter re-fetches with present and shows new records", async () => {
       apiMocks.fetchAttendanceHistoryByFilter
         .mockResolvedValueOnce([
-          { id: "all-1", date: "2026-05-12", status: "Selesai", checkInTime: "2026-05-12T08:00:00.000Z", method: "QR" }
+          { id: "all-1", date: "2026-05-12", status: "Selesai", checkInTime: "2026-05-12T08:00:00", method: "QR" }
         ])
         .mockResolvedValueOnce([
-          { id: "present-1", date: "2026-05-13", status: "Selesai", checkInTime: "2026-05-13T08:05:00.000Z", method: "QR" }
+          { id: "present-1", date: "2026-05-13", status: "Selesai", checkInTime: "2026-05-13T08:05:00", method: "QR" }
         ]);
 
       renderRoute("/app/history");
@@ -3796,7 +3796,7 @@ describe("BUG 3 — Camera uses getUserMedia instead of file input", () => {
       pendingRequests: 0,
       currentAttendanceState: "idle",
       assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
-      todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00.000Z", updatedAt: "2026-05-02T08:00:00.000Z" }
+      todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00", updatedAt: "2026-05-02T08:00:00" }
     });
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
     apiMocks.fetchNotifications.mockResolvedValue([]);
@@ -3882,7 +3882,7 @@ describe("BUG 4 — QR camera scanner mode uses getUserMedia with environment ca
       pendingRequests: 0,
       currentAttendanceState: "idle",
       assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
-      todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00.000Z", updatedAt: "2026-05-02T08:00:00.000Z" }
+      todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00", updatedAt: "2026-05-02T08:00:00" }
     });
     apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
     apiMocks.fetchNotifications.mockResolvedValue([]);
@@ -4003,7 +4003,7 @@ function setupEmployeeSessionForCamera() {
     pendingRequests: 0,
     currentAttendanceState: "idle",
     assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
-    todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00.000Z", updatedAt: "2026-05-02T08:00:00.000Z" }
+    todayRecord: { id: "att-demo-01", employeeId: "usr-employee-01", shiftId: "shift-pagi", status: "Belum check-in", validationStatus: "verified", validationReasons: [], createdAt: "2026-05-02T08:00:00", updatedAt: "2026-05-02T08:00:00" }
   });
   apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
   apiMocks.fetchNotifications.mockResolvedValue([]);
@@ -4159,7 +4159,7 @@ describe("PHASE 10.9 — Attendance cache refresh on tab re-entry", () => {
     apiMocks.fetchAdminOverview.mockResolvedValue({ totalEmployees: 10, checkedInToday: 8, onTimeToday: 7, lateToday: 1, pendingRequests: 2, absentToday: 2, exceptionCount: 1, recentActivity: [] });
     apiMocks.fetchManagerOverview.mockResolvedValue({ totalEmployees: 5, checkedInToday: 4, onTimeToday: 4, lateToday: 0, pendingRequests: 1, absentToday: 1, exceptionCount: 0, recentActivity: [] });
     apiMocks.fetchReportRows.mockResolvedValue([
-      { id: "att-live-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-18", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-18T11:41:00.000Z", status: "Terlambat", validationStatus: "verified", validationReasons: [], isLate: true, hasException: false, selfieProof: true, deviceValidated: true, checkInMethod: "Selfie" }
+      { id: "att-live-01", employeeName: "Fikri Maulana", employeeId: "usr-employee-01", date: "2026-05-18", shiftName: "Shift Pagi", workLocationName: "Kantor Pusat", checkInTime: "2026-05-18T11:41:00", status: "Terlambat", validationStatus: "verified", validationReasons: [], isLate: true, hasException: false, selfieProof: true, deviceValidated: true, checkInMethod: "Selfie" }
     ]);
     apiMocks.fetchEmployeeList.mockResolvedValue([]);
     apiMocks.fetchManagerEmployeeList.mockResolvedValue([
