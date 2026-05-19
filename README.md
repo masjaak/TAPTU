@@ -92,18 +92,33 @@ npm run dev:web   # http://localhost:5173
 
 ## Environment
 
-Copy `apps/api/.env.example` to `apps/api/.env` and set:
+Copy the API environment example:
 
 ```bash
-TAPTU_STORAGE_MODE=local-demo           # default; writes to apps/api/data/demo-store.json (gitignored)
-
-# Supabase mode (optional):
-TAPTU_STORAGE_MODE=supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   # server-side only — never expose in the web app
+cp apps/api/.env.example apps/api/.env
 ```
 
-To use Supabase, apply the migrations in `supabase/migrations/` to your project via the Supabase SQL editor or CLI.
+Local demo mode is the default:
+
+```bash
+TAPTU_STORAGE_MODE=local-demo
+```
+
+Local demo mode writes temporary demo state to `apps/api/data/demo-store.json`. This runtime file is ignored by Git.
+
+### Supabase Mode
+
+To use Supabase-backed storage, set:
+
+```bash
+TAPTU_STORAGE_MODE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` is server-side only. Never expose it in the web app.
+
+Apply the SQL migrations from `supabase/migrations/` using the Supabase SQL editor or Supabase CLI.
 
 ## Testing
 
@@ -120,23 +135,28 @@ npm run build
 
 ## Known Limitations
 
-- Vercel serverless in-memory demo resets on cold start — not reliable for cross-device use
-- QR auto-detection not implemented; current flow uses manual confirmation
-- Selfie upload storage not wired (`selfie_url` nullable)
-- Supabase Auth password reset / production account creation not completed
-- Device registry not completed
-- iOS wrapper requires CocoaPods — run `npx cap add ios && npm run cap:sync` after setup
+- Local demo mode is not reliable for cross-device persistence on serverless deployments. Use Supabase mode for shared demo state.
+- QR auto-detection is not implemented yet. The current QR flow uses manual confirmation.
+- Selfie upload storage is not wired yet. `selfie_url` remains nullable.
+- Supabase Auth password reset and production account creation are not completed.
+- Device registry is not completed.
+- The iOS wrapper requires CocoaPods. After setup, run:
+
+```bash
+npx cap add ios
+npm run cap:sync
+```
 
 ## Roadmap
 
-1. Supabase-backed demo persistence (removes serverless reset problem)
-2. Real QR auto-detection via camera scan
+1. Supabase-backed demo persistence
+2. Real QR auto-detection through camera scan
 3. Selfie upload and storage pipeline
-4. Supabase Auth + password reset
+4. Supabase Auth and password reset
 5. Device registry
 6. Approval timeline UI
-7. Report pagination frontend controls
-8. Payroll Input Readiness — CSV export only, not full payroll
+7. Frontend report pagination controls
+8. Payroll Input Readiness through CSV export and integration, not full payroll processing
 
 ## Docs
 
@@ -144,4 +164,4 @@ npm run build
 - [`HANDOFF_TAPTU.md`](HANDOFF_TAPTU.md) — full architecture and product context
 - [`CHANGELOG_PHASE_10.md`](CHANGELOG_PHASE_10.md) — latest changelog
 - [`docs/CHANGELOG_PHASE_9.md`](docs/CHANGELOG_PHASE_9.md) — Phase 9 changelog
-- [`docs/`](docs/) — implementation notes and older changelogs
+- [`docs/`](docs/) — implementation notes and archived changelogs
