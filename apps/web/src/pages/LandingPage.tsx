@@ -360,9 +360,9 @@ export function LandingPage() {
                       <motion.div
                         key={index}
                         className="grid h-14 place-items-center rounded-2xl bg-[#f6f8fb]"
-                        animate={{ y: [0, -5, 0], rotate: [0, index % 2 === 0 ? -5 : 5, 0], scale: [1, 1.06, 1] }}
-                        transition={{ duration: 2.5, delay: index * 0.22, repeat: Infinity, repeatType: "mirror" }}
-                        whileHover={{ y: -8, scale: 1.1 }}
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 3.5, delay: index * 0.35, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+                        whileHover={{ y: -6 }}
                       >
                         <Icon className="h-6 w-6 text-[#1769ff]" />
                       </motion.div>

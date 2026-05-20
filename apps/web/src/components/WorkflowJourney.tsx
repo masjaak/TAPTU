@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CYCLE_MS = 3200;
+const CYCLE_MS = 3800;
 const RESUME_MS = 5000;
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -394,17 +394,19 @@ function Stage08() {
 const STAGE_COMPONENTS = [Stage01, Stage02, Stage03, Stage04, Stage05, Stage06, Stage07, Stage08] as const;
 
 // ─── Product stage (all steps always in DOM, opacity toggle) ─────────────────
+// min-height spans the tallest stage (PhoneFrame ≈ 380px) so the container
+// never jumps when switching between BrowserFrame and PhoneFrame chapters.
 
 function ProductStage({ activeIndex }: { activeIndex: number }) {
   return (
-    <div className="relative">
+    <div className="relative" style={{ minHeight: 380 }}>
       {STEPS.map((step, i) => {
         const StageComp = STAGE_COMPONENTS[i];
         return (
           <div
             key={step.id}
             aria-hidden={i !== activeIndex}
-            className={`transition-all duration-500 ${
+            className={`transition-opacity duration-500 ${
               i === activeIndex
                 ? "pointer-events-auto opacity-100"
                 : "pointer-events-none absolute inset-0 opacity-0"
@@ -486,16 +488,14 @@ function StepListItem({
               {step.title}
             </p>
           </div>
-          {isActive && (
-            <motion.p
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              transition={{ duration: 0.3 }}
-              className="mt-1.5 text-xs leading-5 text-white/50"
-            >
-              {step.desc}
-            </motion.p>
-          )}
+          {/* Always rendered; max-height toggle avoids mount/unmount layout shift */}
+          <p
+            className={`text-xs leading-5 text-white/50 overflow-hidden transition-all duration-400 ease-out ${
+              isActive ? "mt-1.5 max-h-20 opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
+            {step.desc}
+          </p>
         </div>
       </div>
     </button>
@@ -535,26 +535,39 @@ function StepListPanel({ activeIndex, onPick }: { activeIndex: number; onPick: (
 }
 
 // ─── Desktop caption bar (below product stage) ────────────────────────────────
+// All step content stays in DOM (opacity toggle) so the bar height stays
+// stable and there is no snap when activeIndex changes.
 
 function StageCaption({ activeIndex }: { activeIndex: number }) {
-  const step = STEPS[activeIndex];
   return (
-    <div className="mt-4 overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.05] px-5 py-4">
-      <div className="flex items-start gap-4">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#1769ff] text-xs font-black text-white">
-          {step.id}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-black text-white">{step.title}</p>
-            <ChapterPill chapter={step.chapter} small />
+    <div className="relative mt-4 overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.05]" style={{ minHeight: 88 }}>
+      {STEPS.map((step, i) => (
+        <div
+          key={step.id}
+          aria-hidden={i !== activeIndex}
+          className={`px-5 py-4 transition-opacity duration-400 ${
+            i === activeIndex
+              ? "opacity-100"
+              : "pointer-events-none absolute inset-0 opacity-0"
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#1769ff] text-xs font-black text-white">
+              {step.id}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-black text-white">{step.title}</p>
+                <ChapterPill chapter={step.chapter} small />
+              </div>
+              <p className="mt-1 text-sm leading-6 text-white/50">{step.desc}</p>
+            </div>
+            <span className="shrink-0 text-xs font-bold tabular-nums text-white/25">
+              {i + 1} / {STEPS.length}
+            </span>
           </div>
-          <p className="mt-1 text-sm leading-6 text-white/50">{step.desc}</p>
         </div>
-        <span className="shrink-0 text-xs font-bold tabular-nums text-white/25">
-          {activeIndex + 1} / {STEPS.length}
-        </span>
-      </div>
+      ))}
     </div>
   );
 }
@@ -567,7 +580,6 @@ function MobileLayout({ activeIndex, onPick }: { activeIndex: number; onPick: (i
       {/* Chapter sections */}
       {([0, 1, 2] as const).map((ch) => {
         const chSteps = STEPS.map((s, i) => ({ s, i })).filter(({ s }) => s.chapter === ch);
-        const isChActive = STEPS[activeIndex].chapter === ch;
         return (
           <div key={ch}>
             <div className="mb-2">
@@ -613,7 +625,6 @@ function MobileLayout({ activeIndex, onPick }: { activeIndex: number; onPick: (i
 
 export function WorkflowJourney() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [loopKey, setLoopKey] = useState(0);
   const [paused, setPaused] = useState(false);
   const resumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -621,11 +632,7 @@ export function WorkflowJourney() {
   useEffect(() => {
     if (paused) return;
     const id = setInterval(() => {
-      setActiveIndex((i) => {
-        const next = (i + 1) % STEPS.length;
-        if (next === 0) setLoopKey((k) => k + 1);
-        return next;
-      });
+      setActiveIndex((i) => (i + 1) % STEPS.length);
     }, CYCLE_MS);
     return () => clearInterval(id);
   }, [paused]);
@@ -651,23 +658,13 @@ export function WorkflowJourney() {
 
         {/* Right: product stage + caption */}
         <div className="min-w-0 flex-1">
-          {/* Floating glow behind the mockup */}
-          <div className="relative">
-            <div
-              className="pointer-events-none absolute -inset-8 rounded-full opacity-30 blur-3xl"
-              style={{
-                background: `radial-gradient(ellipse, ${CHAPTER_INFO[STEPS[activeIndex].chapter].dot}44 0%, transparent 70%)`
-              }}
-            />
-            <motion.div
-              key={`mockup-${loopKey}-${activeIndex}`}
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="relative"
-            >
-              <ProductStage activeIndex={activeIndex} />
-            </motion.div>
-          </div>
+          {/* Float wrapper — no key so the animation never remounts on step change */}
+          <motion.div
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }}
+          >
+            <ProductStage activeIndex={activeIndex} />
+          </motion.div>
           <StageCaption activeIndex={activeIndex} />
         </div>
       </div>
