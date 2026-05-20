@@ -149,7 +149,8 @@ const users: Array<AuthUser & { password: string }> = [
     role: "employee",
     departmentId: "dep-ops",
     departmentName: "Operasional",
-    managerId: "usr-manager-01"
+    managerId: "usr-manager-01",
+    managerName: "Raka Saputra"
   },
   {
     id: "usr-scanner-01",
@@ -247,23 +248,18 @@ const roleStats: Record<UserRole, DashboardStat[]> = {
 const attendanceFeed: Record<UserRole, AttendanceTimelineItem[]> = {
   superadmin: [
     { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" },
-    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07.58", method: "QR" }
+    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" }
   ],
   admin: [
     { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" },
-    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07.58", method: "QR" }
+    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" }
   ],
   manager: [
     { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" },
-    { id: "a-03", day: "Kemarin", status: "Tepat waktu", time: "07.58", method: "QR" }
+    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" }
   ],
   employee: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Kemarin", status: "Tepat waktu", time: "07.55", method: "Selfie" },
-    { id: "a-03", day: "Senin", status: "Izin", time: "08.00", method: "Manual" }
+    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" }
   ],
   scanner: [
     { id: "a-01", day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },

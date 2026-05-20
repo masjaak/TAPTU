@@ -519,7 +519,11 @@ describe("overview and summary", () => {
 
 describe("helpers", () => {
   it("filters issue attendance rows", () => {
-    const filtered = filterAttendanceHistory(createInitialStore().attendanceHistory, "issue");
+    const items = [
+      { id: "a-1", day: "Hari ini", status: "Tepat waktu", time: "08:00", method: "QR" },
+      { id: "a-2", day: "Kemarin", status: "Izin", time: "08:00", method: "Manual" }
+    ] as const;
+    const filtered = filterAttendanceHistory([...items], "issue");
     expect(filtered).toHaveLength(1);
   });
 

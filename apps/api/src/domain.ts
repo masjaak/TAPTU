@@ -923,10 +923,7 @@ export function createInitialStore(): DemoStore {
         updatedAt: "2026-05-02T07:30:00.000Z"
       }
     },
-    attendanceHistory: [
-      { id: "att-002", day: "Kemarin", status: "Tepat waktu", time: "07:55", method: "Selfie" },
-      { id: "att-003", day: "Senin", status: "Izin", time: "08:00", method: "Manual" }
-    ],
+    attendanceHistory: [],
     requests: [
       {
         id: "req-001",
