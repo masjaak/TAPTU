@@ -15,7 +15,7 @@ import { motion, MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { WorkflowDiagram } from "../components/WorkflowDiagram";
+import { WorkflowJourney } from "../components/WorkflowJourney";
 
 import { Shell } from "../components/Shell";
 
@@ -452,7 +452,7 @@ export function LandingPage() {
                 </p>
               </motion.div>
               <motion.div variants={fadeUp}>
-                <WorkflowDiagram />
+                <WorkflowJourney />
               </motion.div>
             </motion.section>
 
