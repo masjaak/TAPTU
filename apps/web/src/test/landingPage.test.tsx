@@ -144,9 +144,24 @@ describe("landing page", () => {
     expect(screen.getByRole("button", { name: /step 8.*laporan hr-ready/i })).toBeTruthy();
   });
 
-  it("workflow section mentions Payroll Input Readiness, not full payroll processing", () => {
+  it("workflow step cards show mini UI previews with contextual content", () => {
+    // Desktop (hidden lg:block) and mobile (lg:hidden) layouts both render in JSDOM
+    // because CSS media queries are not evaluated. Use getAllByText to handle both.
     renderAt("/");
-    expect(screen.getByText(/payroll input readiness/i)).toBeTruthy();
+    expect(screen.getAllByText(/workspace aktif/i).length).toBeGreaterThan(0);    // 01
+    expect(screen.getAllByText(/07:00/).length).toBeGreaterThan(0);               // 02
+    expect(screen.getAllByText(/akses penuh/i).length).toBeGreaterThan(0);        // 03
+    expect(screen.getAllByText(/12 karyawan/i).length).toBeGreaterThan(0);        // 04
+    expect(screen.getAllByText(/fikri maulana/i).length).toBeGreaterThan(0);      // 05
+    expect(screen.getAllByText(/^scanner$/i).length).toBeGreaterThan(0);          // 06
+    expect(screen.getAllByText(/^in radius$/i).length).toBeGreaterThan(0);        // 07
+    expect(screen.getAllByText(/rekap mei 2026/i).length).toBeGreaterThan(0);     // 08
+  });
+
+  it("workflow section mentions Payroll Input Readiness, not full payroll processing", () => {
+    // Appears in P08 mini preview (desktop + mobile) and in detail panel — getAllByText is correct.
+    renderAt("/");
+    expect(screen.getAllByText(/payroll input readiness/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/full payroll processing/i)).toBeNull();
   });
 
