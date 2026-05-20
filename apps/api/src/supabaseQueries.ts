@@ -1,7 +1,7 @@
-import type { SupabaseAdmin } from "./supabase";
-import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord, EmployeeListFilters, NotificationDraft } from "./domain";
+import type { SupabaseAdmin } from "./supabase.js";
+import type { AttendanceRecord, ExceptionRecord, RequestRecord, ScannerRecord, DemoStore, AuditLogRecord, EmployeeListFilters, NotificationDraft } from "./domain.js";
 import type { ApprovalStepItem, ApprovalWorkflowStatus, AttendanceExceptionItem, AttendanceReportFilters, AttendanceReportRow, AttendanceTimelineItem, AuthUser, DepartmentItem, EmployeeListItem, EmployeeSummary, LeaveRequestItem, NotificationItem, UserRole } from "@taptu/shared";
-import { applyEmployeeListFilters, createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain";
+import { applyEmployeeListFilters, createApprovalStepPlan, createInitialStore, getApprovalStatusLabel } from "./domain.js";
 
 /**
  * Full relational Supabase adapter.

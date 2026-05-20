@@ -133,6 +133,20 @@ describe("attendance API shared flow", () => {
     }));
   });
 
+  it("admin/reports does not include dummy attendance records not backed by a real user", async () => {
+    const adminToken = await login("admin@taptu.app");
+    const reports = await request<{ employeeName: string }[]>("/admin/reports", {}, adminToken);
+    const dummyRows = reports.filter((r) => r.employeeName === "Employee");
+    expect(dummyRows).toHaveLength(0);
+  });
+
+  it("manager/reports only returns employees in the manager's team", async () => {
+    const managerToken = await login("manager@taptu.app");
+    const reports = await request<{ employeeId: string; employeeName: string }[]>("/admin/reports", {}, managerToken);
+    const nonTeamRows = reports.filter((r) => r.employeeId !== "usr-employee-01");
+    expect(nonTeamRows).toHaveLength(0);
+  });
+
   it("records honest review state when location is unavailable instead of faking valid attendance", async () => {
     const employeeToken = await login("employee@taptu.app");
     const checkIn = await request<{ validationStatus: string; validationReasons: string[] }>("/attendance/checkin", {

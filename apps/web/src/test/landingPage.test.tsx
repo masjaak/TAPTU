@@ -132,6 +132,27 @@ describe("landing page", () => {
     expect(screen.getByRole("heading", { name: /approval dua tahap/i })).toBeTruthy();
   });
 
+  it("workflow section has all 6 steps", () => {
+    renderAt("/");
+    expect(screen.getByRole("heading", { name: /check-in karyawan/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /validasi otomatis/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /antrean exception/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /review manager/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /keputusan hr/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /laporan hr-ready/i })).toBeTruthy();
+  });
+
+  it("workflow section mentions Payroll Input Readiness, not full payroll processing", () => {
+    renderAt("/");
+    expect(screen.getByText(/payroll input readiness/i)).toBeTruthy();
+    expect(screen.queryByText(/full payroll processing/i)).toBeNull();
+  });
+
+  it("workflow section heading reflects full HR flow", () => {
+    renderAt("/");
+    expect(screen.getByRole("heading", { name: /dari check-in sampai laporan hr/i })).toBeTruthy();
+  });
+
   it("answers the updated workflow questions", () => {
     renderAt("/");
     expect(screen.getByText(/apa yang bisa dicoba di demo/i)).toBeTruthy();

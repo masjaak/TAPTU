@@ -181,4 +181,7 @@ npm run cap:sync
 - [`HANDOFF_TAPTU.md`](HANDOFF_TAPTU.md) — full architecture and product context
 - [`CHANGELOG_PHASE_10.md`](CHANGELOG_PHASE_10.md) — latest changelog
 - [`docs/CHANGELOG_PHASE_9.md`](docs/CHANGELOG_PHASE_9.md) — Phase 9 changelog
+- [`docs/architecture/USERFLOW.md`](docs/architecture/USERFLOW.md) — workspace setup, daily attendance, and report flows
+- [`docs/architecture/ROLE_FLOW.md`](docs/architecture/ROLE_FLOW.md) — role responsibilities, access matrix, approval chain
+- [`docs/architecture/ERD.md`](docs/architecture/ERD.md) — logical data model and entity relationships
 - [`docs/`](docs/) — implementation notes and archived changelogs

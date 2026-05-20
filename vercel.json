@@ -5,7 +5,7 @@
   "outputDirectory": "apps/web/dist",
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "src": "/api/(.*)", "dest": "/api/handler" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

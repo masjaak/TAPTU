@@ -7,6 +7,7 @@ import {
   calculateDistanceMeters,
   canManageOrganizationStructure,
   computeAdminOverview,
+  computeManagerOverview,
   computeEmployeeList,
   computeEmployeeSummary,
   createAttendanceException,
@@ -424,6 +425,95 @@ describe("overview and summary", () => {
     expect(summary.currentAttendanceState).toBe("idle");
     expect(summary.assignedShift.name).toBe("Shift Pagi");
     expect(summary.todayRecord.validationStatus).toBe("verified");
+  });
+
+  describe("computeManagerOverview", () => {
+    const managerId = "usr-manager-01";
+    const fikri = { id: "usr-employee-01", fullName: "Fikri Maulana", managerId };
+
+    it("returns zero checked-in and absentToday=1 before Fikri checks in", () => {
+      const store = createInitialStore();
+      store.attendance = {};
+      const overview = computeManagerOverview(store, managerId, [fikri]);
+
+      expect(overview.totalEmployees).toBe(1);
+      expect(overview.checkedInToday).toBe(0);
+      expect(overview.absentToday).toBe(1);
+      expect(overview.onTimeToday).toBe(0);
+      expect(overview.lateToday).toBe(0);
+    });
+
+    it("reflects Fikri check-in after check-in event", () => {
+      const store = createInitialStore();
+      store.attendance = {
+        "usr-employee-01": {
+          id: "att-test",
+          userId: "usr-employee-01",
+          state: "checked_in",
+          status: "Tepat waktu",
+          checkInAt: "2026-05-20T02:07:00.000Z",
+          shiftId: "shift-01",
+          shiftName: "Shift Pagi",
+          shiftStartTime: "08:00",
+          shiftEndTime: "17:00",
+          locationId: "loc-01",
+          locationName: "Kantor Pusat",
+          checkInMethod: "QR",
+          validationStatus: "needs_review",
+          validationReasons: [],
+          createdAt: "2026-05-20T02:07:00.000Z",
+          updatedAt: "2026-05-20T02:07:00.000Z"
+        }
+      };
+      const overview = computeManagerOverview(store, managerId, [fikri]);
+
+      expect(overview.checkedInToday).toBe(1);
+      expect(overview.absentToday).toBe(0);
+      expect(overview.onTimeToday).toBe(1);
+      expect(overview.recentActivity).toHaveLength(1);
+      expect(overview.recentActivity[0]?.employeeName).toBe("Fikri Maulana");
+    });
+
+    it("does not include employees outside manager's team", () => {
+      const store = createInitialStore();
+      store.attendance = {
+        "usr-employee-02": {
+          id: "att-other",
+          userId: "usr-employee-02",
+          state: "checked_in",
+          status: "Tepat waktu",
+          checkInAt: "2026-05-20T08:00:00.000Z",
+          shiftId: "shift-01",
+          shiftName: "Shift Pagi",
+          shiftStartTime: "08:00",
+          shiftEndTime: "17:00",
+          locationId: "loc-01",
+          locationName: "Kantor Pusat",
+          checkInMethod: "QR",
+          validationStatus: "verified",
+          validationReasons: [],
+          createdAt: "2026-05-20T08:00:00.000Z",
+          updatedAt: "2026-05-20T08:00:00.000Z"
+        }
+      };
+      const overview = computeManagerOverview(store, managerId, [fikri]);
+
+      expect(overview.totalEmployees).toBe(1);
+      expect(overview.checkedInToday).toBe(0);
+      expect(overview.recentActivity).toHaveLength(0);
+    });
+
+    it("counts pending requests only from manager's team", () => {
+      const store = createInitialStore();
+      store.attendance = {};
+      store.requests = [
+        { id: "req-1", userId: "usr-employee-01", category: "Izin", startDate: "2026-05-20", endDate: "2026-05-20", title: "Izin sakit", detail: "", status: "Menunggu", createdAt: "2026-05-20T00:00:00.000Z" },
+        { id: "req-2", userId: "usr-employee-99", category: "Izin", startDate: "2026-05-20", endDate: "2026-05-20", title: "Izin lain", detail: "", status: "Menunggu", createdAt: "2026-05-20T00:00:00.000Z" }
+      ] as any;
+      const overview = computeManagerOverview(store, managerId, [fikri]);
+
+      expect(overview.pendingRequests).toBe(1);
+    });
   });
 });
 

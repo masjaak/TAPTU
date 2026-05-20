@@ -13,3 +13,5 @@ apps/api/data/demo-store.json
 /*.pdf
 /*.docx
 /*.png
+.vercel
+api/server.mjs

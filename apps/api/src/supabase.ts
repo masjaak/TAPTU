@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { ApiConfig } from "./config";
+import type { ApiConfig } from "./config.js";
 
 export type SupabaseAdmin = SupabaseClient;
 

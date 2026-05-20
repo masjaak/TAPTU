@@ -1,7 +1,7 @@
-import type { DemoStore } from "./domain";
-import type { ApiConfig, SupabaseConfig } from "./config";
-import { createInitialStore } from "./domain";
-import { ensureStoreFile, loadStore, saveStore } from "./store";
+import type { DemoStore } from "./domain.js";
+import type { ApiConfig, SupabaseConfig } from "./config.js";
+import { createInitialStore } from "./domain.js";
+import { ensureStoreFile, loadStore, saveStore } from "./store.js";
 
 export interface StorageAdapter {
   load(): Promise<DemoStore>;

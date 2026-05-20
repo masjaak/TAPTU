@@ -33,6 +33,7 @@ import {
   buildAttendanceReportRows,
   calculateDistanceMeters,
   computeAdminOverview,
+  computeManagerOverview,
   computeEmployeeList,
   computeEmployeeSummary,
   createAttendanceException,
@@ -59,10 +60,10 @@ import {
   validateScannerToken,
   type AttendanceMode,
   type AttendanceRecord
-} from "./domain";
-import { getApiConfig } from "./config";
-import { createStorageAdapter, uploadAttendanceSelfie } from "./storage";
-import { createSupabaseAdmin, type SupabaseAdmin } from "./supabase";
+} from "./domain.js";
+import { getApiConfig } from "./config.js";
+import { createStorageAdapter, uploadAttendanceSelfie } from "./storage.js";
+import { createSupabaseAdmin, type SupabaseAdmin } from "./supabase.js";
 import {
   supabaseSignUp,
   supabaseSignIn,
@@ -105,7 +106,7 @@ import {
   supabaseCreateNotifications,
   supabaseGetNotifications,
   supabaseMarkNotificationRead
-} from "./supabaseQueries";
+} from "./supabaseQueries.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -160,6 +161,14 @@ const users: Array<AuthUser & { password: string }> = [
   }
 ];
 
+function isLocalDemoUser(userId: string): boolean {
+  return users.some(u => u.id === userId);
+}
+
+function isUuid(id: string | null | undefined): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? "");
+}
+
 export function findLocalDemoUserByCredentials(email: string, password: string): AuthUser | null {
   const found = users.find((user) => user.email === email && user.password === password);
   if (!found) return null;
@@ -172,7 +181,19 @@ const apiDir = dirname(fileURLToPath(import.meta.url));
 const storePath = join(apiDir, "..", "data", "demo-store.json");
 const apiConfig = getApiConfig();
 const storage = createStorageAdapter(apiConfig, storePath);
-let store = await storage.load();
+const _storeInitial = createInitialStore();
+const _storeLoaded = await storage.load();
+// Merge so missing array/object fields from old stored formats don't crash at runtime.
+let store = {
+  ..._storeInitial,
+  ..._storeLoaded,
+  auditLogs: _storeLoaded.auditLogs ?? _storeInitial.auditLogs,
+  exceptions: _storeLoaded.exceptions ?? _storeInitial.exceptions,
+  notifications: _storeLoaded.notifications ?? _storeInitial.notifications,
+  workLocations: _storeLoaded.workLocations ?? _storeInitial.workLocations,
+  workLocationItems: _storeLoaded.workLocationItems ?? _storeInitial.workLocationItems,
+  shifts: _storeLoaded.shifts ?? _storeInitial.shifts,
+};
 const seededLocalDepartments: DepartmentItem[] = [
   {
     id: "dep-ops",
@@ -276,12 +297,12 @@ const loginSchema = z.object({
   password: z.string().min(8)
 });
 
-const registerSchema = z.object({
+export const registerSchema = z.object({
   fullName: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
   organizationName: z.string().min(2),
-  role: z.enum(["superadmin", "admin", "manager", "employee"]).default("superadmin")
+  role: z.literal("superadmin").default("superadmin")
 });
 
 const attendanceSchema = z.object({
@@ -601,7 +622,8 @@ async function notifyAttendanceExceptionCreated(input: {
   managerId?: string | null;
 }) {
   const draft = createAttendanceExceptionNotificationDraft(input);
-  if (useSupabase && sb) {
+  // Only use Supabase when organizationId is a real UUID (not a local demo text ID).
+  if (useSupabase && sb && isUuid(input.organizationId)) {
     await supabaseCreateNotifications(sb, [draft]);
     return;
   }
@@ -814,7 +836,7 @@ app.get("/api/dashboard", async (req, res) => {
     return;
   }
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const isAdmin = user.role === "admin" || user.role === "superadmin";
     const organizationId = isAdmin || user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
     const attendance = await supabaseGetAttendanceHistory(sb, user.id);
@@ -872,7 +894,7 @@ app.get("/api/attendance/today", async (req, res) => {
     return;
   }
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const record = await supabaseGetTodayAttendance(sb, user.id);
     return res.json({
       id: user.id,
@@ -895,7 +917,7 @@ app.get("/api/attendance/history", async (req, res) => {
 
   const filter = historyFilterSchema.parse(req.query.filter);
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const items = await supabaseGetAttendanceHistory(sb, user.id, filter);
     return res.json(items);
   }
@@ -922,7 +944,7 @@ app.post("/api/attendance/checkin", async (req, res) => {
 
   const now = new Date().toISOString();
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const current = await supabaseGetTodayAttendance(sb, user.id);
     const organizationId = await getOrganizationIdForUser(user.id);
     const location = organizationId ? await supabaseGetPrimaryWorkLocation(sb, organizationId) : store.workLocations[0];
@@ -1129,7 +1151,9 @@ app.post("/api/attendance/checkin", async (req, res) => {
       createdAt: now
     });
   }
-  await storage.save(store);
+  await storage.save(store).catch((err: unknown) => {
+    console.error("[taptu-api] storage.save failed (check-in):", err);
+  });
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
@@ -1156,7 +1180,7 @@ app.post("/api/attendance/checkout", async (req, res) => {
 
   const now = new Date().toISOString();
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const current = await supabaseGetTodayAttendance(sb, user.id);
     const organizationId = await getOrganizationIdForUser(user.id);
     const location = organizationId ? await supabaseGetPrimaryWorkLocation(sb, organizationId) : store.workLocations[0];
@@ -1241,7 +1265,9 @@ app.post("/api/attendance/checkout", async (req, res) => {
   if (validation.exceptionType) {
     store.exceptions.unshift(createAttendanceException(next, user.id, validation.exceptionType, validation.reasons[0] ?? "Check-out perlu review."));
   }
-  await storage.save(store);
+  await storage.save(store).catch((err: unknown) => {
+    console.error("[taptu-api] storage.save failed (check-out):", err);
+  });
 
   const response: AttendanceActionResponse = {
     attendanceState: next.state,
@@ -1257,7 +1283,7 @@ app.get("/api/requests", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const organizationId = user.role === "admin" || user.role === "superadmin" ? await getOrganizationIdForUser(user.id) : undefined;
     const items =
       user.role === "admin" || user.role === "superadmin"
@@ -1283,7 +1309,7 @@ app.get("/api/requests/:id", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const isAdmin = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
     const organizationId = user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
     const item = await supabaseGetRequestById(sb, req.params.id, user.id, isAdmin, user.role, organizationId ?? undefined);
@@ -1304,7 +1330,7 @@ app.get("/api/requests/:id/approval-timeline", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const isReviewer = user.role === "admin" || user.role === "superadmin" || user.role === "manager";
     const organizationId = user.role === "manager" ? await getOrganizationIdForUser(user.id) : undefined;
     const item = await supabaseGetRequestById(sb, req.params.id, user.id, isReviewer, user.role, organizationId ?? undefined);
@@ -1324,7 +1350,7 @@ app.post("/api/requests", async (req, res) => {
   const parsed = requestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Judul atau detail pengajuan belum valid." });
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const created = await createEmployeeRequest(sb, user.id, parsed.data);
     const organizationId = await getOrganizationIdForUser(user.id);
     if (organizationId) {
@@ -1370,7 +1396,7 @@ app.delete("/api/requests/:id", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const ok = await supabaseDeleteRequest(sb, req.params.id, user.id);
     if (!ok) return res.status(409).json({ message: "Pengajuan hanya bisa dibatalkan saat masih menunggu." });
     return res.json({ id: req.params.id, removed: true });
@@ -1393,7 +1419,7 @@ app.get("/api/admin/requests", async (req, res) => {
   if (!user) return;
   if (user.role !== "admin" && user.role !== "superadmin" && user.role !== "manager") return res.status(403).json({ message: "Forbidden" });
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const organizationId = await getOrganizationIdForUser(user.id);
     const items =
       user.role === "manager"
@@ -1413,7 +1439,7 @@ app.patch("/api/admin/requests/:id", async (req, res) => {
   const parsed = approvalSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Status approval tidak valid." });
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const actionContext = {
       id: user.id,
       role: user.role,
@@ -1507,30 +1533,14 @@ app.get("/api/admin/overview", async (req, res) => {
     }
 
     if (user.role === "manager") {
-      return res.json({
-        totalEmployees: 0,
-        checkedInToday: 0,
-        onTimeToday: 0,
-        lateToday: 0,
-        pendingRequests: 0,
-        absentToday: 0,
-        exceptionCount: 0,
-        recentActivity: []
-      });
+      const teamEmployees = users.filter((u) => u.role === "employee" && u.managerId === user.id);
+      return res.json(computeManagerOverview(store, user.id, teamEmployees));
     }
   }
 
   if (user.role === "manager") {
-    return res.json({
-      totalEmployees: 0,
-      checkedInToday: 0,
-      onTimeToday: 0,
-      lateToday: 0,
-      pendingRequests: 0,
-      absentToday: 0,
-      exceptionCount: 0,
-      recentActivity: []
-    });
+    const teamEmployees = users.filter((u) => u.role === "employee" && u.managerId === user.id);
+    return res.json(computeManagerOverview(store, user.id, teamEmployees));
   }
 
   const scopedUsers = users.filter((entry) => entry.role === "employee");
@@ -1547,7 +1557,7 @@ app.get("/api/employee/summary", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const summary = await supabaseGetEmployeeSummary(sb, user.id);
     return res.json(summary);
   }
@@ -1593,7 +1603,7 @@ app.patch("/api/admin/exceptions/:id", async (req, res) => {
     return res.status(400).json({ message: "Keputusan exception tidak valid." });
   }
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     if (user.role === "manager") {
       const organizationId = await getOrganizationIdForUser(user.id);
       if (!organizationId) return res.status(404).json({ message: "Exception tidak ditemukan." });
@@ -1725,14 +1735,14 @@ app.get("/api/admin/audit-logs", async (req, res) => {
 app.get("/api/notifications", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
-  if (useSupabase && sb) return res.json(await supabaseGetNotifications(sb, user.id));
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) return res.json(await supabaseGetNotifications(sb, user.id));
   return res.json(filterNotificationsForRecipient(store.notifications ?? [], user.id));
 });
 
 app.patch("/api/notifications/:id/read", async (req, res) => {
   const user = await requireUserAsync(req, res);
   if (!user) return;
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const item = await supabaseMarkNotificationRead(sb, req.params.id, user.id);
     if (!item) return res.status(404).json({ message: "Notifikasi tidak ditemukan." });
     return res.json(item);
@@ -1853,7 +1863,7 @@ app.get("/api/admin/employees", async (req, res) => {
     status: typeof req.query.status === "string" ? req.query.status : undefined
   };
 
-  if (useSupabase && sb) {
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
     const organizationId = await getOrganizationIdForUser(user.id);
     if (!organizationId) return res.json([]);
     return res.json(
@@ -2029,8 +2039,17 @@ app.get("/api/admin/reports", async (req, res) => {
     return res.json(rows);
   }
 
+  const scopedUserIds = user.role === "manager"
+    ? new Set(users.filter((u) => u.role === "employee" && u.managerId === user.id).map((u) => u.id))
+    : new Set(users.map((u) => u.id));
+
+  const scopedStore = {
+    ...store,
+    attendance: Object.fromEntries(Object.entries(store.attendance).filter(([id]) => scopedUserIds.has(id)))
+  };
+
   const rows = buildAttendanceReportRows(
-    store,
+    scopedStore,
     Object.fromEntries(users.map((u) => [u.id, u.fullName])),
     filters,
     Object.fromEntries(users.map((u) => [u.id, { departmentId: u.departmentId, departmentName: u.departmentName }]))
@@ -2107,6 +2126,14 @@ app.get("/api/scanner/token", async (req, res) => {
   await storage.save(store);
 
   return res.json(buildScannerPayload());
+});
+
+// Catch unhandled async errors from route handlers (Express 4 does not auto-catch async throws).
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[taptu-api] Unhandled error:", err);
+  if (!res.headersSent) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {

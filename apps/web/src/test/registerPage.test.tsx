@@ -17,9 +17,11 @@ function renderAt(path: string) {
 describe("register page", () => {
   afterEach(cleanup);
 
-  it("shows role badge defaulting to superadmin", () => {
+  it("shows static superadmin role badge — not a dropdown", () => {
     renderAt("/register");
     expect(screen.getByTestId("role-badge-superadmin")).toBeTruthy();
+    expect(screen.queryByLabelText(/peran akun/i)).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 
   it("has all required registration fields with accessible labels", () => {
@@ -31,13 +33,9 @@ describe("register page", () => {
     expect(screen.getByLabelText(/konfirmasi password/i)).toBeTruthy();
   });
 
-  it("has role selection dropdown with superadmin, admin, employee options", () => {
+  it("copy explains other roles are created from dashboard", () => {
     renderAt("/register");
-    const select = screen.getByLabelText(/peran akun/i);
-    expect(select).toBeTruthy();
-    expect(screen.getByRole("option", { name: /superadmin/i })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /admin hr/i })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /karyawan/i })).toBeTruthy();
+    expect(screen.getByText(/admin hr.*manager.*karyawan.*scanner/i)).toBeTruthy();
   });
 
   it("has a submit button", () => {

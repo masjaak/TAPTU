@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import type { DemoStore } from "./domain";
-import { createInitialStore } from "./domain";
+import type { DemoStore } from "./domain.js";
+import { createInitialStore } from "./domain.js";
 
 export async function ensureStoreFile(filePath: string): Promise<DemoStore> {
   try {

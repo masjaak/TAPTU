@@ -774,6 +774,39 @@ export function computeAdminOverview(
   };
 }
 
+export function computeManagerOverview(
+  store: DemoStore,
+  managerId: string,
+  teamEmployees: Array<{ id: string; fullName: string; managerId?: string | null }>
+) {
+  const teamIds = new Set(teamEmployees.map((e) => e.id));
+  const userDirectory = Object.fromEntries(teamEmployees.map((e) => [e.id, e.fullName]));
+
+  const teamRecords = Object.values(store.attendance).filter((r) => teamIds.has(r.userId));
+  const checkedInToday = teamRecords.filter((r) => r.state === "checked_in" || r.state === "checked_out").length;
+  const onTimeToday = teamRecords.filter((r) => r.status === "Tepat waktu" || r.status === "Selesai").length;
+  const lateToday = teamRecords.filter((r) => r.status === "Terlambat").length;
+  const absentToday = Math.max(0, teamIds.size - checkedInToday);
+  const pendingRequests = store.requests.filter((r) => teamIds.has(r.userId) && r.status === "Menunggu").length;
+  const exceptionCount = store.exceptions.filter(
+    (e) => teamIds.has(e.employeeId) && (e.status === "Need Review" || e.status === "Request Correction")
+  ).length;
+
+  const scopedStore = { ...store, attendance: Object.fromEntries(teamRecords.map((r) => [r.userId, r])) };
+  const recentActivity = listRecentAttendanceActivity(scopedStore, userDirectory);
+
+  return {
+    totalEmployees: teamIds.size,
+    checkedInToday,
+    onTimeToday,
+    lateToday,
+    pendingRequests,
+    absentToday,
+    exceptionCount,
+    recentActivity
+  };
+}
+
 export function computeEmployeeSummary(store: DemoStore, userId: string) {
   const onTimeDays = store.attendanceHistory.filter((item) => item.status === "Tepat waktu").length;
   const lateDays = store.attendanceHistory.filter((item) => item.status === "Terlambat").length;
