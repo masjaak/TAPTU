@@ -2124,6 +2124,27 @@ app.get("/api/scanner/token", async (req, res) => {
   return res.json(buildScannerPayload());
 });
 
+app.post("/api/demo/reset", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+  if (user.role !== "superadmin") {
+    return res.status(403).json({ message: "Hanya superadmin yang dapat mereset demo." });
+  }
+  store = createInitialStore();
+  const fikri = users.find((u) => u.id === "usr-employee-01");
+  if (fikri) {
+    fikri.departmentId = "dep-ops";
+    fikri.departmentName = "Operasional";
+    fikri.managerId = "usr-manager-01";
+    fikri.managerName = "Raka Saputra";
+  }
+  localDepartments = seededLocalDepartments.map((d) => ({ ...d }));
+  await storage.save(store).catch((err: unknown) => {
+    console.error("[taptu-api] demo reset storage.save failed:", err);
+  });
+  return res.json({ ok: true, message: "Demo direset ke kondisi awal." });
+});
+
 // Catch unhandled async errors from route handlers (Express 4 does not auto-catch async throws).
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("[taptu-api] Unhandled error:", err);

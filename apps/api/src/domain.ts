@@ -929,23 +929,12 @@ export function createInitialStore(): DemoStore {
         id: "req-001",
         userId: "usr-employee-01",
         category: "Izin",
-        startDate: "2026-05-03",
-        endDate: "2026-05-03",
+        startDate: "2026-05-21",
+        endDate: "2026-05-21",
         title: "Izin pribadi",
         detail: "Perlu keluar kantor pukul 15.00 untuk urusan keluarga.",
         status: "Menunggu",
-        createdAt: "2026-05-02T08:30:00.000Z"
-      },
-      {
-        id: "req-002",
-        userId: "usr-employee-02",
-        category: "Koreksi Absensi",
-        startDate: "2026-05-02",
-        endDate: "2026-05-02",
-        title: "Koreksi check-in",
-        detail: "GPS valid, tetapi token QR kadaluarsa saat scan pertama.",
-        status: "Menunggu",
-        createdAt: "2026-05-02T07:50:00.000Z"
+        createdAt: "2026-05-20T08:30:00.000Z"
       }
     ],
     scanner,
