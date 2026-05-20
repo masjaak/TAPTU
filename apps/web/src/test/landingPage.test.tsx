@@ -134,28 +134,40 @@ describe("landing page", () => {
 
   it("workflow diagram has all 8 steps covering setup through reporting", () => {
     renderAt("/");
-    expect(screen.getByRole("button", { name: /step 1.*buat workspace/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 2.*setup organisasi/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 3.*tambah admin hr/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 4.*tambah manager/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 5.*tambah karyawan/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 6.*check-in karyawan/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 7.*validasi/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /step 8.*laporan hr-ready/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 1.*superadmin setup/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 2.*admin hr/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 3.*manager/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 4.*employee/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 5.*check-in/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 6.*validation layer/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 7.*exception review/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 8.*hr-ready report/i })).toBeTruthy();
+  });
+
+  it("workflow hub shows Taptu as central attendance validation system", () => {
+    // Both desktop and mobile layouts render in JSDOM — hub card appears in both.
+    renderAt("/");
+    expect(screen.getAllByText(/attendance validation os/i).length).toBeGreaterThan(0);
+  });
+
+  it("workflow section has setup and validation group headings", () => {
+    renderAt("/");
+    expect(screen.getAllByText(/setup & role access/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/attendance validation flow/i).length).toBeGreaterThan(0);
   });
 
   it("workflow step cards show mini UI previews with contextual content", () => {
-    // Desktop (hidden lg:block) and mobile (lg:hidden) layouts both render in JSDOM
-    // because CSS media queries are not evaluated. Use getAllByText to handle both.
+    // Both desktop and mobile hub layouts render in JSDOM (CSS media queries not evaluated).
+    // Hub cards appear in both layouts, so use getAllByText.
     renderAt("/");
-    expect(screen.getAllByText(/workspace aktif/i).length).toBeGreaterThan(0);    // 01
-    expect(screen.getAllByText(/07:00/).length).toBeGreaterThan(0);               // 02
-    expect(screen.getAllByText(/akses penuh/i).length).toBeGreaterThan(0);        // 03
-    expect(screen.getAllByText(/12 karyawan/i).length).toBeGreaterThan(0);        // 04
-    expect(screen.getAllByText(/fikri maulana/i).length).toBeGreaterThan(0);      // 05
-    expect(screen.getAllByText(/^scanner$/i).length).toBeGreaterThan(0);          // 06
-    expect(screen.getAllByText(/^in radius$/i).length).toBeGreaterThan(0);        // 07
-    expect(screen.getAllByText(/rekap mei 2026/i).length).toBeGreaterThan(0);     // 08
+    expect(screen.getAllByText(/workspace aktif/i).length).toBeGreaterThan(0);    // s1 Superadmin Setup
+    expect(screen.getAllByText(/akses penuh/i).length).toBeGreaterThan(0);        // s2 Admin HR
+    expect(screen.getAllByText(/12 karyawan/i).length).toBeGreaterThan(0);        // s3 Manager
+    expect(screen.getAllByText(/fikri maulana/i).length).toBeGreaterThan(0);      // s4 Employee
+    expect(screen.getAllByText(/^scanner$/i).length).toBeGreaterThan(0);          // v1 Check-in methods
+    expect(screen.getAllByText(/^in radius$/i).length).toBeGreaterThan(0);        // v1 Check-in status
+    expect(screen.getAllByText(/perlu review/i).length).toBeGreaterThan(0);       // v3 Exception Review
+    expect(screen.getAllByText(/rekap mei 2026/i).length).toBeGreaterThan(0);     // v4 HR-ready Report
   });
 
   it("workflow section mentions Payroll Input Readiness, not full payroll processing", () => {
