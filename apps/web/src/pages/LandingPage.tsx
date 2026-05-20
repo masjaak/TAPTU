@@ -15,6 +15,8 @@ import { motion, MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { WorkflowDiagram } from "../components/WorkflowDiagram";
+
 import { Shell } from "../components/Shell";
 
 const revealViewport = { once: true, margin: "-80px" } as const;
@@ -47,14 +49,6 @@ const deskItems = [
   }
 ];
 
-const workflowSteps = [
-  ["01", "Check-in Karyawan", "Karyawan melakukan check-in melalui mobile, QR, atau scanner."],
-  ["02", "Validasi Otomatis", "Taptu memeriksa waktu, lokasi, perangkat, QR/scanner, dan selfie proof."],
-  ["03", "Antrean Exception", "Data yang perlu perhatian masuk ke antrean review, bukan langsung jadi laporan final."],
-  ["04", "Review Manager", "Manager meninjau konteks tim dan memberi approval tahap pertama."],
-  ["05", "Keputusan HR", "HR memutuskan status final dengan jejak audit yang jelas."],
-  ["06", "Laporan HR-Ready", "Data bersih siap untuk laporan HR dan Payroll Input Readiness."]
-];
 
 const validationProgress = [
   {
@@ -450,27 +444,16 @@ export function LandingPage() {
               <motion.div className="mx-auto max-w-2xl text-center" variants={fadeUp}>
                 <SectionLabel>Workflow</SectionLabel>
                 <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] md:text-5xl">
-                  Dari check-in sampai laporan HR.
+                  Bagaimana Taptu bekerja.
                 </h2>
                 <p className="mt-5 text-base leading-8 text-[#b7bfca]">
-                  Setiap absensi punya status. Data yang normal bisa langsung dipakai, sementara data yang bermasalah masuk ke
-                  antrian review sebelum masuk laporan.
+                  Taptu membantu perusahaan mulai dari setup workspace, mengatur role, memvalidasi absensi karyawan, sampai
+                  menghasilkan laporan HR-ready yang lebih bisa dipercaya.
                 </p>
               </motion.div>
-              <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {workflowSteps.map(([number, title, copy]) => (
-                  <motion.article
-                    key={title}
-                    className="rounded-[26px] border border-white/10 bg-white/[0.07] p-6"
-                    variants={fadeUp}
-                    whileHover={{ y: -4 }}
-                  >
-                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#1769ff] text-sm font-black">{number}</div>
-                    <h3 className="mt-5 text-xl font-black tracking-[-0.03em]">{title}</h3>
-                    <p className="mt-2 text-sm leading-7 text-[#b7bfca]">{copy}</p>
-                  </motion.article>
-                ))}
-              </div>
+              <motion.div variants={fadeUp}>
+                <WorkflowDiagram />
+              </motion.div>
             </motion.section>
 
             <motion.section

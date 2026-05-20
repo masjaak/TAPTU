@@ -56,7 +56,7 @@ describe("landing page", () => {
   it("explains the landing page trust sequence", () => {
     renderAt("/");
     expect(screen.getByRole("heading", { name: /attendance desk untuk tim operasional/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /dari check-in sampai laporan/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /bagaimana taptu bekerja/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /ruang kerja berbeda untuk tiap peran/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /cocok untuk tim yang punya banyak cara hadir/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /approval mengikuti struktur tim/i })).toBeTruthy();
@@ -132,14 +132,16 @@ describe("landing page", () => {
     expect(screen.getByRole("heading", { name: /approval dua tahap/i })).toBeTruthy();
   });
 
-  it("workflow section has all 6 steps", () => {
+  it("workflow diagram has all 8 steps covering setup through reporting", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /check-in karyawan/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /validasi otomatis/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /antrean exception/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /review manager/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /keputusan hr/i })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /laporan hr-ready/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 1.*buat workspace/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 2.*setup organisasi/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 3.*tambah admin hr/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 4.*tambah manager/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 5.*tambah karyawan/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 6.*check-in karyawan/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 7.*validasi/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /step 8.*laporan hr-ready/i })).toBeTruthy();
   });
 
   it("workflow section mentions Payroll Input Readiness, not full payroll processing", () => {
@@ -148,9 +150,9 @@ describe("landing page", () => {
     expect(screen.queryByText(/full payroll processing/i)).toBeNull();
   });
 
-  it("workflow section heading reflects full HR flow", () => {
+  it("workflow section heading covers full product journey", () => {
     renderAt("/");
-    expect(screen.getByRole("heading", { name: /dari check-in sampai laporan hr/i })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /bagaimana taptu bekerja/i })).toBeTruthy();
   });
 
   it("answers the updated workflow questions", () => {
