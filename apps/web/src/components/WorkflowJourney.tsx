@@ -13,495 +13,598 @@ interface Step {
   title: string;
   desc: string;
   chip: string;
-  chipActive: string;
+  chapter: 0 | 1 | 2;
 }
 
-const LEFT_STEPS: Step[] = [
+const STEPS: Step[] = [
+  // Chapter 0: Setup Workspace
   {
-    id: "s1",
-    title: "Superadmin Setup",
-    desc: "Superadmin membuat workspace pertama dan menjadi pemilik sistem. Atur perusahaan, lokasi, dan aturan validasi.",
-    chip: "Superadmin",
-    chipActive: "bg-[#4c1d95]/50 text-[#c4b5fd]"
+    id: "01", chapter: 0, chip: "Superadmin",
+    title: "Buat Workspace",
+    desc: "Superadmin membuat workspace pertama dan menjadi pemilik sistem."
   },
   {
-    id: "s2",
-    title: "Admin HR",
-    desc: "HR/Admin disiapkan untuk memantau absensi, mengelola approval, dan mengakses laporan organisasi.",
-    chip: "HR/Admin",
-    chipActive: "bg-[#164e63]/70 text-[#67e8f9]"
+    id: "02", chapter: 0, chip: "Setup",
+    title: "Setup Organisasi",
+    desc: "Atur lokasi kerja, shift, divisi, dan aturan validasi absensi."
   },
   {
-    id: "s3",
-    title: "Manager",
-    desc: "Manager mendapat akses tim yang ditugaskan. Hanya melihat tim dalam supervisinya.",
-    chip: "Manager",
-    chipActive: "bg-[#1e3a5f]/70 text-[#93c5fd]"
+    id: "03", chapter: 0, chip: "HR/Admin",
+    title: "Tambah Admin HR",
+    desc: "HR/Admin mendapat akses monitor absensi, approval, dan laporan."
   },
   {
-    id: "s4",
-    title: "Employee",
-    desc: "Karyawan ditetapkan ke divisi, manager, shift, dan lokasi kerja sebelum mulai check-in.",
-    chip: "Employee",
-    chipActive: "bg-white/15 text-white/80"
+    id: "04", chapter: 0, chip: "Manager",
+    title: "Tambah Manager",
+    desc: "Manager hanya melihat tim yang berada dalam supervisinya."
+  },
+  {
+    id: "05", chapter: 0, chip: "Employee",
+    title: "Tambah Karyawan",
+    desc: "Karyawan ditetapkan ke divisi, manager, shift, dan lokasi kerja."
+  },
+  // Chapter 1: Validasi Kehadiran
+  {
+    id: "06", chapter: 1, chip: "Check-in",
+    title: "Check-in Karyawan",
+    desc: "Karyawan check-in melalui mobile, QR, selfie, atau scanner."
+  },
+  {
+    id: "07", chapter: 1, chip: "Validasi",
+    title: "Validasi & Review",
+    desc: "Taptu cek waktu, lokasi, perangkat, QR/scanner, dan selfie proof. Data bermasalah masuk antrean."
+  },
+  // Chapter 2: Approval & Laporan
+  {
+    id: "08", chapter: 2, chip: "HR Ready",
+    title: "Laporan HR-Ready",
+    desc: "HR memberi keputusan final. Data bersih siap untuk rekap dan Payroll Input Readiness."
   }
 ];
 
-const RIGHT_STEPS: Step[] = [
-  {
-    id: "v1",
-    title: "Check-in",
-    desc: "Karyawan check-in melalui mobile, QR, selfie, atau scanner. Taptu mencatat waktu, lokasi, dan bukti hadir.",
-    chip: "Check-in",
-    chipActive: "bg-[#1769ff]/35 text-[#93b4ff]"
-  },
-  {
-    id: "v2",
-    title: "Validation Layer",
-    desc: "Taptu memeriksa waktu, lokasi, perangkat, QR/scanner, dan selfie proof secara otomatis.",
-    chip: "Validasi",
-    chipActive: "bg-[#1e3a5f]/70 text-[#93c5fd]"
-  },
-  {
-    id: "v3",
-    title: "Exception Review",
-    desc: "Data bermasalah masuk antrean exception. Manager review dan memberi keputusan sebelum diteruskan ke HR.",
-    chip: "Needs Review",
-    chipActive: "bg-[#7c2d12]/50 text-[#fdba74]"
-  },
-  {
-    id: "v4",
-    title: "HR-ready Report",
-    desc: "HR memberi keputusan final. Data bersih siap untuk rekap, laporan, dan Payroll Input Readiness.",
-    chip: "HR Ready",
-    chipActive: "bg-emerald-900/50 text-emerald-300"
-  }
-];
+const CHAPTER_INFO = [
+  { label: "Setup Workspace",      dot: "#1769ff", pill: "bg-blue-500/15 text-blue-300 border-blue-400/30" },
+  { label: "Validasi Kehadiran",   dot: "#f59e0b", pill: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
+  { label: "Approval & Laporan",   dot: "#10b981", pill: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" }
+] as const;
 
-const ALL_STEPS: Step[] = [...LEFT_STEPS, ...RIGHT_STEPS];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// ─── Mini previews (compact for hub cards) ────────────────────────────────────
+function tx(on: string, off: string, active: boolean) {
+  return active ? on : off;
+}
 
-function PreviewShell({ isActive, children }: { isActive: boolean; children: React.ReactNode }) {
+// ─── Browser frame (Setup + Report stages) ────────────────────────────────────
+
+function BrowserFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={`mt-3 rounded-[12px] border p-2.5 transition-all duration-500 ${
-        isActive ? "border-white/18 bg-white/[0.08]" : "border-white/8 bg-white/[0.025]"
-      }`}
-    >
+    <div className="overflow-hidden rounded-[16px] bg-white shadow-[0_28px_80px_rgba(10,18,32,0.32),0_4px_16px_rgba(10,18,32,0.14)]">
+      <div className="flex items-center gap-2 border-b border-gray-200/80 bg-[#F2F4F7] px-4 py-2.5">
+        <div className="flex gap-1.5 shrink-0">
+          <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
+          <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
+          <div className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
+        </div>
+        <div className="flex-1 mx-3">
+          <div className="rounded-[6px] bg-white/80 py-1 text-center text-[11px] text-gray-400">
+            app.taptu.id
+          </div>
+        </div>
+      </div>
       {children}
     </div>
   );
 }
 
-function tx(isActive: boolean, on: string, off: string) {
-  return isActive ? on : off;
-}
+// ─── Phone frame (Attendance stage) ──────────────────────────────────────────
 
-// s1 — Superadmin Setup
-function PreviewS1({ isActive }: { isActive: boolean }) {
+function PhoneFrame({ children }: { children: React.ReactNode }) {
   return (
-    <PreviewShell isActive={isActive}>
-      <div className="flex items-center gap-2">
-        <div className="grid h-6 w-6 shrink-0 place-items-center rounded-[8px] bg-[#111827]">
-          <span className="text-[10px] font-black text-white">T</span>
-        </div>
-        <p className={`truncate text-[10px] font-black ${tx(isActive, "text-white/90", "text-white/35")}`}>
-          PT Maju Jaya
-        </p>
+    <div className="mx-auto w-52 overflow-hidden rounded-[36px] border-[5px] border-[#1A1D26] bg-[#1A1D26] shadow-[0_28px_80px_rgba(10,18,32,0.40)]">
+      <div className="relative overflow-hidden rounded-[28px] bg-[#0D0F16]" style={{ minHeight: 300 }}>
+        <div className="absolute left-1/2 top-3 z-10 h-3.5 w-16 -translate-x-1/2 rounded-full bg-black" />
+        {children}
       </div>
-      <div className="mt-1.5 flex items-center gap-1">
-        <div className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-white/15"}`} />
-        <span className={`text-[9px] font-bold ${tx(isActive, "text-emerald-300", "text-white/20")}`}>
-          Workspace aktif
-        </span>
-      </div>
-    </PreviewShell>
+    </div>
   );
 }
 
-// s2 — Admin HR
-function PreviewS2({ isActive }: { isActive: boolean }) {
-  return (
-    <PreviewShell isActive={isActive}>
-      <div className="flex items-center gap-1.5">
-        <div
-          className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-black ${
-            isActive ? "bg-[#164e63] text-[#67e8f9]" : "bg-white/8 text-white/30"
-          }`}
-        >
-          N
-        </div>
-        <p className={`min-w-0 flex-1 text-[10px] font-black ${tx(isActive, "text-white/90", "text-white/35")}`}>
-          Nadia Putri
-        </p>
-        <span
-          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-            isActive ? "bg-[#164e63]/60 text-[#67e8f9]" : "bg-white/5 text-white/20"
-          }`}
-        >
-          Akses penuh
-        </span>
-      </div>
-    </PreviewShell>
-  );
-}
+// ─── Stage content per step (all kept in DOM via opacity toggle) ──────────────
 
-// s3 — Manager
-function PreviewS3({ isActive }: { isActive: boolean }) {
+// Step 01 — Buat Workspace
+function Stage01() {
   return (
-    <PreviewShell isActive={isActive}>
-      <div className="flex items-center gap-1.5">
-        <div
-          className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-black ${
-            isActive ? "bg-[#1e3a5f] text-[#93c5fd]" : "bg-white/8 text-white/30"
-          }`}
-        >
-          R
-        </div>
-        <p className={`min-w-0 flex-1 text-[10px] font-black ${tx(isActive, "text-white/90", "text-white/35")}`}>
-          Raka Saputra
-        </p>
-        <span className={`text-[9px] ${tx(isActive, "text-white/55", "text-white/20")}`}>12 karyawan</span>
-      </div>
-    </PreviewShell>
-  );
-}
-
-// s4 — Employee
-function PreviewS4({ isActive }: { isActive: boolean }) {
-  return (
-    <PreviewShell isActive={isActive}>
-      <div className="flex items-center gap-1.5">
-        <div
-          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-black ${
-            isActive ? "bg-white/15 text-white/80" : "bg-white/8 text-white/30"
-          }`}
-        >
-          F
-        </div>
-        <p className={`text-[10px] font-black ${tx(isActive, "text-white/90", "text-white/35")}`}>Fikri Maulana</p>
-      </div>
-      <div className="mt-1.5 flex gap-1">
-        {["Operasional", "Shift Pagi"].map((tag) => (
-          <span
-            key={tag}
-            className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold ${
-              isActive ? "bg-white/10 text-white/65" : "bg-white/5 text-white/20"
-            }`}
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-    </PreviewShell>
-  );
-}
-
-// v1 — Check-in
-function PreviewV1({ isActive }: { isActive: boolean }) {
-  return (
-    <PreviewShell isActive={isActive}>
-      <div className="flex items-center justify-between">
-        <span className={`text-[11px] font-black tabular-nums ${tx(isActive, "text-white", "text-white/35")}`}>
-          08:42
-        </span>
-        <span
-          className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-            isActive ? "bg-emerald-900/50 text-emerald-300" : "bg-white/5 text-white/20"
-          }`}
-        >
-          In radius
-        </span>
-      </div>
-      <div className="mt-1.5 flex gap-1">
-        {["QR", "Manual", "Scanner"].map((m) => (
-          <div
-            key={m}
-            className={`flex-1 rounded-[6px] py-0.5 text-center text-[8px] font-bold ${
-              isActive ? "bg-[#1769ff]/20 text-[#93b4ff]" : "bg-white/5 text-white/20"
-            }`}
-          >
-            {m}
+    <BrowserFrame>
+      <div className="p-5 space-y-3">
+        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Workspace baru</p>
+        <div className="flex items-center gap-3 rounded-[12px] border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] bg-[#1769ff] text-sm font-black text-white">
+            T
           </div>
-        ))}
+          <div className="min-w-0 flex-1">
+            <p className="font-black text-gray-900">PT Maju Jaya</p>
+            <p className="mt-0.5 text-xs text-gray-400">taptu.app/pt-maju-jaya</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[11px] font-bold text-emerald-700">Workspace aktif</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {[["Superadmin", "#1769ff"], ["Owner", "#6366f1"]].map(([role, col]) => (
+            <div key={role} className="rounded-[10px] bg-gray-50 p-3">
+              <div className="grid h-7 w-7 place-items-center rounded-[8px] text-[10px] font-black text-white" style={{ background: col }}>S</div>
+              <p className="mt-2 text-xs font-black text-gray-800">{role}</p>
+            </div>
+          ))}
+        </div>
       </div>
-    </PreviewShell>
+    </BrowserFrame>
   );
 }
 
-// v2 — Validation Layer
-function PreviewV2({ isActive }: { isActive: boolean }) {
-  const checks = [
-    { label: "Waktu", ok: true },
-    { label: "Lokasi", ok: true },
-    { label: "QR/Scanner", ok: true },
-    { label: "Selfie", ok: false }
+// Step 02 — Setup Organisasi
+function Stage02() {
+  const rows = [
+    ["Lokasi", "Kantor Pusat — Jakarta"],
+    ["Shift", "07:00 – 16:00"],
+    ["GPS radius", "500 m"],
+    ["Validasi", "QR + Selfie + GPS"]
   ] as const;
   return (
-    <PreviewShell isActive={isActive}>
-      <div className="space-y-1">
-        {checks.map(({ label, ok }) => (
-          <div key={label} className="flex items-center gap-1">
-            <div
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                isActive ? (ok ? "bg-emerald-400" : "bg-orange-400") : "bg-white/15"
-              }`}
-            />
-            <span className={`flex-1 text-[9px] ${tx(isActive, "text-white/60", "text-white/25")}`}>{label}</span>
-            <span
-              className={`text-[9px] font-bold ${
-                isActive ? (ok ? "text-emerald-300/80" : "text-orange-300/80") : "text-white/20"
-              }`}
-            >
-              {ok ? "✓" : "⚠"}
+    <BrowserFrame>
+      <div className="p-5 space-y-3">
+        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Setup Organisasi</p>
+        <div className="divide-y divide-gray-100 rounded-[12px] border border-gray-100 bg-white shadow-sm">
+          {rows.map(([label, val]) => (
+            <div key={label} className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-gray-500">{label}</span>
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold text-gray-700">{val}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 rounded-[10px] bg-blue-50 border border-blue-200 px-3 py-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-[#1769ff]" />
+          <span className="text-[11px] font-bold text-blue-700">Konfigurasi disimpan</span>
+        </div>
+      </div>
+    </BrowserFrame>
+  );
+}
+
+// Step 03 — Tambah Admin HR
+function Stage03() {
+  return (
+    <BrowserFrame>
+      <div className="p-5 space-y-3">
+        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Undang Admin HR</p>
+        <div className="rounded-[12px] border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 p-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-100 text-sm font-black text-teal-700">N</div>
+            <div className="min-w-0 flex-1">
+              <p className="font-black text-gray-900">Nadia Putri</p>
+              <p className="mt-0.5 text-xs text-gray-500">nadia@pt-maju-jaya.com</p>
+            </div>
+            <span className="shrink-0 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-700">
+              Akses penuh
             </span>
           </div>
-        ))}
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {["Absensi", "Approval", "Laporan", "Divisi"].map(f => (
+                <span key={f} className="rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-600">{f}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="rounded-[10px] bg-teal-50 border border-teal-200 px-3 py-2 flex items-center gap-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-teal-500" />
+          <span className="text-[11px] font-bold text-teal-700">HR/Admin role aktif</span>
+        </div>
       </div>
-    </PreviewShell>
+    </BrowserFrame>
   );
 }
 
-// v3 — Exception Review
-function PreviewV3({ isActive }: { isActive: boolean }) {
+// Step 04 — Tambah Manager
+function Stage04() {
   return (
-    <PreviewShell isActive={isActive}>
-      <div className="flex items-center gap-1.5">
-        <div
-          className={`grid h-5 w-5 shrink-0 place-items-center rounded-[6px] text-[10px] font-black ${
-            isActive ? "bg-[#7c2d12]/50 text-[#fdba74]" : "bg-white/8 text-white/30"
-          }`}
-        >
-          3
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className={`text-[9px] font-bold ${tx(isActive, "text-[#fdba74]", "text-white/20")}`}>Perlu Review</p>
-          <p className={`text-[8px] ${tx(isActive, "text-white/45", "text-white/15")}`}>Selfie exception</p>
+    <BrowserFrame>
+      <div className="p-5 space-y-3">
+        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Tambah Manager</p>
+        <div className="rounded-[12px] border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 p-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-sm font-black text-blue-700">R</div>
+            <div className="min-w-0 flex-1">
+              <p className="font-black text-gray-900">Raka Saputra</p>
+              <p className="mt-0.5 text-xs text-gray-500">Manager — Divisi Operasional</p>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-1.5">
+                {["F","A","D","B","C"].map((l, i) => (
+                  <div key={i} className="grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-gray-200 text-[9px] font-black text-gray-600">{l}</div>
+                ))}
+              </div>
+              <span className="text-xs text-gray-500">12 karyawan dalam tim</span>
+            </div>
+          </div>
         </div>
       </div>
-    </PreviewShell>
+    </BrowserFrame>
   );
 }
 
-// v4 — HR-ready Report
-function PreviewV4({ isActive }: { isActive: boolean }) {
-  const stats = [
-    { val: "18", col: "text-emerald-300", label: "Hadir" },
-    { val: "2", col: "text-orange-300", label: "Terlambat" },
-    { val: "1", col: "text-[#93b4ff]", label: "Izin" }
+// Step 05 — Tambah Karyawan
+function Stage05() {
+  return (
+    <BrowserFrame>
+      <div className="p-5 space-y-3">
+        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Tambah Karyawan</p>
+        <div className="rounded-[12px] border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 p-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gray-200 text-sm font-black text-gray-600">F</div>
+            <div className="min-w-0 flex-1">
+              <p className="font-black text-gray-900">Fikri Maulana</p>
+              <p className="mt-0.5 text-xs text-gray-500">fikri@pt-maju-jaya.com</p>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {["Divisi Operasional", "Shift Pagi 07:00", "Blok A — Jakarta"].map(tag => (
+                <span key={tag} className="rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-600">{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[["Manager", "Raka S."], ["Shift", "07:00–16:00"], ["Lokasi", "Blok A"]].map(([k, v]) => (
+            <div key={k} className="rounded-[10px] bg-gray-50 border border-gray-100 p-2 text-center">
+              <p className="text-[9px] text-gray-400">{k}</p>
+              <p className="mt-0.5 text-[11px] font-black text-gray-700">{v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </BrowserFrame>
+  );
+}
+
+// Step 06 — Check-in Karyawan (phone frame)
+function Stage06() {
+  return (
+    <PhoneFrame>
+      <div className="px-4 pt-10 pb-5 space-y-3">
+        <div className="text-center">
+          <p className="text-3xl font-black tabular-nums text-white">08:42</p>
+          <p className="mt-0.5 text-xs text-white/40">Senin, 20 Mei 2026</p>
+        </div>
+        <div className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 py-1.5">
+          <div className="h-2 w-2 rounded-full bg-emerald-400" />
+          <span className="text-[11px] font-bold text-emerald-300">In radius</span>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {["QR", "Manual", "Scanner"].map(m => (
+            <div key={m} className="rounded-[10px] bg-white/8 border border-white/12 py-2 text-center text-[10px] font-bold text-white/60">
+              {m}
+            </div>
+          ))}
+        </div>
+        <div className="rounded-[12px] bg-[#1769ff] py-2.5 text-center text-[11px] font-black text-white">
+          Check-in Sekarang
+        </div>
+        <div className="divide-y divide-white/8 rounded-[12px] bg-white/6 border border-white/10 text-[10px]">
+          {[["Lokasi", "Kantor Pusat ✓"], ["GPS", "500 m ✓"], ["Perangkat", "Terdaftar ✓"]].map(([k,v]) => (
+            <div key={k} className="flex items-center justify-between px-3 py-1.5">
+              <span className="text-white/40">{k}</span>
+              <span className="font-bold text-emerald-300">{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </PhoneFrame>
+  );
+}
+
+// Step 07 — Validasi & Review (phone + side panel)
+function Stage07() {
+  const checks = [
+    { label: "Waktu", val: "08:42", ok: true },
+    { label: "Lokasi", val: "Kantor Pusat", ok: true },
+    { label: "QR/Scanner", val: "Valid", ok: true },
+    { label: "Selfie", val: "Butuh Review", ok: false }
   ] as const;
   return (
-    <PreviewShell isActive={isActive}>
-      <p className={`text-[9px] font-black ${tx(isActive, "text-white/70", "text-white/25")}`}>Rekap Mei 2026</p>
-      <div className="mt-1 flex gap-1.5 text-center">
-        {stats.map(({ val, col, label }) => (
-          <div key={label} className="flex-1">
-            <p className={`text-[11px] font-black ${isActive ? col : "text-white/30"}`}>{val}</p>
-            <p className={`text-[8px] ${tx(isActive, "text-white/40", "text-white/20")}`}>{label}</p>
+    <div className="flex flex-col gap-4">
+      <PhoneFrame>
+        <div className="px-4 pt-10 pb-4 space-y-2">
+          <p className="text-center text-xs font-black text-white/60">Validasi Otomatis</p>
+          <div className="divide-y divide-white/8 rounded-[12px] bg-white/6 border border-white/10">
+            {checks.map(({ label, val, ok }) => (
+              <div key={label} className="flex items-center gap-2 px-3 py-2">
+                <div className={`h-2 w-2 shrink-0 rounded-full ${ok ? "bg-emerald-400" : "bg-orange-400"}`} />
+                <span className="flex-1 text-[10px] text-white/60">{label}</span>
+                <span className={`text-[10px] font-bold ${ok ? "text-emerald-300" : "text-orange-300"}`}>{val}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div
-        className={`mt-1.5 rounded-[6px] py-0.5 text-center text-[8px] font-bold ${
-          isActive ? "bg-emerald-900/40 text-emerald-300" : "bg-white/5 text-white/20"
-        }`}
-      >
-        Payroll Input Readiness
-      </div>
-    </PreviewShell>
+          <div className="rounded-[10px] bg-orange-500/15 border border-orange-400/30 px-3 py-2 flex items-center gap-2">
+            <span className="text-[10px] font-bold text-orange-300">1 item masuk antrean review</span>
+          </div>
+        </div>
+      </PhoneFrame>
+    </div>
   );
 }
 
-const MINI_PREVIEWS: Record<string, React.ComponentType<{ isActive: boolean }>> = {
-  s1: PreviewS1, s2: PreviewS2, s3: PreviewS3, s4: PreviewS4,
-  v1: PreviewV1, v2: PreviewV2, v3: PreviewV3, v4: PreviewV4
-};
-
-// ─── Hub center card ──────────────────────────────────────────────────────────
-
-function HubCard({ activeIndex }: { activeIndex: number }) {
-  const chips = ["Validasi", "Approval", "Audit Trail", "HR-ready"];
-  const phase = activeIndex < 4 ? "Setup" : "Validation";
+// Step 08 — Laporan HR-Ready
+function Stage08() {
+  const stats = [
+    { val: "18", label: "Hadir", col: "text-emerald-600" },
+    { val: "2", label: "Terlambat", col: "text-amber-600" },
+    { val: "1", label: "Izin", col: "text-blue-600" }
+  ] as const;
   return (
-    <div className="relative flex w-full flex-col items-center rounded-[28px] border border-[#1769ff]/30 bg-[#1769ff]/10 p-5 text-center shadow-[0_0_40px_rgba(23,105,255,0.22)]">
-      {/* Breathing ring */}
-      <motion.div
-        className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-[#1769ff]/40"
-        animate={{ opacity: [0.3, 0.85, 0.3] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-      />
-      {/* Logo mark */}
-      <div className="grid h-10 w-10 place-items-center rounded-[14px] bg-[#1769ff] text-sm font-black text-white shadow-[0_0_16px_rgba(23,105,255,0.55)]">
-        T
-      </div>
-      {/* Brand */}
-      <p className="mt-3 text-base font-black tracking-[-0.03em] text-white">Taptu</p>
-      <p className="mt-0.5 text-[11px] leading-snug text-white/50">Attendance Validation OS</p>
-      {/* Feature chips */}
-      <div className="mt-3 flex flex-wrap justify-center gap-1">
-        {chips.map((chip) => (
-          <span
-            key={chip}
-            className="rounded-full border border-[#1769ff]/30 bg-[#1769ff]/12 px-2 py-0.5 text-[9px] font-bold text-[#93b4ff]"
-          >
-            {chip}
+    <BrowserFrame>
+      <div className="p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Laporan Kehadiran</p>
+            <p className="mt-0.5 font-black text-gray-900">Rekap Mei 2026</p>
+          </div>
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+            HR Ready
           </span>
-        ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {stats.map(({ val, label, col }) => (
+            <div key={label} className="rounded-[12px] border border-gray-100 bg-white p-3 text-center shadow-sm">
+              <p className={`text-2xl font-black ${col}`}>{val}</p>
+              <p className="mt-0.5 text-[10px] text-gray-500">{label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-[12px] border border-gray-100 bg-white p-4 shadow-sm space-y-2">
+          {[
+            { label: "Status", val: "Siap ekspor", ok: true },
+            { label: "Approval", val: "Selesai", ok: true },
+            { label: "Exception", val: "0 pending", ok: true }
+          ].map(({ label, val, ok }) => (
+            <div key={label} className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">{label}</span>
+              <span className={`flex items-center gap-1 text-[11px] font-bold ${ok ? "text-emerald-700" : "text-gray-600"}`}>
+                {ok && <span className="text-emerald-500">✓</span>} {val}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="text-[11px] font-bold text-emerald-700">Payroll Input Readiness</span>
+          </div>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-700">Export</span>
+        </div>
       </div>
-      {/* Step counter */}
-      <div className="mt-3 rounded-full bg-white/8 px-3 py-1 text-[9px] font-bold text-white/40 tabular-nums">
-        {phase} · {activeIndex + 1} / 8
-      </div>
-    </div>
+    </BrowserFrame>
   );
 }
 
-// ─── Connector line (always travels left→right for unified flow) ──────────────
+const STAGE_COMPONENTS = [Stage01, Stage02, Stage03, Stage04, Stage05, Stage06, Stage07, Stage08] as const;
 
-function ConnLine({
-  active,
-  lit,
-  lk,
-  ci
-}: {
-  active: boolean;
-  lit: boolean;
-  lk: number;
-  ci: number;
-}) {
+// ─── Product stage (all steps always in DOM, opacity toggle) ─────────────────
+
+function ProductStage({ activeIndex }: { activeIndex: number }) {
   return (
-    <div className="relative h-px w-10 shrink-0 lg:w-14">
-      {/* Track */}
-      <div className="h-px w-full bg-white/15" />
-      {/* Animated fill */}
-      {(active || lit) && (
-        <motion.div
-          key={`cf-${lk}-${ci}`}
-          className="absolute top-0 h-px w-full bg-[#1769ff]/65"
-          style={{ transformOrigin: "left center" }}
-          initial={{ scaleX: active ? 0 : 1 }}
-          animate={{ scaleX: 1 }}
-          transition={active ? { duration: CYCLE_MS / 1000, ease: "linear" } : { duration: 0 }}
-        />
-      )}
-      {/* Traveling dot */}
-      {active && (
-        <motion.div
-          key={`cd-${lk}-${ci}`}
-          className="absolute z-10 h-2 w-2 rounded-full bg-[#1769ff] shadow-[0_0_6px_rgba(23,105,255,0.9)]"
-          style={{ top: "calc(50% - 4px)" }}
-          initial={{ left: "0px" }}
-          animate={{ left: "calc(100% - 8px)" }}
-          transition={{ duration: CYCLE_MS / 1000, ease: "linear" }}
-        />
-      )}
+    <div className="relative">
+      {STEPS.map((step, i) => {
+        const StageComp = STAGE_COMPONENTS[i];
+        return (
+          <div
+            key={step.id}
+            aria-hidden={i !== activeIndex}
+            className={`transition-all duration-500 ${
+              i === activeIndex
+                ? "pointer-events-auto opacity-100"
+                : "pointer-events-none absolute inset-0 opacity-0"
+            }`}
+          >
+            <StageComp />
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// ─── Hub step card ────────────────────────────────────────────────────────────
+// ─── Chapter label pill ───────────────────────────────────────────────────────
 
-function HubStepCard({
+function ChapterPill({ chapter, small = false }: { chapter: 0 | 1 | 2; small?: boolean }) {
+  const info = CHAPTER_INFO[chapter];
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-bold ${info.pill} ${
+        small ? "text-[9px]" : "text-[10px]"
+      }`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: info.dot }} />
+      {info.label}
+    </span>
+  );
+}
+
+// ─── Desktop step list ────────────────────────────────────────────────────────
+
+function StepListItem({
   step,
   stepIdx,
   isActive,
+  isDone,
   onClick
 }: {
   step: Step;
   stepIdx: number;
   isActive: boolean;
+  isDone: boolean;
   onClick: () => void;
 }) {
-  const MiniPreview = MINI_PREVIEWS[step.id];
+  const dotColor = CHAPTER_INFO[step.chapter].dot;
   return (
-    <motion.button
+    <button
       onClick={onClick}
-      className={`relative w-full rounded-[18px] border p-4 text-left transition-all duration-500 ${
-        isActive
-          ? "border-[#1769ff]/55 bg-[#1769ff]/14 shadow-[0_0_24px_rgba(23,105,255,0.20)]"
-          : "border-white/10 bg-white/[0.06] hover:bg-white/[0.10] hover:border-white/20"
+      className={`group w-full rounded-[14px] px-4 py-3 text-left transition-all duration-400 ${
+        isActive ? "bg-white/[0.07] ring-1 ring-white/10" : "hover:bg-white/[0.04]"
       }`}
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.97 }}
     >
-      {isActive && (
-        <motion.div
-          className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#1769ff]/45"
-          animate={{ opacity: [0.4, 0.9, 0.4] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-      )}
-      <div className="flex items-start gap-2.5">
-        {/* Number badge */}
-        <div
-          className={`grid h-6 w-6 shrink-0 place-items-center rounded-[8px] text-[10px] font-black transition-all duration-500 ${
-            isActive ? "bg-[#1769ff] text-white" : "bg-white/10 text-white/40"
-          }`}
-        >
-          {stepIdx + 1}
+      <div className="flex items-start gap-3">
+        {/* Dot */}
+        <div className="relative mt-1 flex shrink-0 flex-col items-center">
+          <div
+            className="h-3 w-3 rounded-full border-2 transition-all duration-500"
+            style={{
+              borderColor: isActive || isDone ? dotColor : "rgba(255,255,255,0.20)",
+              background: isActive || isDone ? dotColor : "transparent"
+            }}
+          />
         </div>
+        {/* Content */}
         <div className="min-w-0 flex-1">
-          {/* Title */}
-          <p
-            className={`text-[12px] font-black leading-snug tracking-[-0.02em] transition-colors duration-500 ${
-              isActive ? "text-white" : "text-white/60"
-            }`}
-          >
-            {step.title}
-          </p>
-          {/* Status chip */}
-          <span
-            className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold transition-all duration-500 ${
-              isActive ? step.chipActive : "bg-white/8 text-white/25"
-            }`}
-          >
-            {step.chip}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[11px] font-black transition-colors duration-400 ${
+                isActive ? "text-white" : isDone ? "text-white/60" : "text-white/40"
+              }`}
+            >
+              {stepIdx + 1 < 10 ? `0${stepIdx + 1}` : stepIdx + 1}
+            </span>
+            <p
+              className={`text-[13px] font-black leading-tight transition-colors duration-400 ${
+                isActive ? "text-white" : isDone ? "text-white/55" : "text-white/35"
+              }`}
+            >
+              {step.title}
+            </p>
+          </div>
+          {isActive && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              transition={{ duration: 0.3 }}
+              className="mt-1.5 text-xs leading-5 text-white/50"
+            >
+              {step.desc}
+            </motion.p>
+          )}
         </div>
       </div>
-      {/* Mini visual preview */}
-      <MiniPreview isActive={isActive} />
-    </motion.button>
+    </button>
   );
 }
 
-// ─── Detail panel ─────────────────────────────────────────────────────────────
-// All step content stays in the DOM (opacity toggle, not removal)
-// so tests and screen readers can always find "Payroll Input Readiness".
-
-function DetailPanel({ activeIndex }: { activeIndex: number }) {
+function StepListPanel({ activeIndex, onPick }: { activeIndex: number; onPick: (i: number) => void }) {
+  const chapters = [0, 1, 2] as const;
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-6 lg:p-7">
-      {ALL_STEPS.map((step, i) => (
-        <div
-          key={step.id}
-          aria-hidden={i !== activeIndex}
-          className={`transition-all duration-350 ${
-            i === activeIndex
-              ? "pointer-events-auto opacity-100"
-              : "pointer-events-none absolute inset-0 p-6 opacity-0 lg:p-7"
-          }`}
-        >
-          <div className="flex items-start gap-5">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[16px] bg-[#1769ff] text-base font-black text-white lg:h-14 lg:w-14">
-              {i + 1}
+    <div className="space-y-2">
+      {chapters.map((ch) => {
+        const chSteps = STEPS.map((s, i) => ({ s, i })).filter(({ s }) => s.chapter === ch);
+        return (
+          <div key={ch}>
+            {/* Chapter label */}
+            <div className="mb-1.5 px-4">
+              <ChapterPill chapter={ch} />
             </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-base font-black leading-tight text-white lg:text-lg">{step.title}</p>
-              <p className="mt-2 text-sm leading-7 text-white/55 lg:text-[15px] lg:leading-8">{step.desc}</p>
-              <span className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-bold ${step.chipActive}`}>
-                {step.chip}
-              </span>
+            {/* Steps */}
+            {chSteps.map(({ s, i }) => (
+              <StepListItem
+                key={s.id}
+                step={s}
+                stepIdx={i}
+                isActive={activeIndex === i}
+                isDone={activeIndex > i}
+                onClick={() => onPick(i)}
+              />
+            ))}
+            {/* Divider between chapters */}
+            {ch < 2 && <div className="my-3 mx-4 h-px bg-white/8" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Desktop caption bar (below product stage) ────────────────────────────────
+
+function StageCaption({ activeIndex }: { activeIndex: number }) {
+  const step = STEPS[activeIndex];
+  return (
+    <div className="mt-4 overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.05] px-5 py-4">
+      <div className="flex items-start gap-4">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#1769ff] text-xs font-black text-white">
+          {step.id}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-black text-white">{step.title}</p>
+            <ChapterPill chapter={step.chapter} small />
+          </div>
+          <p className="mt-1 text-sm leading-6 text-white/50">{step.desc}</p>
+        </div>
+        <span className="shrink-0 text-xs font-bold tabular-nums text-white/25">
+          {activeIndex + 1} / {STEPS.length}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mobile layout ────────────────────────────────────────────────────────────
+
+function MobileLayout({ activeIndex, onPick }: { activeIndex: number; onPick: (i: number) => void }) {
+  return (
+    <div className="space-y-5">
+      {/* Chapter sections */}
+      {([0, 1, 2] as const).map((ch) => {
+        const chSteps = STEPS.map((s, i) => ({ s, i })).filter(({ s }) => s.chapter === ch);
+        const isChActive = STEPS[activeIndex].chapter === ch;
+        return (
+          <div key={ch}>
+            <div className="mb-2">
+              <ChapterPill chapter={ch} />
             </div>
-            <div className="shrink-0 pt-1">
-              <span className="text-xs font-bold tabular-nums text-white/25">
-                {i + 1} / {ALL_STEPS.length}
-              </span>
+            <div className="space-y-1.5">
+              {chSteps.map(({ s, i }) => (
+                <button
+                  key={s.id}
+                  onClick={() => onPick(i)}
+                  className={`flex w-full items-start gap-3 rounded-[12px] border p-3.5 text-left transition-all duration-400 ${
+                    activeIndex === i
+                      ? "border-[#1769ff]/40 bg-[#1769ff]/10"
+                      : "border-white/8 bg-white/[0.04] hover:bg-white/[0.07]"
+                  }`}
+                >
+                  <div
+                    className="mt-0.5 h-3 w-3 shrink-0 rounded-full border-2 transition-all duration-400"
+                    style={{
+                      borderColor: activeIndex === i || activeIndex > i ? CHAPTER_INFO[s.chapter].dot : "rgba(255,255,255,0.20)",
+                      background: activeIndex === i || activeIndex > i ? CHAPTER_INFO[s.chapter].dot : "transparent"
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <p className={`text-[12px] font-black leading-tight ${activeIndex === i ? "text-white" : "text-white/45"}`}>
+                      {s.title}
+                    </p>
+                    {activeIndex === i && (
+                      <p className="mt-1 text-[11px] leading-5 text-white/50">{s.desc}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -514,12 +617,12 @@ export function WorkflowJourney() {
   const [paused, setPaused] = useState(false);
   const resumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // TICK — auto-advance
+  // TICK — auto-advance every CYCLE_MS
   useEffect(() => {
     if (paused) return;
     const id = setInterval(() => {
       setActiveIndex((i) => {
-        const next = (i + 1) % ALL_STEPS.length;
+        const next = (i + 1) % STEPS.length;
         if (next === 0) setLoopKey((k) => k + 1);
         return next;
       });
@@ -529,7 +632,6 @@ export function WorkflowJourney() {
 
   useEffect(() => () => { if (resumeRef.current) clearTimeout(resumeRef.current); }, []);
 
-  // PICK — user selects step
   function pick(i: number) {
     setActiveIndex(i);
     setPaused(true);
@@ -540,132 +642,57 @@ export function WorkflowJourney() {
   return (
     <div className="mt-10 space-y-4">
 
-      {/* ── Desktop: hub layout ──────────────────────────────────────────────── */}
-      <div className="hidden lg:block">
-        {/* Group label row */}
-        <div className="mb-4 flex items-center">
-          <div className="flex-1 text-center">
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-              Setup &amp; Role Access
-            </span>
-          </div>
-          {/* Spacer to match hub + connector columns */}
-          <div className="w-64 shrink-0" />
-          <div className="flex-1 text-center">
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-              Attendance Validation Flow
-            </span>
-          </div>
+      {/* ── Desktop: step list (left) + product stage (right) ─────────────── */}
+      <div className="hidden lg:flex items-start gap-8">
+        {/* Left: step list */}
+        <div className="w-72 xl:w-80 shrink-0">
+          <StepListPanel activeIndex={activeIndex} onPick={pick} />
         </div>
 
-        {/* Hub grid: left cards | left connectors | hub | right connectors | right cards */}
-        <div
-          className="grid items-center gap-x-2 gap-y-4"
-          style={{
-            gridTemplateColumns: "1fr auto auto auto 1fr",
-            gridTemplateRows: "repeat(4, auto)"
-          }}
-        >
-          {/* Hub — col 3, spans all 4 rows */}
-          <div style={{ gridColumn: 3, gridRow: "1 / 5" }} className="flex justify-center self-stretch py-2">
-            <HubCard activeIndex={activeIndex} />
+        {/* Right: product stage + caption */}
+        <div className="min-w-0 flex-1">
+          {/* Floating glow behind the mockup */}
+          <div className="relative">
+            <div
+              className="pointer-events-none absolute -inset-8 rounded-full opacity-30 blur-3xl"
+              style={{
+                background: `radial-gradient(ellipse, ${CHAPTER_INFO[STEPS[activeIndex].chapter].dot}44 0%, transparent 70%)`
+              }}
+            />
+            <motion.div
+              key={`mockup-${loopKey}-${activeIndex}`}
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="relative"
+            >
+              <ProductStage activeIndex={activeIndex} />
+            </motion.div>
           </div>
-
-          {/* Left cards + connectors */}
-          {LEFT_STEPS.map((step, i) => {
-            const stepIdx = i;
-            const isActive = activeIndex === stepIdx;
-            const isLit = activeIndex > stepIdx;
-            return (
-              <Fragment key={step.id}>
-                <div style={{ gridColumn: 1, gridRow: i + 1 }}>
-                  <HubStepCard step={step} stepIdx={stepIdx} isActive={isActive} onClick={() => pick(stepIdx)} />
-                </div>
-                <div style={{ gridColumn: 2, gridRow: i + 1 }} className="flex items-center self-center">
-                  <ConnLine active={isActive} lit={isLit} lk={loopKey} ci={i} />
-                </div>
-              </Fragment>
-            );
-          })}
-
-          {/* Right connectors + cards */}
-          {RIGHT_STEPS.map((step, i) => {
-            const stepIdx = i + 4;
-            const isActive = activeIndex === stepIdx;
-            const isLit = activeIndex > stepIdx;
-            return (
-              <Fragment key={step.id}>
-                <div style={{ gridColumn: 4, gridRow: i + 1 }} className="flex items-center self-center">
-                  <ConnLine active={isActive} lit={isLit} lk={loopKey} ci={stepIdx} />
-                </div>
-                <div style={{ gridColumn: 5, gridRow: i + 1 }}>
-                  <HubStepCard step={step} stepIdx={stepIdx} isActive={isActive} onClick={() => pick(stepIdx)} />
-                </div>
-              </Fragment>
-            );
-          })}
+          <StageCaption activeIndex={activeIndex} />
         </div>
       </div>
 
-      {/* ── Mobile: hub top + 2×2 card grids ────────────────────────────────── */}
+      {/* ── Mobile: product stage (top) + chapter step list (below) ─────── */}
       <div className="lg:hidden space-y-5">
-        {/* Central hub card */}
-        <div className="flex justify-center">
-          <div className="w-56">
-            <HubCard activeIndex={activeIndex} />
-          </div>
-        </div>
-
-        {/* Setup group */}
-        <div>
-          <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-            Setup &amp; Role Access
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {LEFT_STEPS.map((step, i) => (
-              <HubStepCard
-                key={step.id}
-                step={step}
-                stepIdx={i}
-                isActive={activeIndex === i}
-                onClick={() => pick(i)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Validation group */}
-        <div>
-          <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-            Attendance Validation Flow
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {RIGHT_STEPS.map((step, i) => (
-              <HubStepCard
-                key={step.id}
-                step={step}
-                stepIdx={i + 4}
-                isActive={activeIndex === i + 4}
-                onClick={() => pick(i + 4)}
-              />
-            ))}
-          </div>
-        </div>
+        <ProductStage activeIndex={activeIndex} />
+        <MobileLayout activeIndex={activeIndex} onPick={pick} />
       </div>
 
-      {/* ── Detail panel ─────────────────────────────────────────────────────── */}
-      <DetailPanel activeIndex={activeIndex} />
-
-      {/* ── Progress dots ────────────────────────────────────────────────────── */}
-      <div className="flex gap-1.5 pt-1">
-        {ALL_STEPS.map((step, i) => (
+      {/* ── Progress dots ─────────────────────────────────────────────────── */}
+      <div className="flex gap-1.5 pt-2">
+        {STEPS.map((step, i) => (
           <button
             key={step.id}
             aria-label={`Step ${i + 1}: ${step.title}`}
             onClick={() => pick(i)}
             className={`h-1 flex-1 rounded-full transition-all duration-500 ${
-              i === activeIndex ? "bg-[#1769ff]" : "bg-white/20"
+              i === activeIndex
+                ? "opacity-100"
+                : activeIndex > i
+                ? "opacity-50"
+                : "opacity-20"
             }`}
+            style={{ background: i <= activeIndex ? CHAPTER_INFO[STEPS[i].chapter].dot : "#ffffff" }}
           />
         ))}
       </div>
