@@ -874,9 +874,16 @@ app.get("/api/dashboard", async (req, res) => {
     requests:
       user.role === "employee"
         ? store.requests.filter((item) => item.userId === user.id).map((item) => buildRequestItem(item))
-        : user.role === "admin"
+        : user.role === "admin" || user.role === "superadmin"
           ? store.requests.map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName))
-          : requestFeed[user.role] ?? requestFeed.employee,
+          : user.role === "manager"
+            ? (() => {
+                const teamIds = new Set(users.filter((u) => u.role === "employee" && u.managerId === user.id).map((u) => u.id));
+                return store.requests
+                  .filter((item) => teamIds.has(item.userId) && ["Izin", "Koreksi Absensi", "Lupa Check-in/out"].includes(item.category))
+                  .map((item) => buildRequestItem(item, users.find((entry) => entry.id === item.userId)?.fullName));
+              })()
+            : requestFeed[user.role] ?? requestFeed.employee,
     scannerToken: user.role === "scanner" ? store.scanner.token : undefined
   };
 

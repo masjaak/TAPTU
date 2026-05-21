@@ -157,4 +157,81 @@ describe("attendance API shared flow", () => {
     expect(checkIn.validationStatus).toBe("needs_review");
     expect(checkIn.validationReasons).toContain("Lokasi belum terekam.");
   });
+
+  it("fresh reset: manager sees Fikri as Belum hadir with no stale cuti/requests", async () => {
+    const superadminToken = await login("superadmin@taptu.app");
+    await request("/demo/reset", { method: "POST" }, superadminToken);
+
+    const managerToken = await login("manager@taptu.app");
+    const team = await request<EmployeeItem[]>("/admin/employees", {}, managerToken);
+
+    const fikri = team.find((e) => e.id === "usr-employee-01");
+    expect(fikri).toBeDefined();
+    expect(fikri?.checkInTime).toBeUndefined();
+
+    const managerRequests = await request<unknown[]>("/admin/requests", {}, managerToken);
+    expect(Array.isArray(managerRequests)).toBe(true);
+    expect(managerRequests).toHaveLength(0);
+  });
+
+  it("fresh reset: HR sees no stale attendance history and no stale requests", async () => {
+    const superadminToken = await login("superadmin@taptu.app");
+    await request("/demo/reset", { method: "POST" }, superadminToken);
+
+    const adminToken = await login("admin@taptu.app");
+    const reports = await request<ReportItem[]>("/admin/reports", {}, adminToken);
+    const staleRows = reports.filter((r) => r.checkInTime != null && new Date(r.checkInTime) < new Date(Date.now() - 24 * 60 * 60 * 1000));
+    expect(staleRows).toHaveLength(0);
+
+    const adminRequests = await request<unknown[]>("/admin/requests", {}, adminToken);
+    expect(adminRequests).toHaveLength(0);
+  });
+
+  it("time sync: Employee check-in time matches Manager and HR view exactly", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const managerToken = await login("manager@taptu.app");
+    const adminToken = await login("admin@taptu.app");
+
+    const checkIn = await request<AttendanceActionResponse>("/attendance/checkin", {
+      method: "POST",
+      body: JSON.stringify({ method: "Manual" })
+    }, employeeToken);
+    expect(checkIn.status).toBe(200);
+    const employeeCheckInTime: string | undefined = checkIn.record.checkInTime;
+    expect(employeeCheckInTime).toBeTruthy();
+
+    const managerTeam = await request<EmployeeItem[]>("/admin/employees", {}, managerToken);
+    const fikri = managerTeam.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkInTime).toBe(employeeCheckInTime);
+
+    const reports = await request<ReportItem[]>("/admin/reports", {}, adminToken);
+    const fikriReport = reports.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikriReport?.checkInTime).toBe(employeeCheckInTime);
+  });
+
+  it("manager review action: PATCH exception persists across reload", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const managerToken = await login("manager@taptu.app");
+
+    await request("/attendance/checkin", {
+      method: "POST",
+      body: JSON.stringify({ method: "Manual" })
+    }, employeeToken);
+
+    const exceptions = await request<{ id: string; status: string }[]>("/admin/exceptions", {}, managerToken);
+    if (exceptions.length === 0) return;
+
+    const exc = exceptions[0];
+    const reviewed = await request<{ exception: { status: string } }>(
+      `/admin/exceptions/${exc.id}`,
+      { method: "PATCH", body: JSON.stringify({ status: "Approved", adminNote: "Lokasi dimaklumi." }) },
+      managerToken
+    );
+    expect(reviewed.status).toBe(200);
+    expect(reviewed.exception?.status).toBe("Approved");
+
+    const afterReload = await request<{ id: string; status: string }[]>("/admin/exceptions", {}, managerToken);
+    const reloaded = afterReload.find((e) => e.id === exc.id);
+    expect(reloaded?.status).toBe("Approved");
+  });
 });

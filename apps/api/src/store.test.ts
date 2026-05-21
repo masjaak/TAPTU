@@ -20,7 +20,7 @@ describe("demo store persistence", () => {
 
     const store = await ensureStoreFile(filePath);
 
-    expect(store.requests.length).toBeGreaterThan(0);
+    expect(Array.isArray(store.requests)).toBe(true);
     const saved = JSON.parse(await readFile(filePath, "utf8")) as ReturnType<typeof createInitialStore>;
     expect(saved.scanner.token).toBe(store.scanner.token);
   });

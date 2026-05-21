@@ -740,7 +740,7 @@ export function listRecentAttendanceActivity(
       id: record.id ?? `activity-${record.userId}`,
       employeeName: userDirectory[record.userId] ?? "Employee",
       event: record.validationStatus === "verified" ? (record.state === "checked_out" ? "Check-out" : "Check-in") : "Butuh review",
-      time: (record.state === "checked_out" ? record.checkOutAt : record.checkInAt)?.slice(11, 16) ?? "--.--",
+      time: (record.state === "checked_out" ? record.checkOutAt : record.checkInAt) ?? "--.--",
       status: record.status,
       detail:
         record.validationStatus === "verified"
@@ -835,6 +835,7 @@ export function computeEmployeeSummary(store: DemoStore, userId: string) {
 
 export function createInitialStore(): DemoStore {
   const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const scanner = {
     id: "scanner-default",
     token: "HDR-31A-7XZ",
@@ -842,31 +843,14 @@ export function createInitialStore(): DemoStore {
     locationName: DEFAULT_LOCATION.name,
     expiresAt: new Date(now.getTime() + 30_000).toISOString(),
     status: "active" as const,
-    scansToday: 124,
-    recentScans: [
-      {
-        id: "scan-01",
-        employeeId: "usr-employee-01",
-        employeeName: "Fikri Maulana",
-        status: "success" as const,
-        detail: "QR valid di Gerbang Utama",
-        createdAt: "2026-05-02T08:03:00.000Z"
-      },
-      {
-        id: "scan-02",
-        employeeId: "usr-employee-03",
-        employeeName: "Leo Pratama",
-        status: "expired" as const,
-        detail: "Token sudah lewat masa aktif.",
-        createdAt: "2026-05-02T08:09:00.000Z"
-      }
-    ]
+    scansToday: 0,
+    recentScans: []
   };
 
   return {
     attendance: {
       "usr-employee-01": {
-        id: "att-usr-employee-01-2026-05-02",
+        id: `att-usr-employee-01-${today}`,
         userId: "usr-employee-01",
         shiftId: DEFAULT_SHIFT.id,
         shiftName: DEFAULT_SHIFT.name,
@@ -878,97 +862,15 @@ export function createInitialStore(): DemoStore {
         status: "Belum check-in",
         validationStatus: "verified",
         validationReasons: [],
-        selfieUrl: "",
-        createdAt: "2026-05-02T07:30:00.000Z",
-        updatedAt: "2026-05-02T07:30:00.000Z"
-      },
-      "usr-employee-02": {
-        id: "att-usr-employee-02-2026-05-02",
-        userId: "usr-employee-02",
-        shiftId: DEFAULT_SHIFT.id,
-        shiftName: DEFAULT_SHIFT.name,
-        shiftStartTime: DEFAULT_SHIFT.startTime,
-        shiftEndTime: DEFAULT_SHIFT.endTime,
-        locationId: DEFAULT_LOCATION.id,
-        locationName: DEFAULT_LOCATION.name,
-        state: "checked_in",
-        status: "Terlambat",
-        checkInAt: "2026-05-02T08:24:00.000Z",
-        checkInMethod: "GPS",
-        locationLat: -6.206,
-        locationLng: 106.851,
-        validationStatus: "needs_review",
-        validationReasons: ["Di luar radius lokasi kerja (603 m).", "Perangkat berbeda dari riwayat sebelumnya."],
-        selfieUrl: "",
-        deviceId: "android-hr-02-new",
-        createdAt: "2026-05-02T08:24:00.000Z",
-        updatedAt: "2026-05-02T08:24:00.000Z"
-      },
-      "usr-employee-03": {
-        id: "att-usr-employee-03-2026-05-02",
-        userId: "usr-employee-03",
-        shiftId: DEFAULT_SHIFT.id,
-        shiftName: DEFAULT_SHIFT.name,
-        shiftStartTime: DEFAULT_SHIFT.startTime,
-        shiftEndTime: DEFAULT_SHIFT.endTime,
-        locationId: DEFAULT_LOCATION.id,
-        locationName: DEFAULT_LOCATION.name,
-        state: "idle",
-        status: "Belum check-in",
-        validationStatus: "blocked",
-        validationReasons: ["Belum masuk geofence"],
-        selfieUrl: "",
-        deviceId: "android-ops-03",
-        createdAt: "2026-05-02T07:30:00.000Z",
-        updatedAt: "2026-05-02T07:30:00.000Z"
+        createdAt: `${today}T00:00:00.000Z`,
+        updatedAt: `${today}T00:00:00.000Z`
       }
     },
     attendanceHistory: [],
-    requests: [
-      {
-        id: "req-001",
-        userId: "usr-employee-01",
-        category: "Izin",
-        startDate: "2026-05-21",
-        endDate: "2026-05-21",
-        title: "Izin pribadi",
-        detail: "Perlu keluar kantor pukul 15.00 untuk urusan keluarga.",
-        status: "Menunggu",
-        createdAt: "2026-05-20T08:30:00.000Z"
-      }
-    ],
+    requests: [],
     scanner,
-    exceptions: [
-      {
-        id: "exc-001",
-        attendanceRecordId: "att-usr-employee-02-2026-05-02",
-        employeeId: "usr-employee-02",
-        exceptionType: "Outside radius",
-        reason: "Di luar radius lokasi kerja (603 m).",
-        status: "Need Review",
-        createdAt: "2026-05-02T08:24:00.000Z"
-      },
-      {
-        id: "exc-002",
-        attendanceRecordId: "att-usr-employee-02-2026-05-02",
-        employeeId: "usr-employee-02",
-        exceptionType: "Different device",
-        reason: "Perangkat berbeda dari riwayat sebelumnya.",
-        status: "Need Review",
-        createdAt: "2026-05-02T08:24:00.000Z"
-      }
-    ],
-    auditLogs: [
-      {
-        id: "audit-001",
-        action: "scanner_token_invalid_attempt",
-        actorName: "System",
-        actorRole: "scanner",
-        targetId: "scan-02",
-        detail: "Scan gagal karena token sudah expired.",
-        createdAt: "2026-05-02T08:09:00.000Z"
-      }
-    ],
+    exceptions: [],
+    auditLogs: [],
     notifications: [],
     workLocations: [DEFAULT_LOCATION],
     workLocationItems: [
@@ -1050,7 +952,7 @@ export function computeEmployeeList(
       if (record) {
         if (record.state === "checked_in" || record.state === "checked_out") {
           todayStatus = record.status === "Terlambat" ? "late" : "present";
-          checkInTime = record.checkInAt?.slice(11, 16);
+          checkInTime = record.checkInAt;
           validationStatus = record.validationStatus;
         }
       }

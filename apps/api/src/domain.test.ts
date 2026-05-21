@@ -94,7 +94,7 @@ describe("attendance state machine", () => {
   });
 
   it("creates late check-in records with validation metadata", () => {
-    const current = createInitialStore().attendance["usr-employee-03"];
+    const current = createIdleRecord();
     const next = createCheckInRecord(current, {
       type: "CHECK_IN",
       method: "GPS",
@@ -215,7 +215,7 @@ describe("scanner token", () => {
       createdAt: "2026-05-02T08:33:00.000Z"
     });
 
-    expect(scanner.scansToday).toBeGreaterThan(124);
+    expect(scanner.scansToday).toBeGreaterThan(0);
     expect(scanner.recentScans[0]?.id).toBe("scan-x");
   });
 });
@@ -242,7 +242,18 @@ describe("request state machine", () => {
   });
 
   it("allows manager to approve operational request types only", () => {
-    const next = reduceRequests(createInitialStore().requests, {
+    const pending = [{
+      id: "req-001",
+      userId: "usr-employee-01",
+      category: "Izin" as const,
+      startDate: "2026-05-21",
+      endDate: "2026-05-21",
+      title: "Izin tim",
+      detail: "Butuh izin operasional.",
+      status: "Menunggu" as const,
+      createdAt: "2026-05-20T08:30:00.000Z"
+    }];
+    const next = reduceRequests(pending, {
       type: "APPROVE",
       id: "req-001",
       actorRole: "manager",
@@ -378,7 +389,7 @@ describe("request state machine", () => {
 
 describe("exceptions and audit", () => {
   it("creates attendance exceptions", () => {
-    const record = createInitialStore().attendance["usr-employee-02"];
+    const record = createIdleRecord();
     const exception = createAttendanceException(record, "usr-employee-02", "Outside radius", "Di luar radius lokasi kerja.");
 
     expect(exception.status).toBe("Need Review");
@@ -386,7 +397,18 @@ describe("exceptions and audit", () => {
   });
 
   it("updates exception review state", () => {
-    const next = reduceExceptionReview(createInitialStore().exceptions, {
+    const exceptions = [
+      {
+        id: "exc-001",
+        attendanceRecordId: "att-1",
+        employeeId: "usr-employee-02",
+        exceptionType: "Outside radius" as const,
+        reason: "Di luar radius lokasi kerja (603 m).",
+        status: "Need Review" as const,
+        createdAt: "2026-05-02T08:24:00.000Z"
+      }
+    ];
+    const next = reduceExceptionReview(exceptions, {
       id: "exc-001",
       status: "Approved",
       actorName: "Nadia Putri",
@@ -409,7 +431,30 @@ describe("exceptions and audit", () => {
 
 describe("overview and summary", () => {
   it("returns dashboard counts including exceptions", () => {
-    const overview = computeAdminOverview(createInitialStore(), 4, {
+    const store = createInitialStore();
+    store.attendance["usr-employee-02"] = {
+      id: "att-usr-employee-02-test",
+      userId: "usr-employee-02",
+      shiftId: "shift-pagi",
+      shiftName: "Shift Pagi",
+      shiftStartTime: "08:00",
+      shiftEndTime: "17:00",
+      locationId: "loc-hq",
+      locationName: "Kantor Pusat",
+      state: "checked_in",
+      status: "Terlambat",
+      checkInAt: "2026-05-02T08:24:00.000Z",
+      checkInMethod: "GPS",
+      validationStatus: "needs_review",
+      validationReasons: ["Di luar radius lokasi kerja (603 m)."],
+      createdAt: "2026-05-02T08:24:00.000Z",
+      updatedAt: "2026-05-02T08:24:00.000Z"
+    };
+    store.exceptions = [
+      { id: "exc-001", attendanceRecordId: "att-usr-employee-02-test", employeeId: "usr-employee-02", exceptionType: "Outside radius", reason: "Di luar radius.", status: "Need Review", createdAt: "2026-05-02T08:24:00.000Z" },
+      { id: "exc-002", attendanceRecordId: "att-usr-employee-02-test", employeeId: "usr-employee-02", exceptionType: "Different device", reason: "Perangkat berbeda.", status: "Need Review", createdAt: "2026-05-02T08:24:00.000Z" }
+    ];
+    const overview = computeAdminOverview(store, 4, {
       "usr-employee-01": "Fikri Maulana",
       "usr-employee-02": "Anisa Rahma"
     });
@@ -584,6 +629,24 @@ describe("computeEmployeeList", () => {
 
   it("returns late for terlambat employee", () => {
     const store = createInitialStore();
+    store.attendance["usr-employee-02"] = {
+      id: "att-usr-employee-02-test",
+      userId: "usr-employee-02",
+      shiftId: "shift-pagi",
+      shiftName: "Shift Pagi",
+      shiftStartTime: "08:00",
+      shiftEndTime: "17:00",
+      locationId: "loc-hq",
+      locationName: "Kantor Pusat",
+      state: "checked_in",
+      status: "Terlambat",
+      checkInAt: "2026-05-02T08:24:00.000Z",
+      checkInMethod: "GPS",
+      validationStatus: "needs_review",
+      validationReasons: [],
+      createdAt: "2026-05-02T08:24:00.000Z",
+      updatedAt: "2026-05-02T08:24:00.000Z"
+    };
     const users = [
       { id: "usr-employee-02", fullName: "Anisa Rahma", email: "anisa@taptu.app", role: "employee" as UserRole }
     ];
@@ -623,8 +686,47 @@ describe("toWorkLocationModel", () => {
 });
 
 describe("buildAttendanceReportRows", () => {
-  it("builds rows from store attendance records", () => {
+  function buildStoreWithMultipleEmployees() {
     const store = createInitialStore();
+    store.attendance["usr-employee-02"] = {
+      id: "att-usr-employee-02-test",
+      userId: "usr-employee-02",
+      shiftId: "shift-pagi",
+      shiftName: "Shift Pagi",
+      shiftStartTime: "08:00",
+      shiftEndTime: "17:00",
+      locationId: "loc-hq",
+      locationName: "Kantor Pusat",
+      state: "checked_in",
+      status: "Terlambat",
+      checkInAt: "2026-05-02T08:24:00.000Z",
+      checkInMethod: "GPS",
+      validationStatus: "needs_review",
+      validationReasons: ["Di luar radius lokasi kerja (603 m)."],
+      createdAt: "2026-05-02T08:24:00.000Z",
+      updatedAt: "2026-05-02T08:24:00.000Z"
+    };
+    store.attendance["usr-employee-03"] = {
+      id: "att-usr-employee-03-test",
+      userId: "usr-employee-03",
+      shiftId: "shift-pagi",
+      shiftName: "Shift Pagi",
+      shiftStartTime: "08:00",
+      shiftEndTime: "17:00",
+      locationId: "loc-hq",
+      locationName: "Kantor Pusat",
+      state: "idle",
+      status: "Belum check-in",
+      validationStatus: "verified",
+      validationReasons: [],
+      createdAt: "2026-05-02T07:30:00.000Z",
+      updatedAt: "2026-05-02T07:30:00.000Z"
+    };
+    return store;
+  }
+
+  it("builds rows from store attendance records", () => {
+    const store = buildStoreWithMultipleEmployees();
     const dir = { "usr-employee-01": "Fikri Maulana", "usr-employee-02": "Anisa Rahma", "usr-employee-03": "Leo Pratama" };
     const rows = buildAttendanceReportRows(store, dir);
     expect(rows.length).toBeGreaterThan(0);
@@ -632,7 +734,7 @@ describe("buildAttendanceReportRows", () => {
   });
 
   it("marks late rows correctly", () => {
-    const store = createInitialStore();
+    const store = buildStoreWithMultipleEmployees();
     const dir = { "usr-employee-02": "Anisa Rahma" };
     const rows = buildAttendanceReportRows(store, dir);
     const lateRow = rows.find((r) => r.employeeId === "usr-employee-02");
@@ -640,7 +742,7 @@ describe("buildAttendanceReportRows", () => {
   });
 
   it("filters rows by department and review status without narrowing defaults", () => {
-    const store = createInitialStore();
+    const store = buildStoreWithMultipleEmployees();
     const dir = { "usr-employee-01": "Fikri Maulana", "usr-employee-02": "Anisa Rahma", "usr-employee-03": "Leo Pratama" };
     const departments = {
       "usr-employee-01": { departmentId: "dep-ops", departmentName: "Operations" },

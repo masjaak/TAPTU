@@ -1296,9 +1296,7 @@ export async function supabaseGetAdminOverview(
           ? ((row.profiles as { full_name?: string }).full_name ?? "Employee")
           : "Employee",
       event: row.validation_status === "verified" ? (row.state === "checked_out" ? "Check-out" : "Check-in") : "Butuh review",
-      time: row.check_in_time
-        ? new Date(row.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
-        : "--.--",
+      time: row.check_in_time ?? "--.--",
       status: row.status ?? (row.state === "checked_out" ? "Selesai" : "Tepat waktu"),
       detail: row.validation_status === "verified" ? "Sinkron dari attendance_records" : ((row.validation_reasons as string[] | null)?.join(", ") ?? "Butuh review")
     }))
@@ -1374,9 +1372,7 @@ export async function supabaseGetManagerOverview(
       id: `${row.employee_id}-${index}`,
       employeeName: employeeNameById.get(row.employee_id) ?? "Employee",
       event: row.validation_status === "verified" ? (row.state === "checked_out" ? "Check-out" : "Check-in") : "Butuh review",
-      time: row.check_in_time
-        ? new Date(row.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
-        : "--.--",
+      time: row.check_in_time ?? "--.--",
       status: row.status ?? (row.state === "checked_out" ? "Selesai" : "Tepat waktu"),
       detail: row.validation_status === "verified" ? "Sinkron dari attendance_records" : ((row.validation_reasons as string[] | null)?.join(", ") ?? "Butuh review")
     }))
@@ -1420,7 +1416,7 @@ async function getEmployeeListForProfiles(
       role: profile.role as UserRole,
       ...readProfileStructure(profile),
       todayStatus,
-      checkInTime: record?.check_in_time ? new Date(record.check_in_time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : undefined,
+      checkInTime: record?.check_in_time ?? undefined,
       validationStatus: record?.validation_status as EmployeeListItem["validationStatus"] | undefined,
       shiftName: record?.shift_id ?? undefined,
       locationName: workLocation?.name ?? undefined

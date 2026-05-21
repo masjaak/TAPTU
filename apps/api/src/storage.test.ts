@@ -28,7 +28,7 @@ describe("storage adapter", () => {
     );
 
     const store = await adapter.load();
-    expect(store.requests.length).toBeGreaterThan(0);
+    expect(Array.isArray(store.requests)).toBe(true);
   });
 
   it("loads a Supabase store row", async () => {

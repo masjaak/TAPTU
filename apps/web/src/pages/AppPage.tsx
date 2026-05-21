@@ -1749,7 +1749,7 @@ export function AppPage() {
                     </div>
                   ),
                   event: item.event,
-                  time: item.time,
+                  time: formatAttendanceTime(item.time),
                   status: <StatusBadge tone={item.event === "Butuh review" ? "warning" : "info"}>{item.status}</StatusBadge>
                 }))}
               />
@@ -1845,7 +1845,7 @@ export function AppPage() {
                     </div>
                   ),
                   event: item.event,
-                  time: <span className="tabular-nums">{item.time}</span>,
+                  time: <span className="tabular-nums">{formatAttendanceTime(item.time)}</span>,
                   status: <StatusBadge tone={item.event === "Butuh review" ? "warning" : "success"}>{item.status}</StatusBadge>
                 }))}
               />
@@ -2777,9 +2777,9 @@ export function AppPage() {
                 shift: emp.shiftName ?? "-",
                 checkin: (
                   <div>
-                    <p className="tabular-nums font-semibold text-[#111827]">{emp.checkInTime ?? "--:--"}</p>
+                    <p className="tabular-nums font-semibold text-[#111827]">{formatAttendanceTime(emp.checkInTime) ?? "--:--"}</p>
                     {emp.checkOutTime && (
-                      <p className="text-xs text-[#667085]">Keluar {emp.checkOutTime}</p>
+                      <p className="text-xs text-[#667085]">Keluar {formatAttendanceTime(emp.checkOutTime)}</p>
                     )}
                     {(emp.checkInMethod || emp.locationName) && emp.checkInTime ? (
                       <p className="mt-0.5 text-xs text-[#8099c8]">
@@ -3834,7 +3834,7 @@ export function AppPage() {
                 department: profileValue(emp.departmentName),
                 manager: profileValue(emp.managerName),
                 shift: emp.shiftName ?? "-",
-                checkin: <span className="tabular-nums">{emp.checkInTime ?? "--:--"}</span>,
+                checkin: <span className="tabular-nums">{formatAttendanceTime(emp.checkInTime) ?? "--:--"}</span>,
                 status: (
                   <StatusBadge tone={emp.todayStatus === "present" ? "success" : emp.todayStatus === "late" ? "warning" : emp.todayStatus === "leave" ? "info" : "neutral"}>
                     {emp.todayStatus === "present" ? "Hadir" : emp.todayStatus === "late" ? "Terlambat" : emp.todayStatus === "leave" ? "Izin" : "Belum hadir"}
