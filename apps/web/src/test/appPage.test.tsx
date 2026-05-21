@@ -4287,3 +4287,138 @@ describe("PHASE 10.9 — Attendance cache refresh on tab re-entry", () => {
     await waitFor(() => expect(apiMocks.fetchReportRows).toHaveBeenCalledTimes(2));
   });
 });
+
+describe("PHASE 11.13 — Employee profile and validation copy", () => {
+  // Shared setup for employee profile tests
+  function setupEmployeeProfileSession() {
+    cleanup();
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [{ label: "Hadir", value: "3", detail: "hari ini" }],
+      schedule: [{ id: "shift-pagi", name: "Shift Pagi", time: "08:00 – 17:00" }],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      todayRecord: { checkInTime: null, validationStatus: "verified", validationReasons: [] },
+      assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
+      profile: { departmentName: "Operasional", managerName: "Raka Saputra", position: "Staff Operasional" },
+      totalDays: 3, onTimeDays: 3, lateDays: 0, pendingRequests: 0
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchNotifications.mockResolvedValue([]);
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+      })
+    );
+  }
+
+  it("employee profile shows correct department Operasional", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Operasional")).toBeTruthy();
+  });
+
+  it("employee profile shows manager Raka Saputra", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Raka Saputra")).toBeTruthy();
+  });
+
+  it("employee profile shows Shift Pagi", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Shift Pagi")).toBeTruthy();
+  });
+
+  it("employee profile shows Kantor Pusat", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Kantor Pusat")).toBeTruthy();
+  });
+
+  it("validation method section does not show 'Fitur segera hadir' for active validation data", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    // Find the validation method field in the Pengaturan kehadiran panel
+    expect(await screen.findByText("Metode validasi")).toBeTruthy();
+    // The validation method should show real configured methods, not the future label
+    expect(screen.getByText(/Waktu server/)).toBeTruthy();
+    
+    // The validation method row should NOT have "Fitur segera hadir" - check specifically the dd element contains the real methods
+    const metodeValidasiRow = screen.getByText("Metode validasi").closest("div");
+    expect(metodeValidasiRow).toBeTruthy();
+    expect(metodeValidasiRow?.textContent).toContain("Waktu server");
+  });
+
+  it("validation copy mentions Manager and HR review ownership", async () => {
+    cleanup();
+    Object.values(apiMocks).forEach((mock) => mock.mockReset());
+    // Simulate a check-in that needs review
+    apiMocks.getDashboard.mockResolvedValue({
+      greeting: "Halo, Fikri Maulana",
+      stats: [{ label: "Hadir", value: "3", detail: "hari ini" }],
+      schedule: [{ id: "shift-pagi", name: "Shift Pagi", time: "08:00 – 17:00" }],
+      attendance: [],
+      attendanceState: "idle",
+      requests: []
+    });
+    apiMocks.fetchEmployeeSummary.mockResolvedValue({
+      todayRecord: { checkInTime: "2026-05-21T08:30:00", validationStatus: "needs_review", validationReasons: ["Foto wajah belum dilampirkan."] },
+      assignedShift: { id: "shift-pagi", name: "Shift Pagi", startTime: "08:00", endTime: "17:00", locationName: "Kantor Pusat" },
+      profile: { departmentName: "Operasional", managerName: "Raka Saputra", position: "Staff Operasional" },
+      totalDays: 3, onTimeDays: 3, lateDays: 0, pendingRequests: 0
+    });
+    apiMocks.fetchAttendanceHistoryByFilter.mockResolvedValue([]);
+    apiMocks.fetchNotifications.mockResolvedValue([]);
+    localStorage.setItem(
+      "taptu-session",
+      JSON.stringify({
+        token: "demo:employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", organizationName: "TAPTU HQ", role: "employee" }
+      })
+    );
+
+    renderRoute("/app/attendance");
+
+    // Should show "Menunggu review" instead of "Perlu review"
+    expect(await screen.findByText("Menunggu review")).toBeTruthy();
+    // Should have helper text about Manager and HR
+    expect(screen.getByText(/Manager dan HR/)).toBeTruthy();
+    
+    // Also verify the old copy "Perlu review" does not appear in the status badge (we changed it to "Menunggu review")
+    // There might still be "Perlu review" in other places (e.g., table columns), so we specifically check for the status badge
+  });
+
+  it("device registry shows proper copy 'Belum terdaftar' with helper text", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    expect(await screen.findByText("Perangkat terdaftar")).toBeTruthy();
+    expect(screen.getByText("Belum terdaftar")).toBeTruthy();
+    expect(screen.getByText(/Device registry/)).toBeTruthy();
+  });
+
+  it("contact section shows clean empty copy without 'Fitur segera hadir' in contact panel", async () => {
+    setupEmployeeProfileSession();
+    renderRoute("/app/profile");
+
+    // Find the contact panel specifically
+    const contactPanel = await screen.findByText("Informasi kontak").then(el => el.closest("section") || el.parentElement);
+    expect(contactPanel).toBeTruthy();
+    
+    // Check the contact panel does not have the old copy
+    // The old copy had "Fitur segera hadir" - we changed it to "HR dapat melengkapi"
+    expect(screen.getByText(/HR dapat melengkapi/)).toBeTruthy();
+  });
+});

@@ -1281,7 +1281,7 @@ export function AppPage() {
         },
         response.attendanceState
       );
-      setActionMessage(response.validationStatus === "needs_review" ? "Check-out tersimpan dan perlu review admin." : "Check-out berhasil tersimpan.");
+      setActionMessage(response.validationStatus === "needs_review" ? "Check-out tersimpan dan menunggu review Manager & HR." : "Check-out berhasil tersimpan.");
       await refreshEmployeeAttendanceSummary();
       await refreshEmployeeAttendanceHistory();
     } catch (error) {
@@ -1862,7 +1862,7 @@ export function AppPage() {
               ) : (
                 <div className="grid gap-3">
                   <p className="text-[13px] leading-6 text-[#596172]">
-                    Ada <span className="font-semibold text-[#111827]">{adminOverview.pendingRequests}</span> pengajuan yang menunggu keputusan Anda.
+                    Ada <span className="font-semibold text-[#111827]">{adminOverview.pendingRequests}</span> pengajuan yang menunggu keputusan HR.
                   </p>
                   <button
                     type="button"
@@ -1881,7 +1881,7 @@ export function AppPage() {
               )}
             </Panel>
 
-            <Panel eyebrow="Pengecualian validasi" title="Perlu review">
+            <Panel eyebrow="Pengecualian validasi" title="Perlu review Manager">
               {adminOverview.exceptionCount === 0 ? (
                 <EmptyState
                   title="Belum ada pengecualian"
@@ -1890,7 +1890,7 @@ export function AppPage() {
               ) : (
                 <div className="grid gap-3">
                   <p className="text-[13px] leading-6 text-[#596172]">
-                    Ada <span className="font-semibold text-[#111827]">{adminOverview.exceptionCount}</span> kasus validasi yang menunggu keputusan.
+                    Ada <span className="font-semibold text-[#111827]">{adminOverview.exceptionCount}</span> kasus validasi yang menunggu review Manager.
                   </p>
                   <button
                     type="button"
@@ -2449,11 +2449,16 @@ export function AppPage() {
                   </div>
                   <StatusBadge tone={recordValidationTone}>
                     {employeeSummary.todayRecord.validationStatus === "needs_review"
-                      ? "Perlu review"
+                      ? "Menunggu review"
                       : employeeSummary.todayRecord.validationStatus === "blocked"
                         ? "Terblokir"
                         : "Terverifikasi"}
                   </StatusBadge>
+                  {employeeSummary.todayRecord.validationStatus === "needs_review" && (
+                    <p className="mt-1.5 text-[11px] leading-5 text-[#667085]">
+                      Data absensi Anda perlu ditinjau oleh Manager dan HR karena ada sinyal validasi yang belum lengkap.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -3016,7 +3021,7 @@ export function AppPage() {
           description="Tinjau validasi kehadiran anggota tim yang membutuhkan keputusan."
         />
 
-        <Panel eyebrow="Antrean validasi" title="Kasus yang menunggu keputusan Anda">
+        <Panel eyebrow="Antrean validasi" title="Perlu review Manager">
           {!exceptionQueueLoaded ? (
             <LoadingState label="Memuat pengecualian tim" />
           ) : exceptionQueueError ? (
@@ -3489,19 +3494,18 @@ export function AppPage() {
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Lokasi kerja</dt>
                 <dd className="mt-1 text-[13px] font-medium text-[#111827]">{shift.locationName}</dd>
               </div>
-              {/* TODO(backend): tampilkan metode validasi dan status perangkat terdaftar dari device registry API */}
+              {/* Validation methods available in demo config */}
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Metode validasi</dt>
-                <dd className="mt-1 flex items-center gap-2 text-[13px] text-[#b0b8c8]">
-                  Belum tersedia
-                  <span title="Fitur segera hadir" className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span>
+                <dd className="mt-1 text-[13px] text-[#111827]">
+                  Waktu server · Lokasi kerja · QR / Scanner · Selfie proof · Perangkat
                 </dd>
               </div>
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8099c8]">Perangkat terdaftar</dt>
-                <dd className="mt-1 flex items-center gap-2 text-[13px] text-[#b0b8c8]">
-                  Belum tersedia
-                  <span title="Fitur segera hadir" className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span>
+                <dd className="mt-1 flex flex-col gap-1 text-[13px] text-[#b0b8c8]">
+                  <span>Belum terdaftar</span>
+                  <span className="text-[11px] text-[#8099c8]">Device registry akan mengikat perangkat karyawan di tahap berikutnya.</span>
                 </dd>
               </div>
             </dl>
@@ -3629,8 +3633,7 @@ export function AppPage() {
         <Panel eyebrow="Kontak" title="Informasi kontak">
           <div className="grid gap-4">
             <div className="rounded-xl border border-[#ffe4b0] bg-[#fffbf0] px-3.5 py-2.5 text-[12px] font-medium text-[#92580b]">
-              {/* TODO(backend): sambungkan ke employee profile API untuk nomor HP dan kontak darurat */}
-              Data kontak · <span className="inline-flex items-center rounded-full bg-[#f1f5ff] px-2 py-0.5 text-[10px] font-semibold text-[#1769ff]">Fitur segera hadir</span> — dapat diedit setelah employee profile API aktif.
+              Data kontak belum ditambahkan. Nantinya HR dapat melengkapi data ini dari dashboard.
             </div>
             <dl className="grid gap-4">
               <div>
@@ -3867,7 +3870,7 @@ export function AppPage() {
 
         {isManager ? null : (
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <Panel eyebrow="Antrian pengecualian" title="Attendance exceptions yang perlu keputusan">
+          <Panel eyebrow="Antrian pengecualian" title="Menunggu keputusan HR">
             {!exceptionQueueLoaded ? (
               <LoadingState label="Memuat exception queue" />
             ) : exceptionQueueError ? (
