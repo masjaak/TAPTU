@@ -1453,8 +1453,17 @@ export function AppPage() {
     try {
       const response = await reviewAttendance(currentSession.token, recordId, decision);
       setActionMessage(response.message);
-      // Refresh admin attendance data
+      // Update local state immediately
       if (tab === "attendance") {
+        setAdminAttendanceRows(prev => prev.map(row => 
+          row.id === recordId 
+            ? {
+                ...row,
+                validationStatus: decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided" as any
+              }
+            : row
+        ));
+        // Also refresh from server to ensure consistency
         fetchReportRows(currentSession.token)
           .then((refreshed) => setAdminAttendanceRows(refreshed))
           .catch(() => {});
@@ -3858,7 +3867,7 @@ export function AppPage() {
                 };
                 const labelMap = { present: "Hadir", late: "Terlambat", absent: "Belum hadir", leave: "Izin" };
                 return (
-                  <span key={filter} className="rounded-full border border-[#edf0f5] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#596172]">
+                  <span key={filter} className="inline-flex items-center rounded-full border border-[#edf0f5] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#596172]">
                     {labelMap[filter]}: {countMap[filter]}
                   </span>
                 );
