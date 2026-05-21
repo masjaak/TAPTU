@@ -3825,45 +3825,48 @@ export function AppPage() {
             <DataTable
               caption={isManager ? "Daftar anggota tim" : "Daftar karyawan aktif"}
               columns={isManager ? managerColumns : adminColumns}
-              rows={filteredEmployees.map((emp) => ({
-                id: emp.id,
-                name: (
-                  <div>
-                    <p className="font-semibold text-[#111827]">{emp.fullName}</p>
-                    <p className="mt-1 text-xs text-[#667085]">{emp.employeeCode ? `${emp.employeeCode} · ` : ""}{emp.email}</p>
-                  </div>
-                ),
-                role: <StatusBadge tone="info">{roleLabels[emp.role]}</StatusBadge>,
-                department: profileValue(emp.departmentName),
-                manager: profileValue(emp.managerName),
-                shift: emp.shiftName ?? "-",
-                checkin: <span className="tabular-nums">{formatAttendanceTime(emp.checkInTime) ?? "--:--"}</span>,
-                status: (
-                  <StatusBadge tone={emp.todayStatus === "present" ? "success" : emp.todayStatus === "late" ? "warning" : emp.todayStatus === "leave" ? "info" : "neutral"}>
-                    {emp.todayStatus === "present" ? "Hadir" : emp.todayStatus === "late" ? "Terlambat" : emp.todayStatus === "leave" ? "Izin" : "Belum hadir"}
-                  </StatusBadge>
-                ),
-                validation: emp.validationStatus ? (
-                  <StatusBadge tone={emp.validationStatus === "verified" ? "success" : emp.validationStatus === "needs_review" ? "warning" : "danger"}>
-                    {emp.validationStatus === "verified" ? "Terverifikasi" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
-                  </StatusBadge>
-                ) : <span className="text-xs text-[#7a8495]">-</span>,
-                actions: (
-                  <button
-                    type="button"
-                    disabled={Boolean(departmentUnavailableReason)}
-                    title={departmentUnavailableReason}
-                    onClick={() => {
-                      setUbahPenempatanEmployee(emp);
-                      setUbahPenempatanDeptId(emp.departmentId ?? "");
-                      setUbahPenempatanError(null);
-                    }}
-                    className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Ubah divisi
-                  </button>
-                )
-              }))}
+              rows={filteredEmployees.map((emp) => {
+                const isAttendanceSubject = emp.role === "employee";
+                return {
+                  id: emp.id,
+                  name: (
+                    <div>
+                      <p className="font-semibold text-[#111827]">{emp.fullName}</p>
+                      <p className="mt-1 text-xs text-[#667085]">{emp.employeeCode ? `${emp.employeeCode} · ` : ""}{emp.email}</p>
+                    </div>
+                  ),
+                  role: <StatusBadge tone="info">{roleLabels[emp.role]}</StatusBadge>,
+                  department: profileValue(emp.departmentName),
+                  manager: profileValue(emp.managerName),
+                  shift: isAttendanceSubject ? (emp.shiftName ?? "-") : "-",
+                  checkin: isAttendanceSubject ? <span className="tabular-nums">{formatAttendanceTime(emp.checkInTime) ?? "--:--"}</span> : "-",
+                  status: isAttendanceSubject ? (
+                    <StatusBadge tone={emp.todayStatus === "present" ? "success" : emp.todayStatus === "late" ? "warning" : emp.todayStatus === "leave" ? "info" : "neutral"}>
+                      {emp.todayStatus === "present" ? "Hadir" : emp.todayStatus === "late" ? "Terlambat" : emp.todayStatus === "leave" ? "Izin" : "Belum hadir"}
+                    </StatusBadge>
+                  ) : <span className="text-xs text-[#9aa3b2]">-</span>,
+                  validation: isAttendanceSubject && emp.validationStatus ? (
+                    <StatusBadge tone={emp.validationStatus === "verified" ? "success" : emp.validationStatus === "needs_review" ? "warning" : "danger"}>
+                      {emp.validationStatus === "verified" ? "Terverifikasi" : emp.validationStatus === "needs_review" ? "Perlu review" : emp.validationStatus}
+                    </StatusBadge>
+                  ) : <span className="text-xs text-[#9aa3b2]">-</span>,
+                  actions: (
+                    <button
+                      type="button"
+                      disabled={Boolean(departmentUnavailableReason)}
+                      title={departmentUnavailableReason}
+                      onClick={() => {
+                        setUbahPenempatanEmployee(emp);
+                        setUbahPenempatanDeptId(emp.departmentId ?? "");
+                        setUbahPenempatanError(null);
+                      }}
+                      className="rounded-lg border border-[#e2e7f0] px-2.5 py-1 text-xs font-semibold text-[#596172] transition hover:border-[#1769ff] hover:text-[#1769ff] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Ubah divisi
+                    </button>
+                  )
+                };
+              })}
             />
           )}
         </Panel>

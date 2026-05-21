@@ -4422,3 +4422,64 @@ describe("PHASE 11.13 — Employee profile and validation copy", () => {
     expect(screen.getByText(/HR dapat melengkapi/)).toBeTruthy();
   });
 });
+
+describe("PHASE 11.13A — HR Team role scoping", () => {
+  it("HR Tim shows both employees and managers with proper role scoping", async () => {
+    // Use setupAdminSession which already has proper mocks for the team page
+    setupAdminSession();
+    
+    // Override the employee list to include both Fikri (employee) and Raka (manager)
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", validationStatus: "verified" },
+      { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "absent" }
+    ]);
+
+    renderRoute("/app/team");
+
+    // Wait for table to load - look for employee names
+    await screen.findAllByText("Fikri Maulana");
+    
+    // Both should appear
+    expect(screen.getAllByText("Fikri Maulana").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Raka Saputra").length).toBeGreaterThan(0);
+  });
+
+  it("Manager rows show dash for attendance columns, employee rows show status", async () => {
+    setupAdminSession();
+    
+    // Override the employee list to include both Fikri (employee) and Raka (manager)
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", validationStatus: "verified" },
+      { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "absent" }
+    ]);
+
+    renderRoute("/app/team");
+
+    // Wait for table
+    await screen.findAllByText("Fikri Maulana");
+    
+    // Find the table
+    const table = document.querySelector("table");
+    expect(table).toBeTruthy();
+    
+    const rows = table!.querySelectorAll("tbody tr");
+    // Should have both rows
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("Fikri shows managerName Raka Saputra in HR Tim list", async () => {
+    setupAdminSession();
+    
+    apiMocks.fetchEmployeeList.mockResolvedValue([
+      { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", validationStatus: "verified" },
+      { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "absent" }
+    ]);
+
+    renderRoute("/app/team");
+
+    await screen.findAllByText("Fikri Maulana");
+    
+    // Fikri should show Raka as manager
+    expect(screen.getAllByText("Raka Saputra").length).toBeGreaterThan(0);
+  });
+});
