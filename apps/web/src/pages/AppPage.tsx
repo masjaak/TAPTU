@@ -2564,7 +2564,7 @@ export function AppPage() {
                   setAttendanceHistoryLoaded(false);
                   setHistoryFilter(filter);
                 }}
-                className={`min-h-9 rounded-full px-3.5 py-1.5 text-[12px] font-semibold tracking-[0.04em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769ff] ${
                   historyFilter === filter ? "bg-[#111827] text-white" : "bg-[#f1f5ff] text-[#596172]"
                 }`}
               >
