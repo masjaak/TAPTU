@@ -458,7 +458,7 @@ function requireUser(req: express.Request, res: express.Response): AuthUser | nu
 }
 
 function createEmptyAttendanceRecord(userId: string) {
-  const template = createInitialStore().attendance["usr-employee-03"];
+  const template = createInitialStore().attendance["usr-employee-01"];
 
   return {
     ...template,

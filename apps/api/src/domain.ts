@@ -947,12 +947,14 @@ export function computeEmployeeList(
       const record = store.attendance[user.id];
       let todayStatus: EmployeeListItem["todayStatus"] = "absent";
       let checkInTime: string | undefined;
+      let checkOutTime: string | undefined;
       let validationStatus: AttendanceValidationStatus | undefined;
 
       if (record) {
         if (record.state === "checked_in" || record.state === "checked_out") {
           todayStatus = record.status === "Terlambat" ? "late" : "present";
           checkInTime = record.checkInAt;
+          checkOutTime = record.checkOutAt;
           validationStatus = record.validationStatus;
         }
       }
@@ -977,6 +979,7 @@ export function computeEmployeeList(
         employeeCode: user.employeeCode ?? null,
         todayStatus,
         checkInTime,
+        checkOutTime,
         validationStatus,
         shiftName: DEFAULT_SHIFT.name,
         locationName: DEFAULT_LOCATION.name

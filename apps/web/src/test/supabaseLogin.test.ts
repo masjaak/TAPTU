@@ -13,93 +13,126 @@ vi.mock("../lib/supabase", () => ({
 
 import { login } from "../lib/api";
 
-describe("supabase-enabled login", () => {
+// With Supabase configured, the login flow is:
+//  1. Try Express API backend first (/api/auth/login)
+//  2. If API succeeds → use API response (demo accounts get server JWT, not demo: prefix token)
+//  3. If API fails → try Supabase direct auth as fallback (for static deployments)
+//  4. If Supabase also fails → use demo token as last resort (for demo accounts offline)
+
+describe("supabase-enabled login — API-first flow", () => {
   beforeEach(() => {
     mockSupabaseClient.auth.signInWithPassword.mockReset();
-    vi.unstubAllGlobals();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("returns demo:role token (not Supabase JWT) when Supabase auth succeeds for a demo account", async () => {
-    // Demo accounts must always use the demo:role token so isDemoToken() stays true and all
-    // subsequent API calls use the local demo data layer instead of hitting the backend.
-    mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
-      data: {
-        user: { id: "usr-employee-01" },
-        session: { access_token: "sbp_supabase_jwt_xyz" }
-      },
-      error: null
-    });
+  it("when API is reachable, uses API response for demo account (server JWT, not demo: token)", async () => {
+    // The API backend issues a signed server JWT for demo accounts.
+    // This allows isDemoToken() to return false so all subsequent calls go through the backend.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        token: "server-jwt-employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee" }
+      })
+    }));
 
     const result = await login({ email: "employee@taptu.app", password: "Taptu123!" });
 
-    expect(result.token).toBe("demo:employee");
+    expect(result.token).toBe("server-jwt-employee");
+    expect(result.token.startsWith("demo:")).toBe(false);
     expect(result.user.id).toBe("usr-employee-01");
     expect(result.user.role).toBe("employee");
-    expect(result.user.fullName).toBe("Fikri Maulana");
-    expect(mockSupabaseClient.auth.signInWithPassword).toHaveBeenCalledWith({
-      email: "employee@taptu.app",
-      password: "Taptu123!"
+    // Supabase auth must not be called when the API is reachable
+    expect(mockSupabaseClient.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("when API is reachable, uses API response for manager demo account", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        token: "server-jwt-manager",
+        user: { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager" }
+      })
+    }));
+
+    const result = await login({ email: "manager@taptu.app", password: "Taptu123!" });
+    expect(result.token).toBe("server-jwt-manager");
+    expect(result.token.startsWith("demo:")).toBe(false);
+  });
+
+  it("when API is reachable, uses API response for real Supabase user (Supabase access token)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        token: "supa-access-token-real-user",
+        user: { id: "uuid-real-user", fullName: "Budi Nyata", email: "budi@company.com", role: "employee" }
+      })
+    }));
+
+    const result = await login({ email: "budi@company.com", password: "Password123!" });
+    expect(result.token).toBe("supa-access-token-real-user");
+  });
+
+  it("when API is unreachable and Supabase succeeds for a real user, uses Supabase token via /auth/me", async () => {
+    // First fetch (API login) unreachable → "Tidak dapat terhubung...", second fetch (/auth/me) succeeds
+    vi.stubGlobal("fetch", vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          user: { id: "uuid-real-user", fullName: "Budi Nyata", email: "budi@company.com", role: "employee" }
+        })
+      })
+    );
+    mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
+      data: { user: { id: "uuid-real-user" }, session: { access_token: "supa-token-real" } },
+      error: null
     });
+
+    const result = await login({ email: "budi@company.com", password: "Password123!" });
+    expect(result.token).toBe("supa-token-real");
+    expect(result.user.fullName).toBe("Budi Nyata");
   });
 
-  it("returns demo:role token for all demo roles even when Supabase auth succeeds", async () => {
-    const cases: Array<{ email: string; id: string; role: string; fullName: string }> = [
-      { email: "superadmin@taptu.app", id: "usr-superadmin-01", role: "superadmin", fullName: "Super Admin" },
-      { email: "admin@taptu.app", id: "usr-admin-01", role: "admin", fullName: "Nadia Putri" },
-      { email: "manager@taptu.app", id: "usr-manager-01", role: "manager", fullName: "Raka Saputra" },
-      { email: "scanner@taptu.app", id: "usr-scanner-01", role: "scanner", fullName: "Front Gate Scanner" }
-    ];
-
-    for (const { email, id, role, fullName } of cases) {
-      mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
-        data: { user: { id }, session: { access_token: `sbp_${role}` } },
-        error: null
-      });
-
-      const result = await login({ email, password: "Taptu123!" });
-      expect(result.token).toBe(`demo:${role}`);
-      expect(result.user.role).toBe(role);
-      expect(result.user.fullName).toBe(fullName);
-    }
-  });
-
-  it("falls back to demo:role token when Supabase auth fails for a known demo account", async () => {
+  it("when API is unreachable and Supabase fails for demo account, returns demo: token fallback", async () => {
+    // API unreachable, Supabase configured but fails (demo user not in Supabase auth)
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Invalid login credentials" }
     });
 
     const result = await login({ email: "employee@taptu.app", password: "Taptu123!" });
-
     expect(result.token).toBe("demo:employee");
     expect(result.user.role).toBe("employee");
-    expect(result.user.id).toBe("usr-employee-01");
   });
 
-  it("falls back to demo:role for all roles when Supabase is unavailable", async () => {
+  it("when API is unreachable and Supabase fails for all demo roles, returns demo: token for each", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
       data: { user: null, session: null },
-      error: { message: "Connection error" }
+      error: { message: "Invalid login credentials" }
     });
 
-    const roles = [
+    const cases = [
       { email: "superadmin@taptu.app", token: "demo:superadmin" },
       { email: "admin@taptu.app", token: "demo:admin" },
       { email: "manager@taptu.app", token: "demo:manager" },
       { email: "scanner@taptu.app", token: "demo:scanner" }
     ];
 
-    for (const { email, token } of roles) {
+    for (const { email, token } of cases) {
       const result = await login({ email, password: "Taptu123!" });
       expect(result.token).toBe(token);
     }
   });
 
-  it("throws when Supabase auth fails for a non-demo account", async () => {
+  it("when API is unreachable and Supabase fails for non-demo account, throws original network error", async () => {
+    // API unreachable → "Tidak dapat terhubung...", Supabase also fails, no demo fallback
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Invalid login credentials" }
@@ -107,17 +140,19 @@ describe("supabase-enabled login", () => {
 
     await expect(
       login({ email: "real-user@company.com", password: "Password123!" })
-    ).rejects.toThrow("Invalid login credentials");
+    ).rejects.toThrow("Tidak dapat terhubung ke server");
   });
 
-  it("throws when Supabase auth fails for a demo email with wrong password", async () => {
-    mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
-      data: { user: null, session: null },
-      error: { message: "Invalid login credentials" }
-    });
+  it("when API returns a 401 for wrong credentials, throws the API error without trying Supabase", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({ message: "Akun tidak ditemukan atau password salah." })
+    }));
 
     await expect(
-      login({ email: "employee@taptu.app", password: "WrongPassword!" })
-    ).rejects.toThrow();
+      login({ email: "employee@taptu.app", password: "WrongPassword1" })
+    ).rejects.toThrow("Akun tidak ditemukan atau password salah.");
+    // Supabase must NOT be called when the API is reachable and returns an auth error
+    expect(mockSupabaseClient.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });

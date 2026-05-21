@@ -72,41 +72,50 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     if (demo) return Promise.resolve(demo);
   }
 
-  if (supabase) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: payload.email,
-      password: payload.password
-    });
-
-    if (!error && data.session) {
-      // Demo accounts always use the local demo token so isDemoToken() stays true for all
-      // subsequent API calls. Using the Supabase JWT here would break the demo data layer.
-      const demoMatch = tryDemoLogin(payload.email, payload.password);
-      if (demoMatch) return demoMatch;
-
-      // For real Supabase users, fetch the normalized profile from the API.
-      const { user } = await requestJson<{ user: AuthUser }>("/auth/me", {}, data.session.access_token);
-      return { token: data.session.access_token, user };
-    }
-
-    // Supabase auth failed — fall back to local demo credentials so demo accounts always work.
-    const demo = tryDemoLogin(payload.email, payload.password);
-    if (demo) return demo;
-
-    throw new Error(error?.message ?? "Akun tidak ditemukan atau password salah.");
-  }
-
-  // No Supabase client — try the Express API server. If the server is unreachable (e.g. static
-  // Vercel deployment without a backend), fall back to demo credentials so demo login still works.
+  // Always call the shared Express API backend first. The backend issues a signed server JWT
+  // for demo accounts so all subsequent calls go through the backend (cross-device sync).
+  // For real Supabase users the backend delegates to supabaseSignIn and returns the access token.
+  // Supabase direct auth is a fallback only when the API server is unreachable (network error).
   try {
     return await requestJson<LoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload)
     });
   } catch (err) {
-    const demo = tryDemoLogin(payload.email, payload.password);
-    if (demo) return demo;
+    // Only try Supabase/demo fallback when the API was not properly reached:
+    // – Network error ("Tidak dapat terhubung...") — server unreachable
+    // – Generic "Permintaan gagal." — API returned a non-JSON response (e.g. 404 HTML)
+    // – SyntaxError — API returned 200 HTML (Vercel SPA rewrite with no backend)
+    // Do NOT fall back for specific auth errors (e.g. "Akun tidak ditemukan...") — those mean
+    // the API is working and the credentials are genuinely wrong.
+    const msg = err instanceof Error ? err.message : "";
+    const apiNotFunctional =
+      msg.startsWith("Tidak dapat terhubung") ||
+      msg === "Permintaan gagal." ||
+      err instanceof SyntaxError ||
+      err instanceof TypeError; // fetch returned an unexpected value (stub/mock returning undefined)
+    if (apiNotFunctional) {
+      // API unreachable — try Supabase direct auth for real users in static/serverless deployments.
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: payload.email,
+          password: payload.password
+        });
+        if (!error && data.session) {
+          try {
+            const { user } = await requestJson<{ user: AuthUser }>("/auth/me", {}, data.session.access_token);
+            return { token: data.session.access_token, user };
+          } catch {
+            // /auth/me also unreachable — fall through to demo fallback below
+          }
+        }
+      }
+      // Final fallback: browser-local demo tokens for offline / no-backend use.
+      const demo = tryDemoLogin(payload.email, payload.password);
+      if (demo) return demo;
+    }
     throw err;
+
   }
 }
 
@@ -529,5 +538,10 @@ async function requestJson<T>(path: string, init: RequestInit = {}, token?: stri
     throw new Error(data.message ?? "Permintaan gagal.");
   }
 
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as Promise<T>;
+  } catch {
+    // 200 OK with a non-JSON body (e.g. Vercel SPA rewrite forwarding index.html to /api routes)
+    throw new Error("Permintaan gagal.");
+  }
 }

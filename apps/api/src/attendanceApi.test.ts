@@ -187,6 +187,28 @@ describe("attendance API shared flow", () => {
     expect(adminRequests).toHaveLength(0);
   });
 
+  it("check-out: Manager employee list shows checkOutTime matching HR report", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const managerToken = await login("manager@taptu.app");
+    const adminToken = await login("admin@taptu.app");
+
+    await request("/attendance/checkin", { method: "POST", body: JSON.stringify({ method: "Manual" }) }, employeeToken);
+    const checkOut = await request<AttendanceActionResponse>("/attendance/checkout", {
+      method: "POST",
+      body: JSON.stringify({ method: "Manual" })
+    }, employeeToken);
+    const checkOutTime: string | undefined = checkOut.record.checkOutTime;
+    expect(checkOutTime).toBeTruthy();
+
+    const managerTeam = await request<EmployeeItem[]>("/admin/employees", {}, managerToken);
+    const fikri = managerTeam.find((e) => e.id === "usr-employee-01");
+    expect(fikri?.checkOutTime).toBe(checkOutTime);
+
+    const reports = await request<ReportItem[]>("/admin/reports", {}, adminToken);
+    const fikriReport = reports.find((r) => r.employeeId === "usr-employee-01");
+    expect(fikriReport?.checkOutTime).toBe(checkOutTime);
+  });
+
   it("time sync: Employee check-in time matches Manager and HR view exactly", async () => {
     const employeeToken = await login("employee@taptu.app");
     const managerToken = await login("manager@taptu.app");

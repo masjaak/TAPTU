@@ -57,6 +57,43 @@ describe("api client", () => {
   });
 });
 
+describe("PHASE 11.10 — demo login with Supabase configured still uses API backend", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("with supabase configured, demo login calls /api/auth/login (not demo: token path)", async () => {
+    // The API server is reachable and returns a proper server JWT for demo accounts.
+    // Supabase being available must NOT override the returned token to demo:employee.
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        token: "server-jwt-employee",
+        user: { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee" }
+      })
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = await login({ email: "employee@taptu.app", password: "Taptu123!" });
+    // Must use server JWT, not demo: prefix token — isDemoToken() must be false
+    expect(result.token).toBe("server-jwt-employee");
+    expect(result.token.startsWith("demo:")).toBe(false);
+    // Must have called the backend API, not skipped it
+    expect(fetchSpy).toHaveBeenCalledWith("/api/auth/login", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("admin demo login via API returns server JWT, not demo:admin token", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        token: "server-jwt-admin",
+        user: { id: "usr-admin-01", fullName: "Nadia Putri", email: "admin@taptu.app", role: "admin" }
+      })
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = await login({ email: "admin@taptu.app", password: "Taptu123!" });
+    expect(result.token).toBe("server-jwt-admin");
+    expect(result.token.startsWith("demo:")).toBe(false);
+  });
+});
+
 describe("shared demo-account login", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
