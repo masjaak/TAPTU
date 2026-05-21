@@ -93,6 +93,7 @@ import {
   refreshScannerToken,
   markNotificationRead,
   reviewException,
+  reviewAttendance,
   updateDepartment,
   updateShift,
   updateWorkLocation
@@ -1447,6 +1448,24 @@ export function AppPage() {
     }
   }
 
+  async function handleAttendanceReview(recordId: string, decision: "approved" | "rejected" | "voided") {
+    setBusyAction(`attendance-review-${decision}-${recordId}`);
+    try {
+      const response = await reviewAttendance(currentSession.token, recordId, decision);
+      setActionMessage(response.message);
+      // Refresh admin attendance data
+      if (tab === "attendance") {
+        fetchReportRows(currentSession.token)
+          .then((refreshed) => setAdminAttendanceRows(refreshed))
+          .catch(() => {});
+      }
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Gagal memperbarui absensi.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function handleSubmitDivisiForm(e: React.FormEvent) {
     e.preventDefault();
     if (!divisiForm.name.trim()) {
@@ -2682,32 +2701,68 @@ export function AppPage() {
               { key: "date", header: "Tanggal" },
               { key: "checkin", header: "Check-in" },
               { key: "status", header: "Status" },
-              { key: "validation", header: "Validasi" }
+              { key: "validation", header: "Validasi" },
+              { key: "actions", header: "Aksi" }
             ]}
-            rows={adminAttendanceRows.map((row) => ({
-              id: row.id,
-              employee: (
-                <div>
-                  <p className="font-semibold text-[#111827]">{row.employeeName}</p>
-                  <p className="mt-1 text-xs text-[#667085]">{row.departmentName ?? row.workLocationName}</p>
-                </div>
-              ),
-              date: row.date,
-              checkin: (
-                <div>
-                  <p className="tabular-nums font-semibold text-[#111827]">{formatAttendanceTime(row.checkInTime)}</p>
-                  {row.checkInMethod && row.checkInTime ? (
-                    <p className="mt-0.5 text-xs text-[#8099c8]">{row.checkInMethod}</p>
-                  ) : null}
-                </div>
-              ),
-              status: <StatusBadge tone={row.status === "Terlambat" ? "warning" : row.status === "Belum check-in" ? "neutral" : row.status === "Izin" ? "info" : "success"}>{row.status}</StatusBadge>,
-              validation: (
-                <StatusBadge tone={row.validationStatus === "verified" ? "success" : row.validationStatus === "needs_review" ? "warning" : row.validationStatus === "blocked" || row.validationStatus === "rejected" ? "danger" : "neutral"}>
-                  {row.validationStatus === "verified" ? "Terverifikasi" : row.validationStatus === "needs_review" ? "Perlu review" : row.validationStatus}
-                </StatusBadge>
-              )
-            }))}
+            rows={adminAttendanceRows.map((row) => {
+              const hasAttendanceRecord = Boolean(row.checkInTime);
+              const validationStatus = row.validationStatus as string;
+              const isFinalized = validationStatus === "verified" || validationStatus === "rejected" || validationStatus === "voided";
+              
+              return {
+                id: row.id,
+                employee: (
+                  <div>
+                    <p className="font-semibold text-[#111827]">{row.employeeName}</p>
+                    <p className="mt-1 text-xs text-[#667085]">{row.departmentName ?? row.workLocationName}</p>
+                  </div>
+                ),
+                date: row.date,
+                checkin: (
+                  <div>
+                    <p className="tabular-nums font-semibold text-[#111827]">{formatAttendanceTime(row.checkInTime)}</p>
+                    {row.checkInMethod && row.checkInTime ? (
+                      <p className="mt-0.5 text-xs text-[#8099c8]">{row.checkInMethod}</p>
+                    ) : null}
+                  </div>
+                ),
+                status: <StatusBadge tone={row.status === "Terlambat" ? "warning" : row.status === "Belum check-in" ? "neutral" : row.status === "Izin" ? "info" : "success"}>{row.status}</StatusBadge>,
+                validation: (
+                  <StatusBadge tone={validationStatus === "verified" ? "success" : validationStatus === "needs_review" ? "warning" : validationStatus === "blocked" || validationStatus === "rejected" ? "danger" : validationStatus === "voided" ? "neutral" : "neutral"}>
+                    {validationStatus === "verified" ? "Terverifikasi" : validationStatus === "needs_review" ? "Perlu review" : validationStatus === "voided" ? "Void" : validationStatus}
+                  </StatusBadge>
+                ),
+                actions: hasAttendanceRecord && !isFinalized && isAdmin ? (
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleAttendanceReview(row.id, "approved")}
+                      className="rounded-lg border border-[#22c55e]/30 bg-[#22c55e]/10 px-2 py-1 text-[11px] font-semibold text-[#16a34a] transition hover:bg-[#22c55e]/20"
+                    >
+                      Setuju
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAttendanceReview(row.id, "rejected")}
+                      className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-2 py-1 text-[11px] font-semibold text-[#dc2626] transition hover:bg-[#ef4444]/20"
+                    >
+                      Tolak
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAttendanceReview(row.id, "voided")}
+                      className="rounded-lg border border-[#6b7280]/30 bg-[#6b7280]/10 px-2 py-1 text-[11px] font-semibold text-[#4b5563] transition hover:bg-[#6b7280]/20"
+                    >
+                      Void
+                    </button>
+                  </div>
+                ) : hasAttendanceRecord ? (
+                  <span className="text-[11px] text-[#9aa3b2]">—</span>
+                ) : (
+                  <span className="text-[11px] text-[#9aa3b2]">—</span>
+                )
+              };
+            })}
           />
         )}
       </Panel>

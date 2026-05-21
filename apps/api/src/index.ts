@@ -296,6 +296,14 @@ const attendanceSchema = z.object({
 
 type AttendancePayload = z.infer<typeof attendanceSchema>;
 
+// Attendance review decision schema for HR/Admin
+const attendanceReviewSchema = z.object({
+  decision: z.enum(["approved", "rejected", "voided"]),
+  note: z.string().trim().optional()
+});
+
+type AttendanceReviewPayload = z.infer<typeof attendanceReviewSchema>;
+
 function isPersistentSelfieUrl(value: string | undefined): value is string {
   return Boolean(value && !value.startsWith("blob:") && !value.startsWith("data:"));
 }
@@ -1266,6 +1274,102 @@ app.post("/api/attendance/checkout", async (req, res) => {
   };
 
   return res.json(response);
+});
+
+// HR/Admin attendance review endpoint
+app.post("/api/attendance/:id/review", async (req, res) => {
+  const user = await requireUserAsync(req, res);
+  if (!user) return;
+
+  // Only HR/Admin can review attendance
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    return res.status(403).json({ message: "Hanya HR/Admin yang dapat meninjau absensi." });
+  }
+
+  const parsed = attendanceReviewSchema.safeParse(req.body as AttendanceReviewPayload);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Keputusan review tidak valid." });
+  }
+
+  const { decision, note } = parsed.data;
+  const recordId = req.params.id;
+
+  if (useSupabase && sb && !isLocalDemoUser(user.id)) {
+    // Get current record
+    const { data: record, error: fetchError } = await sb.from("attendance_records").select("*").eq("id", recordId).single();
+    if (fetchError || !record) {
+      return res.status(404).json({ message: "Record absensi tidak ditemukan." });
+    }
+
+    // Update validation status based on decision
+    let newValidationStatus: string;
+    let newStatusLabel: string;
+
+    switch (decision) {
+      case "approved":
+        newValidationStatus = "verified";
+        newStatusLabel = "Disetujui";
+        break;
+      case "rejected":
+        newValidationStatus = "rejected";
+        newStatusLabel = "Ditolak";
+        break;
+      case "voided":
+        newValidationStatus = "voided";
+        newStatusLabel = "Void";
+        break;
+      default:
+        return res.status(400).json({ message: "Keputusan tidak valid." });
+    }
+
+    // Update the record
+    const { error: updateError } = await sb
+      .from("attendance_records")
+      .update({
+        validation_status: newValidationStatus,
+        status_label: newStatusLabel,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        review_note: note ?? null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", recordId);
+
+    if (updateError) {
+      console.error("[taptu-api] attendance review update failed:", updateError);
+      return res.status(500).json({ message: "Gagal memperbarui status absensi." });
+    }
+
+    // Create audit log
+    await supabaseCreateAuditLog(
+      sb,
+      createAuditLog(
+        "attendance_record_updated",
+        user.id,
+        user.role,
+        recordId,
+        `Review decision: ${decision}${note ? ` - ${note}` : ""}`
+      )
+    );
+
+    return res.json({
+      success: true,
+      message: `Absensi berhasil ditandai sebagai ${newStatusLabel}.`,
+      record: { id: recordId, validationStatus: newValidationStatus, statusLabel: newStatusLabel }
+    });
+  }
+
+  // Demo mode - return success without modifying store for now
+  // (Demo mode attendance history is regenerated from employee state on each request)
+  let demoStatusLabel = "Disetujui";
+  if (decision === "rejected") demoStatusLabel = "Ditolak";
+  if (decision === "voided") demoStatusLabel = "Void";
+
+  return res.json({
+    success: true,
+    message: `Absensi berhasil ditandai sebagai ${demoStatusLabel}.`,
+    record: { id: recordId, validationStatus: decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided", statusLabel: demoStatusLabel }
+  });
 });
 
 app.get("/api/requests", async (req, res) => {

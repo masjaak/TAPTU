@@ -475,6 +475,20 @@ export async function fetchReportRows(token: string, filters?: { dateFrom?: stri
   return requestJson<AttendanceReportRow[]>(`/admin/reports${query ? `?${query}` : ""}`, {}, token);
 }
 
+// HR/Admin attendance review action
+export async function reviewAttendance(
+  token: string,
+  recordId: string,
+  decision: "approved" | "rejected" | "voided",
+  note?: string
+): Promise<{ success: boolean; message: string; record: { id: string; validationStatus: string; statusLabel: string } }> {
+  return requestJson(
+    `/attendance/${recordId}/review`,
+    { method: "POST", body: JSON.stringify({ decision, note }) },
+    token
+  );
+}
+
 export function exportReportCsv(rows: AttendanceReportRow[], fileName?: string): void {
   const headers = [
     "Employee Name", "Employee ID", "Date", "Shift", "Work Location",
