@@ -255,6 +255,58 @@ describe("attendance API shared flow", () => {
     expect(reports.some((r) => r.employeeId === "usr-manager-01")).toBe(false);
   });
 
+  it("PHASE 11.12 — admin/reports returns [] before any employee check-in (no synthetic Belum check-in row)", async () => {
+    const adminToken = await login("admin@taptu.app");
+    const reports = await request<unknown[]>("/admin/reports", {}, adminToken);
+    expect(reports).toHaveLength(0);
+  });
+
+  it("PHASE 11.12 — manager/reports returns [] before any employee check-in", async () => {
+    const managerToken = await login("manager@taptu.app");
+    const reports = await request<unknown[]>("/admin/reports", {}, managerToken);
+    expect(reports).toHaveLength(0);
+  });
+
+  it("PHASE 11.12 — employee attendance/history returns [] before check-in (no synthetic today row)", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const history = await request<unknown[]>("/attendance/history", {}, employeeToken);
+    expect(history).toHaveLength(0);
+  });
+
+  it("PHASE 11.12 — admin/reports shows exactly one Fikri row after check-in", async () => {
+    const employeeToken = await login("employee@taptu.app");
+    const adminToken = await login("admin@taptu.app");
+
+    await request("/attendance/checkin", { method: "POST", body: JSON.stringify({ method: "Manual" }) }, employeeToken);
+
+    const reports = await request<{ employeeId: string; checkInTime?: string }[]>("/admin/reports", {}, adminToken);
+    expect(reports).toHaveLength(1);
+    expect(reports[0].employeeId).toBe("usr-employee-01");
+    expect(reports[0].checkInTime).toBeTruthy();
+  });
+
+  it("PHASE 11.12 — employee attendance/history shows one row after check-in", async () => {
+    const employeeToken = await login("employee@taptu.app");
+
+    await request("/attendance/checkin", { method: "POST", body: JSON.stringify({ method: "Manual" }) }, employeeToken);
+
+    const history = await request<{ id: string; checkInTime?: string }[]>("/attendance/history", {}, employeeToken);
+    expect(history).toHaveLength(1);
+    expect(history[0].checkInTime).toBeTruthy();
+  });
+
+  it("PHASE 11.12 — admin overview absentToday is 0 before any check-in (no phantom KPI count)", async () => {
+    const adminToken = await login("admin@taptu.app");
+    const overview = await request<{ absentToday: number }>("/admin/overview", {}, adminToken);
+    expect(overview.absentToday).toBe(0);
+  });
+
+  it("PHASE 11.12 — manager overview absentToday is 0 before any check-in", async () => {
+    const managerToken = await login("manager@taptu.app");
+    const overview = await request<{ absentToday: number }>("/admin/overview", {}, managerToken);
+    expect(overview.absentToday).toBe(0);
+  });
+
   it("manager review action: PATCH exception persists across reload", async () => {
     const employeeToken = await login("employee@taptu.app");
     const managerToken = await login("manager@taptu.app");

@@ -438,12 +438,17 @@ function requireUser(req: express.Request, res: express.Response): AuthUser | nu
 }
 
 function createEmptyAttendanceRecord(userId: string) {
-  const template = createInitialStore().attendance["usr-employee-01"];
-
+  const shift = _storeInitial.shifts[0];
+  const location = _storeInitial.workLocations[0];
   return {
-    ...template,
     id: `att-${userId}-${new Date().toISOString().slice(0, 10)}`,
     userId,
+    shiftId: shift?.id ?? "shift-pagi",
+    shiftName: shift?.name ?? "Shift Pagi",
+    shiftStartTime: shift?.startTime ?? "08:00",
+    shiftEndTime: shift?.endTime ?? "17:00",
+    locationId: location?.id ?? "loc-hq",
+    locationName: location?.name ?? "Kantor Pusat",
     state: "idle" as const,
     status: "Belum check-in" as const,
     checkInAt: undefined,
@@ -513,10 +518,11 @@ function buildAttendanceItemFromRecord(record: AttendanceRecord): AttendanceTime
 }
 
 function listAttendanceHistory(user: AuthUser): AttendanceTimelineItem[] {
-  const todayItem = buildAttendanceItem(user.id);
+  const record = store.attendance[user.id];
   const rest = store.attendanceHistory.filter((item) => item.day !== "Hari ini");
 
-  return [todayItem, ...rest];
+  if (!record || record.state === "idle") return rest;
+  return [buildAttendanceItemFromRecord(record), ...rest];
 }
 
 function buildRequestItem(request: (typeof store.requests)[number], actorName?: string): LeaveRequestItem {

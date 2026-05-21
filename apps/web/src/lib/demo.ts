@@ -362,13 +362,14 @@ export function getDemoAdminOverview(): AdminOverview {
     (r) => r.workflowStatus === "pending_manager" || r.workflowStatus === "pending_hr"
   ).length;
 
+  const hasActivity = checkedIn.length > 0 || late.length > 0;
   return {
     totalEmployees: employees.length,
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
     pendingRequests,
-    absentToday: absent.length,
+    absentToday: hasActivity ? absent.length : 0,
     exceptionCount: exceptions.length,
     recentActivity: buildRecentActivity(employees, "act-admin")
   };
@@ -384,13 +385,14 @@ export function getDemoManagerOverview(): AdminOverview {
   const late = team.filter((e) => e.todayStatus === "late");
   const absent = team.filter((e) => e.todayStatus === "absent");
 
+  const hasActivity = checkedIn.length > 0 || late.length > 0;
   return {
     totalEmployees: team.length,
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
     pendingRequests: demoFikriRequests.filter((r) => r.workflowStatus === "pending_manager").length,
-    absentToday: absent.length,
+    absentToday: hasActivity ? absent.length : 0,
     exceptionCount: 0,
     recentActivity: buildRecentActivity(team, "act-mgr")
   };

@@ -759,7 +759,7 @@ export function computeAdminOverview(
   const onTimeToday = todayRecords.filter((record) => record.status === "Tepat waktu" || record.status === "Selesai").length;
   const lateToday = todayRecords.filter((record) => record.status === "Terlambat").length;
   const pendingRequests = store.requests.filter((request) => request.status === "Menunggu").length;
-  const absentToday = Math.max(0, totalEmployees - checkedInToday);
+  const absentToday = todayRecords.filter((record) => record.state === "idle").length;
   const exceptionCount = store.exceptions.filter((item) => item.status === "Need Review" || item.status === "Request Correction").length;
 
   return {
@@ -786,7 +786,7 @@ export function computeManagerOverview(
   const checkedInToday = teamRecords.filter((r) => r.state === "checked_in" || r.state === "checked_out").length;
   const onTimeToday = teamRecords.filter((r) => r.status === "Tepat waktu" || r.status === "Selesai").length;
   const lateToday = teamRecords.filter((r) => r.status === "Terlambat").length;
-  const absentToday = Math.max(0, teamIds.size - checkedInToday);
+  const absentToday = teamRecords.filter((r) => r.state === "idle").length;
   const pendingRequests = store.requests.filter((r) => teamIds.has(r.userId) && r.status === "Menunggu").length;
   const exceptionCount = store.exceptions.filter(
     (e) => teamIds.has(e.employeeId) && (e.status === "Need Review" || e.status === "Request Correction")
@@ -848,24 +848,7 @@ export function createInitialStore(): DemoStore {
   };
 
   return {
-    attendance: {
-      "usr-employee-01": {
-        id: `att-usr-employee-01-${today}`,
-        userId: "usr-employee-01",
-        shiftId: DEFAULT_SHIFT.id,
-        shiftName: DEFAULT_SHIFT.name,
-        shiftStartTime: DEFAULT_SHIFT.startTime,
-        shiftEndTime: DEFAULT_SHIFT.endTime,
-        locationId: DEFAULT_LOCATION.id,
-        locationName: DEFAULT_LOCATION.name,
-        state: "idle",
-        status: "Belum check-in",
-        validationStatus: "verified",
-        validationReasons: [],
-        createdAt: `${today}T00:00:00.000Z`,
-        updatedAt: `${today}T00:00:00.000Z`
-      }
-    },
+    attendance: {},
     attendanceHistory: [],
     requests: [],
     scanner,
@@ -1092,6 +1075,8 @@ export function buildAttendanceReportRows(
   const rows: AttendanceReportRow[] = [];
 
   for (const [userId, record] of Object.entries(store.attendance)) {
+    if (record.state === "idle") continue;
+
     const employeeName = userDirectory[userId] ?? "Employee";
     const department = userDepartments[userId] ?? {};
 

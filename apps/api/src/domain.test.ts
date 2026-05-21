@@ -476,14 +476,14 @@ describe("overview and summary", () => {
     const managerId = "usr-manager-01";
     const fikri = { id: "usr-employee-01", fullName: "Fikri Maulana", managerId };
 
-    it("returns zero checked-in and absentToday=1 before Fikri checks in", () => {
+    it("returns zero checked-in and absentToday=0 before Fikri checks in (no phantom KPI)", () => {
       const store = createInitialStore();
-      store.attendance = {};
+      // attendance is empty by default — no pre-seeded idle records
       const overview = computeManagerOverview(store, managerId, [fikri]);
 
       expect(overview.totalEmployees).toBe(1);
       expect(overview.checkedInToday).toBe(0);
-      expect(overview.absentToday).toBe(1);
+      expect(overview.absentToday).toBe(0); // 0 idle records = 0 absent
       expect(overview.onTimeToday).toBe(0);
       expect(overview.lateToday).toBe(0);
     });
@@ -715,12 +715,14 @@ describe("buildAttendanceReportRows", () => {
       shiftEndTime: "17:00",
       locationId: "loc-hq",
       locationName: "Kantor Pusat",
-      state: "idle",
-      status: "Belum check-in",
+      state: "checked_in",
+      status: "Tepat waktu",
+      checkInAt: "2026-05-02T08:00:00.000Z",
+      checkInMethod: "Manual",
       validationStatus: "verified",
       validationReasons: [],
-      createdAt: "2026-05-02T07:30:00.000Z",
-      updatedAt: "2026-05-02T07:30:00.000Z"
+      createdAt: "2026-05-02T08:00:00.000Z",
+      updatedAt: "2026-05-02T08:00:00.000Z"
     };
     return store;
   }
@@ -762,6 +764,24 @@ describe("buildAttendanceReportRows", () => {
 describe("generateCsvFromRows", () => {
   it("generates a CSV with header and data rows", () => {
     const store = createInitialStore();
+    store.attendance["usr-employee-01"] = {
+      id: "att-fikri-test",
+      userId: "usr-employee-01",
+      shiftId: "shift-pagi",
+      shiftName: "Shift Pagi",
+      shiftStartTime: "08:00",
+      shiftEndTime: "17:00",
+      locationId: "loc-hq",
+      locationName: "Kantor Pusat",
+      state: "checked_in",
+      status: "Tepat waktu",
+      checkInAt: "2026-05-02T08:05:00.000Z",
+      checkInMethod: "Manual",
+      validationStatus: "verified",
+      validationReasons: [],
+      createdAt: "2026-05-02T08:05:00.000Z",
+      updatedAt: "2026-05-02T08:05:00.000Z"
+    };
     const dir = { "usr-employee-01": "Fikri Maulana" };
     const rows = buildAttendanceReportRows(store, dir);
     const csv = generateCsvFromRows(rows);

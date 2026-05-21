@@ -774,14 +774,13 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(after.lateToday).toBeGreaterThanOrEqual(before.lateToday);
   });
 
-  it("HR admin absentToday decreases after Fikri check-in", async () => {
+  it("HR admin absentToday is 0 before activity; stays 0 after Fikri check-in (no phantom KPI)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchAdminOverview("demo:admin");
-    // Clean demo universe (10.18): only Fikri as employee, starts absent
-    expect(before.absentToday).toBe(1);
+    expect(before.absentToday).toBe(0); // no activity yet → no phantom absent count
     await checkIn("demo:employee", { method: "Selfie" });
     const after = await fetchAdminOverview("demo:admin");
-    expect(after.absentToday).toBe(before.absentToday - 1);
+    expect(after.absentToday).toBe(0); // Fikri checked in → not absent
   });
 
   it("HR admin exceptionCount starts at 0 (no stale needs_review employees)", async () => {
@@ -821,13 +820,13 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(after.checkedInToday).toBe(before.checkedInToday + 1);
   });
 
-  it("Manager absentToday decreases after Fikri check-in", async () => {
+  it("Manager absentToday is 0 before check-in; stays 0 after check-in (no phantom KPI)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchManagerOverview("demo:manager");
-    expect(before.absentToday).toBe(1); // only Fikri is absent in team
+    expect(before.absentToday).toBe(0); // no idle records = 0 absent before any attendance
     await checkIn("demo:employee", { method: "Selfie" });
     const after = await fetchManagerOverview("demo:manager");
-    expect(after.absentToday).toBe(0);
+    expect(after.absentToday).toBe(0); // checked_in = not absent
   });
 
   it("Manager KPI excludes non-team employees Leo, Dina, Anisa, and Budi", async () => {
