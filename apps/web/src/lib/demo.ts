@@ -117,34 +117,9 @@ const ATTENDANCE: Record<UserRole, AttendanceTimelineItem[]> = {
   ]
 };
 
-// Fikri-scoped requests: used by Manager Pengajuan (manager's team = Fikri only).
+// Fikri-scoped requests: starts empty; populated by employee leave request actions.
 // Mutable so that demo approval actions persist within the session.
-const INITIAL_FIKRI_REQUESTS: LeaveRequestItem[] = [
-  {
-    id: "req-fikri-01",
-    employeeId: "usr-employee-01",
-    requester: "Fikri Maulana",
-    category: "Cuti",
-    title: "Cuti tahunan · Fikri Maulana",
-    status: "Menunggu",
-    detail: "2 hari kerja minggu depan, sudah konfirmasi dengan tim.",
-    workflowStatus: "pending_manager",
-    statusLabel: "Menunggu Manager",
-    createdAt: "2026-05-19T08:00:00"
-  },
-  {
-    id: "req-fikri-02",
-    employeeId: "usr-employee-01",
-    requester: "Fikri Maulana",
-    category: "Izin",
-    title: "Izin dokter · Fikri Maulana",
-    status: "Disetujui",
-    detail: "Kontrol kesehatan rutin, sudah ada surat dokter.",
-    workflowStatus: "approved",
-    statusLabel: "Disetujui",
-    createdAt: "2026-05-10T08:00:00"
-  }
-];
+const INITIAL_FIKRI_REQUESTS: LeaveRequestItem[] = [];
 
 let demoFikriRequests: LeaveRequestItem[] = INITIAL_FIKRI_REQUESTS.map((r) => ({ ...r }));
 
@@ -328,6 +303,35 @@ export function approveDemoRequest(
   return updated;
 }
 
+/**
+ * Creates a new leave request for Fikri and adds it to the mutable demo request list.
+ * Called by api.ts createRequest() for demo employee tokens so that approval tests
+ * can work action-driven without relying on seeded data.
+ */
+export function submitDemoLeaveRequest(payload: {
+  title: string;
+  detail: string;
+  category: string;
+  startDate?: string;
+  endDate?: string;
+}): LeaveRequestItem {
+  const item: LeaveRequestItem = {
+    id: `req-demo-${Date.now()}`,
+    employeeId: "usr-employee-01",
+    requester: "Fikri Maulana",
+    category: payload.category as "Cuti" | "Izin",
+    title: payload.title,
+    status: "Menunggu",
+    detail: payload.detail,
+    workflowStatus: "pending_manager",
+    statusLabel: "Menunggu Manager",
+    createdAt: new Date().toISOString()
+  };
+  demoFikriRequests = [...demoFikriRequests, item];
+  saveDemoLiveState();
+  return item;
+}
+
 function buildRecentActivity(members: EmployeeListItem[], idPrefix: string): AttendanceActivityItem[] {
   return members
     .filter((e) => e.todayStatus === "present" || e.todayStatus === "late")
@@ -458,7 +462,7 @@ const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
   { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
-  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "present", checkInTime: "08:00", checkInMethod: "QR", validationStatus: "verified", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
+  { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
 ];
 
 let demoDepartments: DepartmentItem[] = INITIAL_DEMO_DEPARTMENTS.map((department) => ({ ...department }));

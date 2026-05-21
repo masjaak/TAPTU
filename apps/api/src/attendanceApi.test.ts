@@ -231,6 +231,30 @@ describe("attendance API shared flow", () => {
     expect(fikriReport?.checkInTime).toBe(employeeCheckInTime);
   });
 
+  it("PHASE 11.11 — clean default: dashboard attendance for manager is empty (no seeded fake 08.03)", async () => {
+    const managerToken = await login("manager@taptu.app");
+    const dashboard = await request<{ attendance: unknown[] }>("/dashboard", {}, managerToken);
+    expect(dashboard.attendance).toHaveLength(0);
+  });
+
+  it("PHASE 11.11 — clean default: dashboard attendance for admin is empty (no seeded fake 08.24)", async () => {
+    const adminToken = await login("admin@taptu.app");
+    const dashboard = await request<{ attendance: unknown[] }>("/dashboard", {}, adminToken);
+    expect(dashboard.attendance).toHaveLength(0);
+  });
+
+  it("PHASE 11.11 — clean default: dashboard requests for manager is empty (no seeded fake Izin tim lapangan)", async () => {
+    const managerToken = await login("manager@taptu.app");
+    const dashboard = await request<{ requests: unknown[] }>("/dashboard", {}, managerToken);
+    expect(dashboard.requests).toHaveLength(0);
+  });
+
+  it("PHASE 11.11 — Raka (manager) does not appear as an attendance subject in admin/reports", async () => {
+    const adminToken = await login("admin@taptu.app");
+    const reports = await request<{ employeeId: string }[]>("/admin/reports", {}, adminToken);
+    expect(reports.some((r) => r.employeeId === "usr-manager-01")).toBe(false);
+  });
+
   it("manager review action: PATCH exception persists across reload", async () => {
     const employeeToken = await login("employee@taptu.app");
     const managerToken = await login("manager@taptu.app");

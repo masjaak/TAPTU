@@ -9,6 +9,7 @@ import {
   checkIn,
   checkOut,
   createDepartment,
+  createRequest,
   fetchAdminOverview,
   fetchAttendanceHistory,
   fetchEmployeeSummary,
@@ -791,11 +792,11 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(overview.exceptionCount).not.toBe(5); // not hardcoded enterprise value
   });
 
-  it("HR admin pendingRequests uses demo request count, not hardcoded 6", async () => {
+  it("HR admin pendingRequests is 0 by default (no seeded requests)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchAdminOverview("demo:admin");
     expect(overview.pendingRequests).not.toBe(6);
-    expect(overview.pendingRequests).toBe(1); // only Anisa sick leave is Menunggu
+    expect(overview.pendingRequests).toBe(0);
   });
 
   // --- Manager KPI ---
@@ -986,12 +987,16 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
     }
   });
 
-  it("fetchManagerRequests returns requests with workflowStatus defined", async () => {
+  it("fetchManagerRequests returns empty by default; submitted requests have workflowStatus", async () => {
     vi.stubGlobal("fetch", vi.fn());
+    const empty = await fetchManagerRequests("demo:manager");
+    expect(empty).toHaveLength(0);
+    // After submitting a request, workflowStatus is set correctly
+    await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
     const result = await fetchManagerRequests("demo:manager");
-    expect(result.length).toBeGreaterThan(0); // at least one pending request for Fikri
+    expect(result.length).toBeGreaterThan(0);
     for (const req of result) {
-      expect(req.workflowStatus).toBeDefined(); // RED: current REQUESTS.manager has no workflowStatus
+      expect(req.workflowStatus).toBeDefined();
     }
   });
 
@@ -1005,20 +1010,22 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
     }
   });
 
-  it("fetchRequests for demo:admin returns Fikri requests (clean demo — no Anisa)", async () => {
+  it("fetchRequests for demo:admin starts empty; submitted request is visible to admin (no Anisa)", async () => {
     vi.stubGlobal("fetch", vi.fn());
+    const empty = await fetchRequests("demo:admin", true);
+    expect(empty).toHaveLength(0);
+    // After Fikri submits a request, admin sees it with no Anisa
+    await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
     const result = await fetchRequests("demo:admin", true);
     const names = result.map((r) => r.requester ?? r.title);
-    // Admin sees only connected demo requests (Fikri); Anisa removed from demo universe
-    const hasFikri = names.some((n) => n.includes("Fikri"));
-    const hasAnisa = names.some((n) => n.includes("Anisa"));
-    expect(hasFikri).toBe(true);
-    expect(hasAnisa).toBe(false);
+    expect(names.some((n) => n.includes("Fikri"))).toBe(true);
+    expect(names.some((n) => n.includes("Anisa"))).toBe(false);
   });
 
   it("approveRequest by manager sets workflowStatus to pending_hr and statusLabel to Menunggu HR", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const result = await approveRequest("demo:manager", "req-fikri-01", "Disetujui");
+    const created = await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const result = await approveRequest("demo:manager", created.request.id!, "Disetujui");
     expect(result.request.workflowStatus).toBe("pending_hr");
     expect(result.request.statusLabel).toBe("Menunggu HR");
     expect(result.request.status).toBe("Menunggu"); // still pending until HR finalizes
@@ -1026,7 +1033,8 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
 
   it("approveRequest by HR sets workflowStatus to approved and statusLabel to Disetujui", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const result = await approveRequest("demo:admin", "req-fikri-01", "Disetujui");
+    const created = await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const result = await approveRequest("demo:admin", created.request.id!, "Disetujui");
     expect(result.request.workflowStatus).toBe("approved");
     expect(result.request.statusLabel).toBe("Disetujui");
     expect(result.request.status).toBe("Disetujui");
@@ -1034,7 +1042,8 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
 
   it("approveRequest reject by manager sets workflowStatus to rejected and statusLabel to Ditolak", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const result = await approveRequest("demo:manager", "req-fikri-01", "Ditolak");
+    const created = await createRequest("demo:employee", { category: "Izin", title: "Izin dokter · Fikri Maulana", detail: "Kontrol kesehatan.", startDate: "2026-05-27", endDate: "2026-05-27" });
+    const result = await approveRequest("demo:manager", created.request.id!, "Ditolak");
     expect(result.request.workflowStatus).toBe("rejected");
     expect(result.request.statusLabel).toBe("Ditolak");
   });
@@ -1067,67 +1076,62 @@ describe("PHASE 10.15 — Final demo consistency QA", () => {
 
   it("manager approve mutates request — re-fetch reflects pending_hr workflowStatus", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    // Before: request is pending_manager
-    const before = await fetchManagerRequests("demo:manager");
-    const pendingReq = before.find((r) => r.workflowStatus === "pending_manager");
-    expect(pendingReq).toBeDefined();
+    // Submit a request (action-driven, no seeded data)
+    const created = await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const pendingReq = created.request;
+    expect(pendingReq.workflowStatus).toBe("pending_manager");
 
     // Manager approves
-    await approveRequest("demo:manager", pendingReq!.id!, "Disetujui");
+    await approveRequest("demo:manager", pendingReq.id!, "Disetujui");
 
-    // After: re-fetch reflects pending_hr (RED: currently static, still pending_manager)
+    // After: re-fetch reflects pending_hr
     const after = await fetchManagerRequests("demo:manager");
-    const updated = after.find((r) => r.id === pendingReq!.id);
-    expect(updated?.workflowStatus).toBe("pending_hr"); // RED
-    expect(updated?.statusLabel).toBe("Menunggu HR"); // RED
+    const updated = after.find((r) => r.id === pendingReq.id);
+    expect(updated?.workflowStatus).toBe("pending_hr");
+    expect(updated?.statusLabel).toBe("Menunggu HR");
     expect(updated?.status).toBe("Menunggu"); // still awaiting final HR decision
   });
 
   it("HR/admin approve mutates request — re-fetch reflects approved workflowStatus", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const reqs = await fetchManagerRequests("demo:manager");
-    const pendingReq = reqs.find((r) => r.workflowStatus === "pending_manager");
-    expect(pendingReq).toBeDefined();
+    const created = await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const pendingReq = created.request;
 
     // Admin approves (finalizes)
-    await approveRequest("demo:admin", pendingReq!.id!, "Disetujui");
+    await approveRequest("demo:admin", pendingReq.id!, "Disetujui");
 
     // Re-fetch via manager view still reflects final state
     const after = await fetchManagerRequests("demo:manager");
-    const updated = after.find((r) => r.id === pendingReq!.id);
-    expect(updated?.workflowStatus).toBe("approved"); // RED
-    expect(updated?.statusLabel).toBe("Disetujui"); // RED
-    expect(updated?.status).toBe("Disetujui"); // RED
+    const updated = after.find((r) => r.id === pendingReq.id);
+    expect(updated?.workflowStatus).toBe("approved");
+    expect(updated?.statusLabel).toBe("Disetujui");
+    expect(updated?.status).toBe("Disetujui");
   });
 
   it("reject by manager mutates request — re-fetch reflects rejected workflowStatus", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const reqs = await fetchManagerRequests("demo:manager");
-    const pendingReq = reqs.find((r) => r.workflowStatus === "pending_manager");
+    const created = await createRequest("demo:employee", { category: "Izin", title: "Izin dokter · Fikri Maulana", detail: "Kontrol kesehatan.", startDate: "2026-05-27", endDate: "2026-05-27" });
+    const pendingReq = created.request;
 
-    await approveRequest("demo:manager", pendingReq!.id!, "Ditolak", "Tidak sesuai jadwal.");
+    await approveRequest("demo:manager", pendingReq.id!, "Ditolak", "Tidak sesuai jadwal.");
 
     const after = await fetchManagerRequests("demo:manager");
-    const updated = after.find((r) => r.id === pendingReq!.id);
-    expect(updated?.workflowStatus).toBe("rejected"); // RED
-    expect(updated?.status).toBe("Ditolak"); // RED
-    expect(updated?.adminNote).toBe("Tidak sesuai jadwal."); // RED
+    const updated = after.find((r) => r.id === pendingReq.id);
+    expect(updated?.workflowStatus).toBe("rejected");
+    expect(updated?.status).toBe("Ditolak");
+    expect(updated?.adminNote).toBe("Tidak sesuai jadwal.");
   });
 
-  it("resetDemoAttendanceState restores request to initial pending_manager state", async () => {
+  it("resetDemoAttendanceState clears all submitted requests", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    // Mutate via approval
-    const reqs = await fetchManagerRequests("demo:manager");
-    const pendingReq = reqs.find((r) => r.workflowStatus === "pending_manager");
-    await approveRequest("demo:manager", pendingReq!.id!, "Disetujui");
+    await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const before = await fetchManagerRequests("demo:manager");
+    expect(before.length).toBeGreaterThan(0);
 
-    // Reset
     resetDemoAttendanceState();
 
-    // Should be back to pending_manager
-    const restored = await fetchManagerRequests("demo:manager");
-    const restoredReq = restored.find((r) => r.id === pendingReq!.id);
-    expect(restoredReq?.workflowStatus).toBe("pending_manager"); // RED
+    const after = await fetchManagerRequests("demo:manager");
+    expect(after).toHaveLength(0);
   });
 
   // ── Stale dummy attendance: manager home has no hardcoded dummy rows ──────
@@ -1358,31 +1362,31 @@ describe("PHASE 10.18 — Clean demo universe: roster, departments, exceptions, 
   });
 
   // --- Requests ---
-  it("fetchRequests for demo:admin returns only Fikri requests (no Anisa)", async () => {
+  it("fetchRequests for demo:admin starts empty (no seeded Fikri requests)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const result = await fetchRequests("demo:admin", true);
-    const names = result.map((r) => r.requester ?? r.title);
-    expect(names.some((n) => n.includes("Anisa"))).toBe(false);
-    expect(names.some((n) => n.includes("Fikri"))).toBe(true);
+    expect(result).toHaveLength(0);
+    expect(result.some((r) => (r.requester ?? r.title).includes("Anisa"))).toBe(false);
   });
 
-  it("fetchRequests for demo:superadmin returns only Fikri requests (no Anisa)", async () => {
+  it("fetchRequests for demo:superadmin starts empty (no Anisa)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const result = await fetchRequests("demo:superadmin", true);
-    const names = result.map((r) => r.requester ?? r.title);
-    expect(names.some((n) => n.includes("Anisa"))).toBe(false);
+    expect(result.some((r) => (r.requester ?? r.title).includes("Anisa"))).toBe(false);
   });
 
-  it("getDemoAdminOverview pendingRequests is live from demoFikriRequests (1 initially)", async () => {
+  it("getDemoAdminOverview pendingRequests is 0 by default (no seeded requests)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchAdminOverview("demo:admin");
-    expect(overview.pendingRequests).toBe(1);
+    expect(overview.pendingRequests).toBe(0);
   });
 
-  it("getDemoAdminOverview pendingRequests becomes 0 after HR approves Fikri request", async () => {
+  it("getDemoAdminOverview pendingRequests becomes 0 after HR approves submitted Fikri request", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    await approveRequest("demo:manager", "req-fikri-01", "Disetujui");
-    await approveRequest("demo:admin", "req-fikri-01", "Disetujui");
+    const created = await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const id = created.request.id!;
+    await approveRequest("demo:manager", id, "Disetujui");
+    await approveRequest("demo:admin", id, "Disetujui");
     const overview = await fetchAdminOverview("demo:admin");
     expect(overview.pendingRequests).toBe(0);
   });
@@ -1448,8 +1452,10 @@ describe("PHASE 10.18 — Clean demo universe: roster, departments, exceptions, 
 
   it("after HR approves Fikri request: demo:employee receives approved notification", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    await approveRequest("demo:manager", "req-fikri-01", "Disetujui");
-    await approveRequest("demo:admin", "req-fikri-01", "Disetujui");
+    const created = await createRequest("demo:employee", { category: "Cuti", title: "Cuti tahunan · Fikri Maulana", detail: "2 hari kerja.", startDate: "2026-05-26", endDate: "2026-05-27" });
+    const id = created.request.id!;
+    await approveRequest("demo:manager", id, "Disetujui");
+    await approveRequest("demo:admin", id, "Disetujui");
     const notifs = await fetchNotifications("demo:employee");
     const approvedNotif = notifs.find((n) => n.type === "request_approved");
     expect(approvedNotif).toBeDefined();
@@ -1499,11 +1505,12 @@ describe("PHASE 11.1 — live dashboard stats (RED: must fail before fix)", () =
     expect(stat?.value).toBe("1");
   });
 
-  it("getDashboard for demo:admin Approval pending reflects live demoFikriRequests (not hardcoded 6)", async () => {
+  it("getDashboard for demo:admin Approval pending is 0 by default; reflects live demoFikriRequests (not hardcoded 6)", async () => {
     const dashboard = await getDashboard("demo:admin");
     const stat = dashboard.stats.find((s) => s.label === "Approval pending");
-    // 1 pending_manager request seeded in demoFikriRequests
-    expect(stat?.value).toBe("1");
+    // 0 pending requests by default (no seeded data)
+    expect(stat?.value).toBe("0");
+    expect(stat?.value).not.toBe("6");
   });
 });
 

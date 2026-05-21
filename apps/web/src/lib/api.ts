@@ -49,6 +49,7 @@ import {
   recordDemoCheckIn,
   recordDemoCheckOut,
   resetDemoAttendanceState,
+  submitDemoLeaveRequest,
   updateDemoDepartment,
   updateDemoShift,
   updateDemoWorkLocation,
@@ -225,10 +226,8 @@ export async function createRequest(
   payload: Record<string, unknown> & { category: string; startDate: string; endDate: string; title: string; detail: string }
 ) {
   if (isDemoToken(token)) {
-    const response: RequestActionResponse = {
-      request: { id: `demo-req-${Date.now()}`, title: payload.title, detail: payload.detail, category: payload.category as ApprovalRequestType, startDate: payload.startDate, endDate: payload.endDate, status: "Menunggu" }
-    };
-    return Promise.resolve(response);
+    const item = submitDemoLeaveRequest(payload);
+    return Promise.resolve<RequestActionResponse>({ request: item });
   }
   return requestJson<RequestActionResponse>(
     "/requests",

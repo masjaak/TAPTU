@@ -246,21 +246,10 @@ const roleStats: Record<UserRole, DashboardStat[]> = {
 };
 
 const attendanceFeed: Record<UserRole, AttendanceTimelineItem[]> = {
-  superadmin: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" }
-  ],
-  admin: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" }
-  ],
-  manager: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" },
-    { id: "a-02", day: "Hari ini", status: "Terlambat", time: "08.24", method: "GPS" }
-  ],
-  employee: [
-    { id: "a-01", day: "Hari ini", status: "Tepat waktu", time: "08.03", method: "QR" }
-  ],
+  superadmin: [],
+  admin: [],
+  manager: [],
+  employee: [],
   scanner: [
     { id: "a-01", day: "08.03", status: "Tepat waktu", time: "Nadia Putri", method: "QR" },
     { id: "a-02", day: "08.07", status: "Tepat waktu", time: "Ilham Fadli", method: "QR" },
@@ -269,19 +258,10 @@ const attendanceFeed: Record<UserRole, AttendanceTimelineItem[]> = {
 };
 
 const requestFeed: Record<UserRole, LeaveRequestItem[]> = {
-  superadmin: [
-    { id: "req-01", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." }
-  ],
-  admin: [
-    { id: "req-01", title: "Cuti tahunan · Fikri Maulana", status: "Disetujui", detail: "2 hari kerja, mulai Jumat." }
-  ],
-  manager: [
-    { id: "req-01", title: "Izin tim lapangan", status: "Menunggu", detail: "Butuh keputusan supervisor sebelum jam 12.00." }
-  ],
-  employee: [
-    { id: "req-01", title: "Cuti tahunan", status: "Disetujui", detail: "2 hari kerja disetujui untuk minggu depan." },
-    { id: "req-02", title: "Izin pribadi", status: "Menunggu", detail: "Dokumen pendukung sedang direview admin." }
-  ],
+  superadmin: [],
+  admin: [],
+  manager: [],
+  employee: [],
   scanner: [
     { id: "req-01", title: "Token gate timur", status: "Disetujui", detail: "QR aktif dan sinkron sampai 30 detik ke depan." },
     { id: "req-02", title: "Permintaan reset scanner", status: "Menunggu", detail: "Tunggu admin memperbarui PIN perangkat." }
