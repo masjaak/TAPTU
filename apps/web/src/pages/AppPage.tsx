@@ -1459,7 +1459,7 @@ export function AppPage() {
           row.id === recordId 
             ? {
                 ...row,
-                validationStatus: decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided" as any
+                validationStatus: decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided"
               }
             : row
         ));
@@ -2738,7 +2738,7 @@ export function AppPage() {
                 status: <StatusBadge tone={row.status === "Terlambat" ? "warning" : row.status === "Belum check-in" ? "neutral" : row.status === "Izin" ? "info" : "success"}>{row.status}</StatusBadge>,
                 validation: (
                   <StatusBadge tone={validationStatus === "verified" ? "success" : validationStatus === "needs_review" ? "warning" : validationStatus === "blocked" || validationStatus === "rejected" ? "danger" : validationStatus === "voided" ? "neutral" : "neutral"}>
-                    {validationStatus === "verified" ? "Terverifikasi" : validationStatus === "needs_review" ? "Perlu review" : validationStatus === "voided" ? "Void" : validationStatus}
+                    {validationStatus === "verified" ? "Disetujui HR" : validationStatus === "needs_review" ? "Perlu review" : validationStatus === "rejected" ? "Ditolak" : validationStatus === "voided" ? "Void" : validationStatus}
                   </StatusBadge>
                 ),
                 actions: hasAttendanceRecord && !isFinalized && isAdmin ? (

@@ -248,7 +248,7 @@ export function StatCard({ label, value, detail }: { label: string; value: strin
 export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "success" | "warning" | "danger" | "neutral" | "info" }) {
   return (
     <span
-      className={clsx("inline-flex max-w-full shrink-0 items-center rounded-full px-2.5 py-1 text-left text-[11px] font-semibold tracking-[0.04em]", {
+      className={clsx("inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] whitespace-nowrap", {
         "bg-[#edf4ff] text-[#174ea6]": tone === "success",
         "bg-[#fff3dc] text-[#92600a]": tone === "warning",
         "bg-[#fff2ee] text-[#a54c2f]": tone === "danger",

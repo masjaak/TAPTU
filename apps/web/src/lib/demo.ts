@@ -800,3 +800,15 @@ export function resetDemoAttendanceState(): void {
     try { localStorage.removeItem(DEMO_LS_KEY); } catch { /* ignore */ }
   }
 }
+
+/**
+ * Persists an HR attendance review decision in the demo store.
+ * recordId format: "att-live-{employeeId}"
+ */
+export function recordDemoAttendanceReview(recordId: string, decision: "approved" | "rejected" | "voided"): void {
+  const employeeId = recordId.replace(/^att-live-/, "");
+  const newStatus = decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided";
+  demoEmployees = demoEmployees.map((e) =>
+    e.id === employeeId ? { ...e, validationStatus: newStatus as typeof e.validationStatus } : e
+  );
+}

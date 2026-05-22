@@ -1,7 +1,7 @@
 export type UserRole = "superadmin" | "admin" | "manager" | "employee" | "scanner";
 
 export type AttendanceState = "idle" | "checked_in" | "checked_out";
-export type AttendanceValidationStatus = "verified" | "needs_review" | "blocked" | "rejected" | "corrected";
+export type AttendanceValidationStatus = "verified" | "needs_review" | "blocked" | "rejected" | "corrected" | "voided";
 export type AttendanceExceptionStatus = "Need Review" | "Approved" | "Rejected" | "Request Correction";
 export type ApprovalStepStatus = "pending" | "approved" | "rejected" | "skipped" | "cancelled";
 export type ApprovalFinalStatus = "pending" | "approved" | "rejected" | "cancelled";

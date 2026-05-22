@@ -48,6 +48,7 @@ import {
   reassignDemoEmployeeDepartment,
   recordDemoCheckIn,
   recordDemoCheckOut,
+  recordDemoAttendanceReview,
   resetDemoAttendanceState,
   submitDemoLeaveRequest,
   updateDemoDepartment,
@@ -482,6 +483,12 @@ export async function reviewAttendance(
   decision: "approved" | "rejected" | "voided",
   note?: string
 ): Promise<{ success: boolean; message: string; record: { id: string; validationStatus: string; statusLabel: string } }> {
+  if (isDemoToken(token)) {
+    recordDemoAttendanceReview(recordId, decision);
+    const statusLabel = decision === "approved" ? "Disetujui HR" : decision === "rejected" ? "Ditolak" : "Void";
+    const validationStatus = decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided";
+    return Promise.resolve({ success: true, message: `Absensi berhasil ditandai sebagai ${statusLabel}.`, record: { id: recordId, validationStatus, statusLabel } });
+  }
   return requestJson(
     `/attendance/${recordId}/review`,
     { method: "POST", body: JSON.stringify({ decision, note }) },
