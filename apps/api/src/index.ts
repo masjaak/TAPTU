@@ -1359,16 +1359,25 @@ app.post("/api/attendance/:id/review", async (req, res) => {
     });
   }
 
-  // Demo mode - return success without modifying store for now
-  // (Demo mode attendance history is regenerated from employee state on each request)
-  let demoStatusLabel = "Disetujui";
-  if (decision === "rejected") demoStatusLabel = "Ditolak";
-  if (decision === "voided") demoStatusLabel = "Void";
+  // Demo mode - update store.attendance so refetch reflects the decision
+  const newValidationStatus = decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided";
+  const newStatusLabel = decision === "approved" ? "Disetujui HR" : decision === "rejected" ? "Ditolak" : "Void";
+
+  // Find and update the attendance record by id
+  for (const [userId, record] of Object.entries(store.attendance)) {
+    if (record.id === recordId) {
+      store.attendance[userId] = { ...record, validationStatus: newValidationStatus as AttendanceValidationStatus };
+      break;
+    }
+  }
+  await storage.save(store).catch((err: unknown) => {
+    console.error("[taptu-api] storage.save failed (attendance review):", err);
+  });
 
   return res.json({
     success: true,
-    message: `Absensi berhasil ditandai sebagai ${demoStatusLabel}.`,
-    record: { id: recordId, validationStatus: decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided", statusLabel: demoStatusLabel }
+    message: `Absensi berhasil ditandai sebagai ${newStatusLabel}.`,
+    record: { id: recordId, validationStatus: newValidationStatus, statusLabel: newStatusLabel }
   });
 });
 
