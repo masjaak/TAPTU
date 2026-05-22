@@ -811,4 +811,5 @@ export function recordDemoAttendanceReview(recordId: string, decision: "approved
   demoEmployees = demoEmployees.map((e) =>
     e.id === employeeId ? { ...e, validationStatus: newStatus as typeof e.validationStatus } : e
   );
+  saveDemoLiveState();
 }

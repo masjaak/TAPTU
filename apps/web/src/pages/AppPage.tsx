@@ -1453,17 +1453,13 @@ export function AppPage() {
     try {
       const response = await reviewAttendance(currentSession.token, recordId, decision);
       setActionMessage(response.message);
-      // Update local state immediately
       if (tab === "attendance") {
-        setAdminAttendanceRows(prev => prev.map(row => 
-          row.id === recordId 
-            ? {
-                ...row,
-                validationStatus: decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided"
-              }
-            : row
+        // Apply decision immediately to local state
+        const newValidationStatus = decision === "approved" ? "verified" : decision === "rejected" ? "rejected" : "voided";
+        setAdminAttendanceRows(prev => prev.map(row =>
+          row.id === recordId ? { ...row, validationStatus: newValidationStatus } : row
         ));
-        // Also refresh from server to ensure consistency
+        // Sync from store (mutation already persisted by reviewAttendance)
         fetchReportRows(currentSession.token)
           .then((refreshed) => setAdminAttendanceRows(refreshed))
           .catch(() => {});
