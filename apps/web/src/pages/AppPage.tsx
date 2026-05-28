@@ -515,6 +515,41 @@ export function AppPage() {
     setAttendanceCapture((current) => ({ ...current, deviceId }));
   }, []);
 
+  // React to demo state changes (cross-tab from localStorage + same-tab via custom event)
+  // so Manager/HR views reflect employee check-ins without manual refresh.
+  useEffect(() => {
+    if (!session) return;
+    const handler = () => {
+      if (isManager || isAdmin) {
+        const loadOverview = isManager ? fetchManagerOverview : fetchAdminOverview;
+        loadOverview(session.token)
+          .then((data) => { setAdminOverview(data); })
+          .catch(() => { /* silent — existing data stays */ });
+        const loadEmployees = isManager ? fetchManagerEmployeeList : fetchEmployeeList;
+        loadEmployees(session.token)
+          .then((items) => { setEmployeeList(items); })
+          .catch(() => { /* silent */ });
+      }
+      if (isEmployee && (tab === "home" || tab === "attendance")) {
+        refreshEmployeeAttendanceSummary();
+        refreshEmployeeAttendanceHistory();
+      }
+    };
+    window.addEventListener("taptu:state-change", handler);
+    return () => window.removeEventListener("taptu:state-change", handler);
+  }, [session?.token, isManager, isAdmin, isEmployee, tab]);
+
+  // Notification polling — periodically check for new notifications
+  useEffect(() => {
+    if (!session || isScanner) return;
+    const interval = window.setInterval(() => {
+      fetchNotifications(session.token)
+        .then((items) => { setNotifications(items); })
+        .catch(() => { /* silent */ });
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [session?.token, isScanner]);
+
   useEffect(() => {
     if (!session) {
       return;
@@ -1419,6 +1454,30 @@ export function AppPage() {
     }
   }
 
+  async function handleRefreshDashboard() {
+    setBusyAction("refresh-dashboard");
+    try {
+      if (isManager || isAdmin) {
+        const loadOverview = isManager ? fetchManagerOverview : fetchAdminOverview;
+        const [overview, employees] = await Promise.all([
+          loadOverview(currentSession.token),
+          (isManager ? fetchManagerEmployeeList : fetchEmployeeList)(currentSession.token)
+        ]);
+        setAdminOverview(overview);
+        setEmployeeList(employees);
+      }
+      if (isEmployee) {
+        await refreshEmployeeAttendanceSummary();
+        await refreshEmployeeAttendanceHistory();
+      }
+      setActionMessage("Data berhasil diperbarui.");
+    } catch {
+      setActionMessage("Gagal memperbarui data.", "err");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function handleExceptionDecision(id: string, status: "Approved" | "Rejected" | "Request Correction") {
     if (status !== "Approved" && !(exceptionNotes[id] ?? "").trim()) {
       setExceptionErrors((current) => ({ ...current, [id]: "Tambahkan catatan agar keputusan review bisa ditindaklanjuti." }));
@@ -1742,6 +1801,17 @@ export function AppPage() {
 
     return (
       <>
+        <PageHeader
+          eyebrow="Beranda Admin"
+          title="Dashboard Kehadiran"
+          description={`${now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · Ringkasan kehadiran organisasi.`}
+          action={
+            <SecondaryButton onClick={handleRefreshDashboard} disabled={busyAction === "refresh-dashboard"} className="gap-2 whitespace-nowrap text-[#596172] shadow-none">
+              <RefreshCw className={`h-4 w-4 ${busyAction === "refresh-dashboard" ? "animate-spin" : ""}`} />
+              {busyAction === "refresh-dashboard" ? "Memuat..." : "Muat ulang"}
+            </SecondaryButton>
+          }
+        />
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard label="Hadir hari ini" value={String(adminOverview.checkedInToday)} detail={`${adminOverview.onTimeToday} tepat waktu`} />
           <StatCard label="Terlambat" value={String(adminOverview.lateToday)} detail="Perlu follow-up supervisor" />
@@ -1834,6 +1904,12 @@ export function AppPage() {
           eyebrow="Beranda Supervisor"
           title="Selamat datang kembali"
           description={`${now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · Pantau kehadiran dan pengajuan tim Anda hari ini.`}
+          action={
+            <SecondaryButton onClick={handleRefreshDashboard} disabled={busyAction === "refresh-dashboard"} className="gap-2 whitespace-nowrap text-[#596172] shadow-none">
+              <RefreshCw className={`h-4 w-4 ${busyAction === "refresh-dashboard" ? "animate-spin" : ""}`} />
+              {busyAction === "refresh-dashboard" ? "Memuat..." : "Muat ulang"}
+            </SecondaryButton>
+          }
         />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -2802,6 +2878,12 @@ export function AppPage() {
           eyebrow="Presensi Tim"
           title="Status Kehadiran Hari Ini"
           description="Lihat status kehadiran anggota tim hari ini."
+          action={
+            <SecondaryButton onClick={handleRefreshDashboard} disabled={busyAction === "refresh-dashboard"} className="gap-2 whitespace-nowrap text-[#596172] shadow-none">
+              <RefreshCw className={`h-4 w-4 ${busyAction === "refresh-dashboard" ? "animate-spin" : ""}`} />
+              {busyAction === "refresh-dashboard" ? "Memuat..." : "Muat ulang"}
+            </SecondaryButton>
+          }
         />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -3333,6 +3415,47 @@ export function AppPage() {
                       <p className="text-sm leading-6 text-[#596172]">{item.detail}</p>
                       {item.adminNote ? (
                         <p className="text-xs font-semibold text-[#667085]">Catatan reviewer: {item.adminNote}</p>
+                      ) : null}
+                      {/* Approval timeline indicator */}
+                      {item.workflowStatus ? (
+                        <div className="mt-2 rounded-xl border border-[#edf0f5] bg-[#f9fafc] p-2.5">
+                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8099c8]">Tahap approval</p>
+                          <div className="flex items-center gap-1.5">
+                            {[
+                              { key: "pending_manager", label: "Manager", done: item.workflowStatus !== "pending_manager" && item.workflowStatus !== "pending_hr" ? false : false },
+                              { key: "pending_hr", label: "HR", done: item.workflowStatus === "approved" || item.workflowStatus === "rejected" },
+                              { key: "final", label: "Final", done: item.workflowStatus === "approved" || item.workflowStatus === "rejected" }
+                            ].map((step, idx) => {
+                              const isActive = 
+                                (step.key === "pending_manager" && (item.workflowStatus === "pending_manager" || item.workflowStatus === "pending_hr")) ||
+                                (step.key === "pending_hr" && item.workflowStatus === "pending_hr") ||
+                                (step.key === "final" && (item.workflowStatus === "approved" || item.workflowStatus === "rejected"));
+                              const isDone = step.done || (step.key === "pending_manager" && (item.workflowStatus === "approved" || item.workflowStatus === "rejected"));
+                              return (
+                                <div key={step.key} className="flex items-center gap-1.5">
+                                  {idx > 0 && <div className="h-px w-3 bg-[#d6def0]" />}
+                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                    item.workflowStatus === "rejected" && step.key === "final"
+                                      ? "bg-[#fee2e2] text-[#dc2626]"
+                                      : isDone || (step.key === "pending_manager" && item.workflowStatus === "approved")
+                                        ? "bg-[#dcfce7] text-[#16a34a]"
+                                        : isActive
+                                          ? "bg-[#d9e6ff] text-[#1769ff]"
+                                          : "bg-[#f0f2f5] text-[#9aa3b2]"
+                                  }`}>
+                                    {step.label}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="mt-1 text-[10px] leading-4 text-[#7a8495]">
+                            {item.workflowStatus === "rejected" ? "Pengajuan ditolak"
+                              : item.workflowStatus === "approved" ? "Pengajuan disetujui HR"
+                              : item.workflowStatus === "pending_hr" ? "Menunggu keputasan HR"
+                              : "Menunggu persetujuan Manager"}
+                          </p>
+                        </div>
                       ) : null}
                     </div>
                     {canApproveRequest ? (

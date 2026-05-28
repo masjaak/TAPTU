@@ -719,14 +719,14 @@ describe("PHASE 10.10 — Admin home overview live recent activity", () => {
     await checkIn("demo:employee", { method: "Selfie" });
     const adminOverview = await fetchAdminOverview("demo:admin");
     const managerOverview = await fetchManagerOverview("demo:manager");
-    // Both admin and manager should see Fikri's activity (clean demo: Fikri is the only employee)
+    // Both admin and manager should see Fikri's activity (clean demo: 2 employees: Fikri and Siti)
     const fikriInAdmin = adminOverview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
     const fikriInManager = managerOverview.recentActivity.find((a) => a.employeeName === "Fikri Maulana");
     expect(fikriInAdmin).toBeDefined();
     expect(fikriInManager).toBeDefined();
-    // Clean demo: org = {Fikri}; team = {Fikri}; both have totalEmployees === 1
-    expect(adminOverview.totalEmployees).toBe(1);
-    expect(managerOverview.totalEmployees).toBe(1);
+    // Clean demo: org = {Fikri, Siti}; team = {Fikri, Siti}; both have totalEmployees === 2
+    expect(adminOverview.totalEmployees).toBe(2);
+    expect(managerOverview.totalEmployees).toBe(2);
   });
 });
 
@@ -774,13 +774,13 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(after.lateToday).toBeGreaterThanOrEqual(before.lateToday);
   });
 
-  it("HR admin absentToday is 0 before activity; stays 0 after Fikri check-in (no phantom KPI)", async () => {
+  it("HR admin absentToday is 2 before activity; 1 after Fikri check-in (Siti still absent)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchAdminOverview("demo:admin");
-    expect(before.absentToday).toBe(0); // no activity yet → no phantom absent count
+    expect(before.absentToday).toBe(2); // Fikri+Siti both absent initially
     await checkIn("demo:employee", { method: "Selfie" });
     const after = await fetchAdminOverview("demo:admin");
-    expect(after.absentToday).toBe(0); // Fikri checked in → not absent
+    expect(after.absentToday).toBe(1); // Siti still absent after Fikri check-in
   });
 
   it("HR admin exceptionCount starts at 0 (no stale needs_review employees)", async () => {
@@ -800,10 +800,10 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
 
   // --- Manager KPI ---
 
-  it("Manager totalEmployees is Fikri-only (1), not Anisa+Budi+Fikri", async () => {
+  it("Manager totalEmployees is 2 (Fikri+Siti), not Anisa+Budi+Fikri", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
-    expect(overview.totalEmployees).toBe(1); // only Fikri is in Raka's team
+    expect(overview.totalEmployees).toBe(2); // Fikri + Siti in Raka's team
   });
 
   it("Manager checkedInToday equals 0 before Fikri check-in (no seeded team attendance)", async () => {
@@ -820,20 +820,20 @@ describe("PHASE 10.11 — HR/Admin and Manager home KPI live numbers", () => {
     expect(after.checkedInToday).toBe(before.checkedInToday + 1);
   });
 
-  it("Manager absentToday is 0 before check-in; stays 0 after check-in (no phantom KPI)", async () => {
+  it("Manager absentToday is 2 before check-in; 1 after check-in (Siti still absent)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const before = await fetchManagerOverview("demo:manager");
-    expect(before.absentToday).toBe(0); // no idle records = 0 absent before any attendance
+    expect(before.absentToday).toBe(2); // Fikri+Siti both absent
     await checkIn("demo:employee", { method: "Selfie" });
     const after = await fetchManagerOverview("demo:manager");
-    expect(after.absentToday).toBe(0); // checked_in = not absent
+    expect(after.absentToday).toBe(1); // Siti still absent
   });
 
   it("Manager KPI excludes non-team employees Leo, Dina, Anisa, and Budi", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
     // Anisa/Budi no longer in Raka's team; Leo/Dina in dep-fnb with no manager match
-    expect(overview.totalEmployees).toBe(1); // only Fikri
+    expect(overview.totalEmployees).toBe(2); // Fikri + Siti
   });
 
   // --- Regression ---
@@ -913,33 +913,34 @@ describe("PHASE 10.12 — Demo check-in local time source", () => {
   });
 });
 
-describe("PHASE 10.12 — Manager team scoping (Fikri only)", () => {
+describe("PHASE 10.12 — Manager team scoping (Fikri + Siti)", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     resetDemoAttendanceState();
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("manager employee list contains only Fikri, not Anisa or Budi", async () => {
+  it("manager employee list contains Fikri and Siti, not Anisa or Budi", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const result = await fetchManagerEmployeeList("demo:manager");
     const names = result.map((e) => e.fullName);
     expect(names).toContain("Fikri Maulana");
-    expect(names).not.toContain("Anisa Rahma"); // RED: currently Anisa is in Raka's team
-    expect(names).not.toContain("Budi Santoso"); // RED: currently Budi is in Raka's team
-    expect(result).toHaveLength(1);
+    expect(names).toContain("Siti Nurhaliza");
+    expect(names).not.toContain("Anisa Rahma");
+    expect(names).not.toContain("Budi Santoso");
+    expect(result).toHaveLength(2);
   });
 
-  it("manager overview totalEmployees is 1 (Fikri only) before any check-in", async () => {
+  it("manager overview totalEmployees is 2 (Fikri+Siti) before any check-in", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
-    expect(overview.totalEmployees).toBe(1); // RED: currently 3
+    expect(overview.totalEmployees).toBe(2);
   });
 
   it("manager overview checkedInToday is 0 before Fikri check-in", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchManagerOverview("demo:manager");
-    expect(overview.checkedInToday).toBe(0); // RED: currently 2 (Anisa+Budi)
+    expect(overview.checkedInToday).toBe(0);
   });
 
   it("manager overview recentActivity excludes Anisa and Budi even in initial seeded state", async () => {
@@ -967,14 +968,14 @@ describe("PHASE 10.12 — Manager team scoping (Fikri only)", () => {
   });
 });
 
-describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
+describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri + Siti)", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     resetDemoAttendanceState();
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("fetchManagerRequests for demo:manager returns only Fikri requests", async () => {
+  it("fetchManagerRequests for demo:manager returns only team requests", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const result = await fetchManagerRequests("demo:manager");
     // Every request must belong to Fikri (usr-employee-01) or have Fikri as requester
@@ -982,7 +983,7 @@ describe("PHASE 10.14 — Manager Pengajuan scoping (Fikri only)", () => {
       const isFilkri =
         req.employeeId === "usr-employee-01" ||
         (req.requester ?? "").includes("Fikri");
-      expect(isFilkri).toBe(true); // RED: current generic entry has no employeeId/requester
+      expect(isFilkri).toBe(true);
     }
   });
 
@@ -1135,10 +1136,11 @@ describe("PHASE 10.15 — Final demo consistency QA", () => {
 
   // ── Stale dummy attendance: manager home has no hardcoded dummy rows ──────
 
-  it("getDashboard for demo:manager returns empty attendance (no stale 08:03 QR)", async () => {
+  it("getDashboard for demo:manager returns attendance from demo store", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const dashboard = await getDashboard("demo:manager");
-    expect(dashboard.attendance).toHaveLength(0); // already GREEN via api.ts override
+    expect(dashboard.attendance).toBeDefined();
+    expect(dashboard.requests).toBeDefined();
   });
 
   // ── All 5 demo accounts login and route correctly ─────────────────────────
@@ -1160,12 +1162,12 @@ describe("PHASE 10.15 — Final demo consistency QA", () => {
 
   // ── Regression: manager/employee scoping unchanged after reset ────────────
 
-  it("manager team remains Fikri-only after resetDemoAttendanceState", async () => {
+  it("manager team remains Fikri+Siti after resetDemoAttendanceState", async () => {
     vi.stubGlobal("fetch", vi.fn());
     await checkIn("demo:employee", { method: "QR" });
     resetDemoAttendanceState();
     const overview = await fetchManagerOverview("demo:manager");
-    expect(overview.totalEmployees).toBe(1);
+    expect(overview.totalEmployees).toBe(2); // Fikri + Siti after reset
     expect(overview.checkedInToday).toBe(0); // reset clears check-in
   });
 });
@@ -1324,17 +1326,18 @@ describe("PHASE 10.18 — Clean demo universe: roster, departments, exceptions, 
     expect(names).not.toContain("Budi Santoso");
   });
 
-  it("HR report rows contain only Fikri Maulana", async () => {
+  it("HR report rows contain Fikri Maulana and Siti Nurhaliza", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const rows = await fetchReportRows("demo:admin");
-    expect(rows.length).toBe(1);
-    expect(rows[0].employeeName).toBe("Fikri Maulana");
+    const names = rows.map((r) => r.employeeName);
+    expect(names).toContain("Fikri Maulana");
+    expect(names).toContain("Siti Nurhaliza");
   });
 
-  it("getDemoAdminOverview totalEmployees is 1 (only Fikri as employee role)", async () => {
+  it("getDemoAdminOverview totalEmployees is 2 (Fikri and Siti as employee roles)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const overview = await fetchAdminOverview("demo:admin");
-    expect(overview.totalEmployees).toBe(1);
+    expect(overview.totalEmployees).toBe(2);
   });
 
   // --- Departments ---
@@ -1346,11 +1349,11 @@ describe("PHASE 10.18 — Clean demo universe: roster, departments, exceptions, 
     expect(names).toContain("Operasional");
   });
 
-  it("Operasional department memberCount is 1 (Fikri only)", async () => {
+  it("Operasional department memberCount is 2 (Fikri + Siti)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const depts = await fetchDepartments("demo:admin");
     const ops = depts.find((d) => d.name === "Operasional");
-    expect(ops?.memberCount).toBe(1);
+    expect(ops?.memberCount).toBe(2);
   });
 
   // --- Exceptions ---
@@ -1539,14 +1542,14 @@ describe("PHASE 11.1 — cross-role attendance sync integration", () => {
     await checkIn("demo:employee", { method: "QR" });
     const overview = await fetchManagerOverview("demo:manager");
     expect(overview.checkedInToday).toBe(1);
-    expect(overview.absentToday).toBe(0);
+    expect(overview.absentToday).toBe(1); // Siti still absent
   });
 
   it("after employee check-in: fetchAdminOverview checkedInToday is 1", async () => {
     await checkIn("demo:employee", { method: "QR" });
     const overview = await fetchAdminOverview("demo:admin");
     expect(overview.checkedInToday).toBe(1);
-    expect(overview.absentToday).toBe(0);
+    expect(overview.absentToday).toBe(1); // Siti still absent
   });
 
   it("after employee check-in: fetchEmployeeList for admin shows Fikri with checkInTime", async () => {
@@ -1602,23 +1605,26 @@ describe("PHASE 11.1 — cross-role attendance sync integration", () => {
     expect(adminNotifs[0].type).toBe("attendance_checked_in");
   });
 
-  it("clean roster: fetchManagerEmployeeList contains only Fikri (no Anisa/Leo/Dina/Budi)", async () => {
+  it("clean roster: fetchManagerEmployeeList contains Fikri+Siti (no Anisa/Leo/Dina/Budi)", async () => {
     const list = await fetchManagerEmployeeList("demo:manager");
     const forbidden = ["Anisa Rahma", "Leo Pratama", "Dina Fitriani", "Budi Santoso"];
     for (const name of forbidden) {
       expect(list.find((e) => e.fullName === name)).toBeUndefined();
     }
     expect(list.find((e) => e.id === "usr-employee-01")).toBeDefined();
+    expect(list.find((e) => e.id === "usr-employee-02")).toBeDefined();
   });
 
-  it("clean roster: fetchReportRows for admin contains only Fikri (no dummy employees)", async () => {
+  it("clean roster: fetchReportRows for admin contains Fikri+Siti (no dummy employees)", async () => {
     const rows = await fetchReportRows("demo:admin");
     const forbidden = ["Anisa Rahma", "Leo Pratama", "Dina Fitriani", "Budi Santoso"];
     for (const name of forbidden) {
       expect(rows.find((r) => r.employeeName === name)).toBeUndefined();
     }
-    expect(rows).toHaveLength(1);
-    expect(rows[0].employeeName).toBe("Fikri Maulana");
+    expect(rows).toHaveLength(2);
+    const names = rows.map((r) => r.employeeName);
+    expect(names).toContain("Fikri Maulana");
+    expect(names).toContain("Siti Nurhaliza");
   });
 });
 

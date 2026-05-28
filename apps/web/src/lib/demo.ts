@@ -362,14 +362,13 @@ export function getDemoAdminOverview(): AdminOverview {
     (r) => r.workflowStatus === "pending_manager" || r.workflowStatus === "pending_hr"
   ).length;
 
-  const hasActivity = checkedIn.length > 0 || late.length > 0;
   return {
     totalEmployees: employees.length,
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
     pendingRequests,
-    absentToday: hasActivity ? absent.length : 0,
+    absentToday: absent.length,
     exceptionCount: exceptions.length,
     recentActivity: buildRecentActivity(employees, "act-admin")
   };
@@ -385,14 +384,13 @@ export function getDemoManagerOverview(): AdminOverview {
   const late = team.filter((e) => e.todayStatus === "late");
   const absent = team.filter((e) => e.todayStatus === "absent");
 
-  const hasActivity = checkedIn.length > 0 || late.length > 0;
   return {
     totalEmployees: team.length,
     checkedInToday: checkedIn.length,
     onTimeToday: onTime.length,
     lateToday: late.length,
     pendingRequests: demoFikriRequests.filter((r) => r.workflowStatus === "pending_manager").length,
-    absentToday: hasActivity ? absent.length : 0,
+    absentToday: absent.length,
     exceptionCount: 0,
     recentActivity: buildRecentActivity(team, "act-mgr")
   };
@@ -459,11 +457,12 @@ export function getDemoAuditLogs() {
 // Clean demo universe: only the connected demo actors appear in the roster.
 // Anisa, Leo, Dina, Budi removed — they were confusing dummy data never tied to real demo accounts.
 const INITIAL_DEMO_DEPARTMENTS: DepartmentItem[] = [
-  { id: "dep-ops", name: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", isActive: true, memberCount: 1 }
+  { id: "dep-ops", name: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", isActive: true, memberCount: 2 }
 ];
 
 const INITIAL_DEMO_EMPLOYEES: EmployeeListItem[] = [
   { id: "usr-employee-01", fullName: "Fikri Maulana", email: "employee@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
+  { id: "usr-employee-02", fullName: "Siti Nurhaliza", email: "siti@taptu.app", role: "employee", departmentId: "dep-ops", departmentName: "Operasional", managerId: "usr-manager-01", managerName: "Raka Saputra", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" },
   { id: "usr-manager-01", fullName: "Raka Saputra", email: "manager@taptu.app", role: "manager", departmentId: "dep-ops", departmentName: "Operasional", todayStatus: "absent", shiftName: "Shift Pagi", locationName: "Kantor Pusat" }
 ];
 
@@ -499,6 +498,7 @@ let demoShifts: ShiftRecord[] = INITIAL_DEMO_SHIFTS.map((shift) => ({ ...shift }
 // Cross-device sync requires TAPTU_STORAGE_MODE=supabase on the API server — see Deployment.
 
 const DEMO_LS_KEY = "taptu:demo_live_state";
+const STATE_CHANGE_EVENT = "taptu:state-change";
 
 interface DemoLiveState {
   employees: EmployeeListItem[];
@@ -532,6 +532,9 @@ function saveDemoLiveState(): void {
       fikriRequests: demoFikriRequests
     };
     localStorage.setItem(DEMO_LS_KEY, JSON.stringify(state));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STATE_CHANGE_EVENT));
+    }
   } catch {
     // storage quota exceeded or private mode — ignore
   }
@@ -543,7 +546,10 @@ loadDemoLiveState();
 // Keep module vars in sync when another browser tab writes to localStorage
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event: StorageEvent) => {
-    if (event.key === DEMO_LS_KEY) loadDemoLiveState();
+    if (event.key === DEMO_LS_KEY) {
+      loadDemoLiveState();
+      window.dispatchEvent(new CustomEvent(STATE_CHANGE_EVENT));
+    }
   });
 }
 
@@ -716,7 +722,7 @@ export function getDemoReportRows(): AttendanceReportRow[] {
  * getDemoManagerOverview(), HR report rows, and employee Riwayat all reflect
  * the live check-in without requiring a real backend.
  */
-export function recordDemoCheckIn(employeeId: string, method: string): void {
+export function recordDemoCheckIn(employeeId: string, method: string, hasSelfie?: boolean): void {
   const now = new Date();
   const time = now.toTimeString().slice(0, 5);
   const today = now.toISOString().slice(0, 10);
@@ -725,6 +731,7 @@ export function recordDemoCheckIn(employeeId: string, method: string): void {
   const isLate = h * 60 + m > 8 * 60 + 10;
   const status: "Tepat waktu" | "Terlambat" = isLate ? "Terlambat" : "Tepat waktu";
   const safeMethod = (["QR", "GPS", "Selfie", "Manual"].includes(method) ? method : "Manual") as AttendanceTimelineItem["method"];
+  const validationStatus = hasSelfie ? "needs_review" : "verified";
 
   demoEmployees = demoEmployees.map((e) => {
     if (e.id !== employeeId) return e;
@@ -734,7 +741,7 @@ export function recordDemoCheckIn(employeeId: string, method: string): void {
       checkInTime: time,
       checkInMethod: method,
       checkOutTime: undefined,
-      validationStatus: "verified"
+      validationStatus
     } as typeof e;
   });
 

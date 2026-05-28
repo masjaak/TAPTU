@@ -130,11 +130,7 @@ export async function register(payload: RegisterRequest): Promise<LoginResponse>
 
 export async function getDashboard(token: string): Promise<DashboardPayload> {
   if (isDemoToken(token)) {
-    const dashboard = getDemoDashboard(token);
-    if (token === "demo:manager") {
-      return Promise.resolve({ ...dashboard, attendance: [], requests: [] });
-    }
-    return Promise.resolve(dashboard);
+    return Promise.resolve(getDemoDashboard(token));
   }
   return requestJson<DashboardPayload>("/dashboard", {}, token);
 }
@@ -159,7 +155,7 @@ export async function checkIn(
     // Determine the employee id from the demo token (employee role → usr-employee-01)
     const demoEmployeeId = "usr-employee-01";
     // Write check-in into the shared demo store so manager/HR overview reflects it
-    recordDemoCheckIn(demoEmployeeId, payload.method);
+    recordDemoCheckIn(demoEmployeeId, payload.method, hasSelfieProof);
     const selfieNote = hasSelfieProof ? "Selfie tersimpan sebagai bukti hadir." : undefined;
     const response: AttendanceActionResponse = {
       attendanceState: "checked_in",

@@ -3663,7 +3663,8 @@ describe("HR Divisi & Penempatan", () => {
       fireEvent.click(within(requestCard!).getByRole("button", { name: /setujui/i }));
 
       await waitFor(() => expect(apiMocks.approveRequest).toHaveBeenCalledWith("demo:admin", "req-final", "Disetujui", undefined));
-      expect(await screen.findByText(/pengajuan disetujui/i)).toBeTruthy();
+      const matches = await screen.findAllByText(/pengajuan disetujui/i);
+      expect(matches.length).toBeGreaterThanOrEqual(1);
     });
   });
 
